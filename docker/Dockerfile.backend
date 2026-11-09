@@ -1,0 +1,48 @@
+# Production Multi-Stage Dockerfile for ASRTAVA Backend
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+# Copy package manifests
+COPY backend/package*.json ./
+
+# Install all dependencies including devDependencies for build
+RUN npm ci
+
+# Copy backend source code and config
+COPY backend/tsconfig.json ./
+COPY backend/src ./src
+
+# Compile TypeScript to production JavaScript
+RUN npm run build
+
+# Prune devDependencies to keep container lean and secure
+RUN npm prune --production
+
+# Stage 2: Final Minimal Production Runtime
+FROM node:24-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# Security: Run as non-root node user
+RUN addgroup -S asrtava && adduser -S asrtava -G asrtava
+
+# Copy compiled artifacts and production dependencies
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+
+# Create storage directory for audit Merkle logs and local documents
+RUN mkdir -p /app/storage && chown -R asrtava:asrtava /app
+
+USER asrtava
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/health || exit 1
+
+CMD ["node", "dist/server.js"]
+

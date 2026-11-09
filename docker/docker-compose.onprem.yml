@@ -1,0 +1,62 @@
+version: '3.8'
+
+# ASRTAVA On-Premises Air-Gapped Hospital Installation Compose
+# Operates 100% offline without external internet or SaaS license phone-home locks
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asrtava_onprem_db
+    restart: always
+    environment:
+      POSTGRES_DB: asrtava_hospital
+      POSTGRES_USER: hospital_admin
+      POSTGRES_PASSWORD: ${ONPREM_DB_PASSWORD:-LocalHospital2026!}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - onprem_postgres_data:/var/lib/postgresql/data
+      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hospital_admin -d asrtava_hospital"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: asrtava_onprem_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgres://hospital_admin:${ONPREM_DB_PASSWORD:-LocalHospital2026!}@postgres:5432/asrtava_hospital
+      JWT_SECRET: ${JWT_SECRET:-LocalHospitalJWTSecretKey2026!}
+      DEPLOYMENT_MODE: ON_PREMISES_AIR_GAPPED
+      PERPETUAL_LICENSE_FILE: /app/storage/asrtava_license.key
+      OFFLINE_STRICT_MODE: "true"
+    volumes:
+      - onprem_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5000:5000"
+
+  web-portal:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web-portal
+    container_name: asrtava_onprem_portal
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  onprem_postgres_data:
+  onprem_storage:
+

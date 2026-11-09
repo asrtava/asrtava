@@ -1,0 +1,84 @@
+name: ASRTAVA Controlled Production Release
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Semantic Version Tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  deploy-production:
+    name: Production Release & Zero-Downtime Rolling Update
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.asrtava.com
+    steps:
+      - name: Checkout Release Tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.release_version || github.ref }}
+
+      - name: Configure AWS Production Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_PROD_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_PROD_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pre-Deployment Automated Database Snapshot (PITR Safeguard)
+        run: |
+          snapshot_id="asrtava-prod-predeploy-$(date +%Y%m%d%H%M%S)"
+          echo "Initiating RDS snapshot: $snapshot_id"
+          aws rds create-db-snapshot --db-instance-identifier asrtava-prod-pg --db-snapshot-identifier $snapshot_id
+
+      - name: Build, Tag & Push Production Container Images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          VERSION: ${{ github.event.inputs.release_version || github.ref_name }}
+        run: |
+          # Build with production optimizations
+          docker build -t $ECR_REGISTRY/asrtava-backend:$VERSION -t $ECR_REGISTRY/asrtava-backend:latest ./backend
+          docker build -t $ECR_REGISTRY/asrtava-web-portal:$VERSION -t $ECR_REGISTRY/asrtava-web-portal:latest ./apps/web-portal
+          
+          docker push $ECR_REGISTRY/asrtava-backend:$VERSION
+          docker push $ECR_REGISTRY/asrtava-backend:latest
+          docker push $ECR_REGISTRY/asrtava-web-portal:$VERSION
+          docker push $ECR_REGISTRY/asrtava-web-portal:latest
+
+      - name: Zero-Downtime Rolling Deployment (ECS Fargate)
+        run: |
+          echo "Triggering zero-downtime rolling update on ECS Fargate..."
+          aws ecs update-service --cluster asrtava-prod-cluster --service asrtava-prod-backend --force-new-deployment
+          aws ecs update-service --cluster asrtava-prod-cluster --service asrtava-prod-web --force-new-deployment
+
+      - name: Verify Production Health & Readiness Endpoints
+        run: |
+          for i in {1..15}; do
+            health_code=$(curl -s -o /dev/null -w "%{http_code}" https://api.asrtava.com/health || true)
+            ready_code=$(curl -s -o /dev/null -w "%{http_code}" https://api.asrtava.com/ready || true)
+            if [ "$health_code" = "200" ] && [ "$ready_code" = "200" ]; then
+              echo "Production API is healthy and ready (HTTP 200)!"
+              exit 0
+            fi
+            echo "Waiting for canary instances to report ready (attempt $i/15)..."
+            sleep 10
+          done
+          echo "CRITICAL: Production health verification failed! Triggering automatic rollback."
+          exit 1
+
+      - name: Automatic Rollback on Failure
+        if: failure()
+        run: |
+          echo "Deployment failed. Rolling back to previous stable task definition..."
+          aws ecs update-service --cluster asrtava-prod-cluster --service asrtava-prod-backend --task-definition asrtava-prod-backend:PREVIOUS
+          aws ecs update-service --cluster asrtava-prod-cluster --service asrtava-prod-web --task-definition asrtava-prod-web:PREVIOUS
+

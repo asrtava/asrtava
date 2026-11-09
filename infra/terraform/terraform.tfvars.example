@@ -1,0 +1,10 @@
+# Example Terraform variables for ASRTAVA deployment
+aws_region               = "ap-south-1" # Mumbai, India (DPDP Act 2023 compliance)
+environment              = "production"
+vpc_cidr                 = "10.0.0.0/16"
+db_instance_class        = "db.r6g.xlarge"
+db_allocated_storage     = 250
+db_max_allocated_storage = 1000
+redis_node_type          = "cache.m6g.large"
+domain_name              = "asrtava.com"
+

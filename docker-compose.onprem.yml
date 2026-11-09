@@ -1,0 +1,122 @@
+# ==============================================================================
+# ASRTAVA HMS - On-Premises Air-Gapped Docker Compose Deployment
+# Self-contained stack for hospital-local data centers and bare-metal servers
+# Zero external internet dependencies required for full clinical operations
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Local Hospital PostgreSQL 16 Database
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: asrtava-onprem-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-asrtava_hospital_local}
+      POSTGRES_USER: ${DB_USER:-asrtava_local_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-asrtava_onprem_secure_pass_2026}
+    ports:
+      - "127.0.0.1:5432:5432" # Bound strictly to localhost/internal network
+    volumes:
+      - onprem_db_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-asrtava_local_admin} -d ${DB_NAME:-asrtava_hospital_local}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asrtava-onprem-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Local Redis 7 Cache & Job Outbox
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: asrtava-onprem-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-asrtava_local_redis_2026}"]
+    volumes:
+      - onprem_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-asrtava_local_redis_2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asrtava-onprem-net
+
+  # ----------------------------------------------------------------------------
+  # 3. Local Backend API (Configured for On-Premises Air-Gapped Mode)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asrtava-onprem-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DEPLOYMENT_MODEL: on_premises
+      STORAGE_DRIVER: local
+      NOTIFICATION_DRIVER: local_queue
+      DATABASE_TOPOLOGY: local_instance
+      LOCAL_STORAGE_PATH: /var/asrtava/storage
+      OFFLINE_LICENSE_FILE_PATH: /etc/asrtava/license.asrtalic
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-asrtava_hospital_local}
+      DB_USER: ${DB_USER:-asrtava_local_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-asrtava_onprem_secure_pass_2026}
+      JWT_SECRET: ${JWT_SECRET:-asrtava-onprem-airgapped-jwt-secret-min-32-chars-2026}
+      CORS_ORIGIN: "*"
+    volumes:
+      - onprem_storage_data:/var/asrtava/storage
+      - ./license.asrtalic:/etc/asrtava/license.asrtalic:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:5000/health | grep -q 'healthy' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - asrtava-onprem-net
+
+  # ----------------------------------------------------------------------------
+  # 4. Local Hospital Staff Web Portal (Nginx Reverse Proxy)
+  # ----------------------------------------------------------------------------
+  web-portal:
+    build:
+      context: ./apps/web-portal
+      dockerfile: Dockerfile
+    container_name: asrtava-onprem-portal
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - asrtava-onprem-net
+
+volumes:
+  onprem_db_data:
+    driver: local
+  onprem_redis_data:
+    driver: local
+  onprem_storage_data:
+    driver: local
+
+networks:
+  asrtava-onprem-net:
+    driver: bridge
+

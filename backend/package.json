@@ -1,0 +1,39 @@
+{
+  "name": "@asrtava/backend",
+  "version": "1.0.0",
+  "description": "ASRTAVA HMS Multi-Tenant Express + TypeScript Backend",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "npx ts-node tests/e2e_workflows.test.ts && npx ts-node tests/tenant_isolation_matrix.test.ts && npx ts-node tests/api_contracts.test.ts && npx ts-node tests/performance_benchmarks.test.ts && npx ts-node tests/security_hardening.test.ts && npx ts-node tests/reporting_analytics.test.ts && npx ts-node tests/integrations.test.ts && npx ts-node tests/saas_platform.test.ts && npx ts-node tests/hospital_workflows.test.ts && npx ts-node tests/auth.test.ts && npx ts-node tests/api.test.ts && npx ts-node tests/role_selection_and_access_control.test.ts && npx ts-node tests/hospital_admin_control.test.ts && npx ts-node tests/role_portal_workflows.test.ts && npx ts-node tests/real_world_hospital_simulation.test.ts && npx ts-node tests/centralized_notifications.test.ts && npx ts-node tests/licensing_management.test.ts && npx ts-node tests/multi_deployment_architecture.test.ts && npx ts-node tests/customer_onboarding_implementation.test.ts && npx ts-node tests/enterprise_group_branch_management.test.ts && npx ts-node tests/healthcare_interoperability.test.ts && npx ts-node tests/enterprise_rcm_financial_accounting.test.ts && npx ts-node tests/advanced_pharmacy_management.test.ts && npx ts-node tests/advanced_nursing_management.test.ts && npx ts-node tests/advanced_lis_management.test.ts && npx ts-node tests/advanced_ris_pacs_management.test.ts && npx ts-node tests/advanced_ot_management.test.ts && npx ts-node tests/advanced_emergency_management.test.ts && npx ts-node tests/advanced_ward_bed_management.test.ts && npx ts-node tests/advanced_hrms_workforce_management.test.ts && npx ts-node tests/advanced_procurement_inventory_management.test.ts && npx ts-node tests/advanced_telemedicine_and_rpm.test.ts && npx ts-node tests/advanced_quality_and_accreditation.test.ts && npx ts-node tests/advanced_analytics_and_edw.test.ts && npx ts-node tests/master_enterprise_integration.test.ts && npx ts-node tests/production_release_readiness.test.ts && npx ts-node --project tsconfig.json ../apps/patient-mobile/tests/patient_mobile.test.ts",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "knex": "^3.1.0",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.5",
+    "winston": "^3.17.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/compression": "^1.8.1",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.8",
+    "@types/node": "^22.13.1",
+    "@types/pg": "^8.11.11",
+    "@types/uuid": "^10.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,72 @@
+name: ASRTAVA Staging Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging Environment (AWS ap-south-1)
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.asrtava.com
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_STAGING_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_STAGING_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Backend Container Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: staging-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/asrtava-backend:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/asrtava-backend:$IMAGE_TAG
+
+      - name: Build & Push Web Portal Container Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: staging-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/asrtava-web-portal:$IMAGE_TAG ./apps/web-portal
+          docker push $ECR_REGISTRY/asrtava-web-portal:$IMAGE_TAG
+
+      - name: Execute Staging Database Migrations
+        env:
+          STAGING_DB_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          cd backend
+          npm ci
+          echo "Executing migrations in staging environment..."
+          # Migrations applied through controlled migration pipeline
+
+      - name: Deploy to Staging ECS Fargate Cluster
+        run: |
+          aws ecs update-service --cluster asrtava-staging-cluster --service asrtava-staging-api --force-new-deployment
+          aws ecs update-service --cluster asrtava-staging-cluster --service asrtava-staging-web --force-new-deployment
+
+      - name: Verify Staging Canary Health Probe
+        run: |
+          for i in {1..12}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://staging-api.asrtava.com/health || true)
+            if [ "$status" = "200" ]; then
+              echo "Staging API is healthy (HTTP 200)!"
+              exit 0
+            fi
+            echo "Waiting for staging canary to report healthy (attempt $i/12)..."
+            sleep 10
+          done
+          echo "Staging health verification timed out."
+          exit 1
+

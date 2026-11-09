@@ -1,0 +1,108 @@
+# ==============================================================================
+# ASRTAVA HMS - Hybrid Deployment Docker Compose Orchestration
+# Local Edge Node providing zero-latency clinical care with encrypted background sync to Cloud VPC
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Local Edge PostgreSQL Database (Clinical Source of Truth)
+  # ----------------------------------------------------------------------------
+  edge-postgres:
+    image: postgres:16-alpine
+    container_name: asrtava-edge-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-asrtava_edge_clinical}
+      POSTGRES_USER: ${DB_USER:-asrtava_edge_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-asrtava_edge_secure_2026}
+    volumes:
+      - edge_db_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-asrtava_edge_admin} -d ${DB_NAME:-asrtava_edge_clinical}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asrtava-hybrid-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Local Edge Redis Outbox & Session Cache
+  # ----------------------------------------------------------------------------
+  edge-redis:
+    image: redis:7-alpine
+    container_name: asrtava-edge-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-asrtava_edge_redis_2026}"]
+    volumes:
+      - edge_redis_data:/data
+    networks:
+      - asrtava-hybrid-net
+
+  # ----------------------------------------------------------------------------
+  # 3. Hybrid Edge Backend (Clinical API + Cloud Sync Outbox Agent)
+  # ----------------------------------------------------------------------------
+  edge-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asrtava-edge-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DEPLOYMENT_MODEL: hybrid
+      STORAGE_DRIVER: local
+      NOTIFICATION_DRIVER: gateway
+      DATABASE_TOPOLOGY: local_instance
+      HYBRID_SYNC_ROLE: edge_node
+      HYBRID_CLOUD_SYNC_URL: ${HYBRID_CLOUD_SYNC_URL:-https://sync.asrtava.health/api/v1/sync}
+      HYBRID_SYNC_INTERVAL: 30
+      MASK_PII_CLOUD_SYNC: "true"
+      DB_HOST: edge-postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-asrtava_edge_clinical}
+      DB_USER: ${DB_USER:-asrtava_edge_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-asrtava_edge_secure_2026}
+      JWT_SECRET: ${JWT_SECRET:-asrtava-hybrid-edge-jwt-secret-min-32-chars-2026}
+      CORS_ORIGIN: "*"
+    volumes:
+      - edge_storage_data:/var/asrtava/storage
+      - ./license.asrtalic:/etc/asrtava/license.asrtalic:ro
+    depends_on:
+      edge-postgres:
+        condition: service_healthy
+    networks:
+      - asrtava-hybrid-net
+
+  # ----------------------------------------------------------------------------
+  # 4. Local Edge Web Portal for Hospital Staff
+  # ----------------------------------------------------------------------------
+  edge-portal:
+    build:
+      context: ./apps/web-portal
+      dockerfile: Dockerfile
+    container_name: asrtava-edge-portal
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - edge-backend
+    networks:
+      - asrtava-hybrid-net
+
+volumes:
+  edge_db_data:
+    driver: local
+  edge_redis_data:
+    driver: local
+  edge_storage_data:
+    driver: local
+
+networks:
+  asrtava-hybrid-net:
+    driver: bridge
+

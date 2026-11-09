@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asrtava_prod_db
+    restart: always
+    environment:
+      POSTGRES_DB: asrtava_prod
+      POSTGRES_USER: asrtava_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-AsrtavaSecure2026!}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asrtava_admin -d asrtava_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: asrtava_prod_redis
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-RedisSecure2026!}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-RedisSecure2026!}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: asrtava_prod_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgres://asrtava_admin:${DB_PASSWORD:-AsrtavaSecure2026!}@postgres:5432/asrtava_prod
+      REDIS_URL: redis://:${REDIS_PASSWORD:-RedisSecure2026!}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-AsrtavaProdSuperSecretKey2026!}
+      JWT_EXPIRES_IN: 15m
+      REFRESH_TOKEN_SECRET: ${REFRESH_SECRET:-AsrtavaProdRefreshSecret2026!}
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      DEPLOYMENT_MODE: CLOUD
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+
+  web-portal:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web-portal
+    container_name: asrtava_prod_portal
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+

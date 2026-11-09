@@ -1,0 +1,57 @@
+version: '3.8'
+
+# ASRTAVA Hybrid Edge-Cloud Deployment Compose
+# Local resilience for hospital operations + asynchronous background telemetry synchronization
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asrtava_hybrid_db
+    restart: always
+    environment:
+      POSTGRES_DB: asrtava_branch
+      POSTGRES_USER: branch_admin
+      POSTGRES_PASSWORD: ${BRANCH_DB_PASSWORD:-BranchSecure2026!}
+    volumes:
+      - hybrid_postgres_data:/var/lib/postgresql/data
+      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U branch_admin -d asrtava_branch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: asrtava_hybrid_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgres://branch_admin:${BRANCH_DB_PASSWORD:-BranchSecure2026!}@postgres:5432/asrtava_branch
+      DEPLOYMENT_MODE: HYBRID_EDGE
+      HQ_CENTRAL_SYNC_URL: ${HQ_SYNC_URL:-https://hq.apexcare.com/api/v1/sync}
+      HQ_API_TOKEN: ${HQ_TOKEN:-hq_sync_token_secure_2026}
+      OUTBOX_SYNC_INTERVAL_SEC: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+
+  web-portal:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web-portal
+    container_name: asrtava_hybrid_portal
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  hybrid_postgres_data:
+

@@ -1,0 +1,387 @@
+import { Router, Response } from 'express';
+import { OnboardingService, ImplementationStage, DataMigrationJobRecord } from './onboarding.service';
+import { authMiddleware, requireSuperAdmin, AuthenticatedRequest } from '../../middleware/auth.middleware';
+
+const router = Router();
+
+function getParamId(param: string | string[]): string {
+  return Array.isArray(param) ? param[0] : param;
+}
+
+// ============================================================================
+// SUPER ADMIN & IMPLEMENTATION MANAGEMENT ENDPOINTS
+// ============================================================================
+
+/**
+ * Register a new hospital customer organization
+ * POST /api/v1/onboarding/customers
+ */
+router.post('/customers', authMiddleware, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const customer = await OnboardingService.registerCustomer({
+      ...req.body,
+      implementationOwnerUserId: req.user?.id
+    });
+    res.status(201).json({ success: true, message: 'Customer organization registered.', customer });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Create an implementation project for a customer hospital
+ * POST /api/v1/onboarding/projects
+ */
+router.post('/projects', authMiddleware, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { customerId, hospitalId, deploymentModel, targetGoLiveDate } = req.body;
+    if (!customerId || !hospitalId || !deploymentModel) {
+      res.status(400).json({ success: false, message: 'customerId, hospitalId, and deploymentModel are required.' });
+      return;
+    }
+
+    const project = await OnboardingService.createImplementationProject({
+      customerId,
+      hospitalId,
+      deploymentModel,
+      targetGoLiveDate,
+      actorId: req.user?.id,
+      actorName: 'Super Administrator'
+    });
+
+    res.status(201).json({ success: true, message: 'Implementation project initialized.', project });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Super Admin implementation dashboard metrics
+ * GET /api/v1/onboarding/dashboard
+ */
+router.get('/dashboard', authMiddleware, requireSuperAdmin, (_req: AuthenticatedRequest, res: Response): void => {
+  const telemetry = OnboardingService.getSuperAdminImplementationDashboard();
+  res.json({ success: true, ...telemetry });
+});
+
+/**
+ * Transition implementation lifecycle stage
+ * POST /api/v1/onboarding/projects/:id/stage
+ */
+router.post('/projects/:id/stage', authMiddleware, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { targetStage, notes } = req.body;
+    const implId = getParamId(req.params.id);
+
+    const updated = await OnboardingService.transitionStage({
+      implementationId: implId,
+      targetStage: targetStage as ImplementationStage,
+      actorId: req.user?.id,
+      notes
+    });
+
+    res.json({ success: true, message: `Transitioned to stage ${targetStage}.`, project: updated });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Record deployment assessment data
+ * POST /api/v1/onboarding/projects/:id/assessment
+ */
+router.post('/projects/:id/assessment', authMiddleware, requireSuperAdmin, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const updated = OnboardingService.recordDeploymentAssessment({
+      implementationId: implId,
+      assessmentData: req.body,
+      actorId: req.user?.id
+    });
+    res.json({ success: true, message: 'Deployment assessment recorded.', project: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Add requirement to implementation catalog
+ * POST /api/v1/onboarding/projects/:id/requirements
+ */
+router.post('/projects/:id/requirements', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const reqItem = OnboardingService.addRequirement({
+      implementationId: implId,
+      ...req.body
+    });
+    res.status(201).json({ success: true, requirement: reqItem });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Execute dry-run validation for data migration
+ * POST /api/v1/onboarding/projects/:id/migration/dry-run
+ */
+router.post('/projects/:id/migration/dry-run', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const { hospitalId, category, sourceFormat, fieldMappings, rawRecords } = req.body;
+
+    const job = OnboardingService.createMigrationJob({
+      implementationId: implId,
+      hospitalId,
+      category: category as DataMigrationJobRecord['category'],
+      sourceFormat,
+      fieldMappings
+    });
+
+    const validated = OnboardingService.executeDryRunValidation(job.id, rawRecords || []);
+    res.json({ success: true, message: 'Dry-run validation completed.', job: validated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Approve migration job
+ * POST /api/v1/onboarding/migration/:jobId/approve
+ */
+router.post('/migration/:jobId/approve', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const jobId = getParamId(req.params.jobId);
+    const approved = OnboardingService.approveMigrationJob(jobId, req.user!.id);
+    res.json({ success: true, message: 'Migration job approved.', job: approved });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Execute production migration
+ * POST /api/v1/onboarding/migration/:jobId/execute
+ */
+router.post('/migration/:jobId/execute', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const jobId = getParamId(req.params.jobId);
+    const completed = OnboardingService.executeProductionMigration(jobId, req.user!.id);
+    res.json({ success: true, message: 'Production migration executed successfully.', job: completed });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Bulk onboard staff accounts
+ * POST /api/v1/onboarding/projects/:id/staff/bulk
+ */
+router.post('/projects/:id/staff/bulk', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const { hospitalId, staffList } = req.body;
+    const result = OnboardingService.bulkOnboardStaff({
+      implementationId: implId,
+      hospitalId,
+      staffList,
+      actorId: req.user?.id
+    });
+    res.status(201).json({ success: true, message: 'Staff bulk enrolled successfully.', ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Create training program
+ * POST /api/v1/onboarding/projects/:id/training/programs
+ */
+router.post('/projects/:id/training/programs', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const prog = OnboardingService.createTrainingProgram({
+      implementationId: implId,
+      ...req.body
+    });
+    res.status(201).json({ success: true, program: prog });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Record training attendance & certification
+ * POST /api/v1/onboarding/training/:programId/attendance
+ */
+router.post('/training/:programId/attendance', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const progId = getParamId(req.params.programId);
+    const record = OnboardingService.recordTrainingAttendance({
+      programId: progId,
+      ...req.body
+    });
+    res.json({ success: true, attendance: record });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Add UAT test case
+ * POST /api/v1/onboarding/projects/:id/uat/test-cases
+ */
+router.post('/projects/:id/uat/test-cases', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const tc = OnboardingService.createUatTestCase({
+      implementationId: implId,
+      ...req.body
+    });
+    res.status(201).json({ success: true, testCase: tc });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Record UAT test result
+ * POST /api/v1/onboarding/uat/:testCaseId/result
+ */
+router.post('/uat/:testCaseId/result', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const tcId = getParamId(req.params.testCaseId);
+    const { implementationId, status, actualOutcome, defectReference } = req.body;
+    const result = OnboardingService.recordUatResult({
+      implementationId,
+      testCaseId: tcId,
+      status,
+      actualOutcome,
+      executedBy: req.user?.id,
+      defectReference
+    });
+    res.json({ success: true, testCase: result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Go-Live readiness checklist report
+ * GET /api/v1/onboarding/projects/:id/readiness
+ */
+router.get('/projects/:id/readiness', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  const implId = getParamId(req.params.id);
+  const report = OnboardingService.getGoLiveReadinessReport(implId);
+  res.json({ success: true, ...report });
+});
+
+/**
+ * Verify checklist item
+ * POST /api/v1/onboarding/projects/:id/checklist/verify
+ */
+router.post('/projects/:id/checklist/verify', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const { checkItemCode, notes } = req.body;
+    const item = OnboardingService.verifyChecklistItem(implId, checkItemCode, req.user?.id, notes);
+    res.json({ success: true, item });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Execute production go-live (Dual Sign-Off)
+ * POST /api/v1/onboarding/projects/:id/go-live
+ */
+router.post('/projects/:id/go-live', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const implId = getParamId(req.params.id);
+    const { hospitalAdminUserId, asrtavaLeadUserId, notes } = req.body;
+
+    const result = await OnboardingService.executeProductionGoLive({
+      implementationId: implId,
+      hospitalAdminUserId,
+      asrtavaLeadUserId,
+      notes
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Create hypercare ticket
+ * POST /api/v1/onboarding/projects/:id/hypercare/tickets
+ */
+router.post('/projects/:id/hypercare/tickets', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const implId = getParamId(req.params.id);
+    const { hospitalId, subject, department, severity } = req.body;
+    const ticket = OnboardingService.createHypercareTicket({
+      implementationId: implId,
+      hospitalId,
+      subject,
+      department,
+      severity,
+      reportedBy: req.user?.id
+    });
+    res.status(201).json({ success: true, ticket });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Resolve hypercare ticket
+ * POST /api/v1/onboarding/hypercare/:ticketId/resolve
+ */
+router.post('/hypercare/:ticketId/resolve', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  try {
+    const tId = getParamId(req.params.ticketId);
+    const { resolutionSummary } = req.body;
+    const resolved = OnboardingService.resolveHypercareTicket(tId, resolutionSummary);
+    res.json({ success: true, message: 'Ticket resolved.', ticket: resolved });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Handover to standard support
+ * POST /api/v1/onboarding/projects/:id/handover
+ */
+router.post('/projects/:id/handover', authMiddleware, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const implId = getParamId(req.params.id);
+    const completed = await OnboardingService.handoverToStandardSupport(implId, req.user?.id);
+    res.json({ success: true, message: 'Handover complete. Project marked implementation_completed.', project: completed });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// ============================================================================
+// HOSPITAL ADMIN ONBOARDING PROGRESS ENDPOINT
+// ============================================================================
+
+/**
+ * Hospital Admin views own onboarding & go-live progress
+ * GET /api/v1/onboarding/my-hospital/progress
+ */
+router.get('/my-hospital/progress', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  const hospitalId = (req.hospitalId || req.user?.hospitalId) as string;
+  if (!hospitalId) {
+    res.status(400).json({ success: false, message: 'Hospital tenant context required.' });
+    return;
+  }
+
+  const progress = OnboardingService.getHospitalOnboardingProgress(hospitalId);
+  res.json({ success: true, ...progress });
+});
+
+export const onboardingRouter = router;
+
