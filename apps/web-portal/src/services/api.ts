@@ -88,6 +88,11 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('asrtava_user');
         return Promise.reject(refreshErr);
       }
+    } else if (error.response?.status === 401) {
+      // Clear invalid credentials from browser
+      localStorage.removeItem('asrtava_token');
+      localStorage.removeItem('asrtava_refresh_token');
+      localStorage.removeItem('asrtava_user');
     }
 
     return Promise.reject(error);

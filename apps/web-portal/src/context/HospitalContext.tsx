@@ -429,6 +429,11 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Load All Live Hospital Data from PostgreSQL API
   const refreshAllData = useCallback(async () => {
+    const token = localStorage.getItem('asrtava_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const [
@@ -597,8 +602,10 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   useEffect(() => {
-    refreshAllData();
-  }, [refreshAllData]);
+    if (user) {
+      refreshAllData();
+    }
+  }, [user, refreshAllData]);
 
   // ==========================================
   // ACTION: Register New Patient
