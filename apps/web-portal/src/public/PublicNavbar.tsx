@@ -16,7 +16,10 @@ import {
   Menu,
   X,
   ArrowRight,
-  Lock
+  Lock,
+  Siren,
+  Scissors,
+  Network
 } from 'lucide-react';
 import { PortalType, useAuth } from '../context/AuthContext';
 
@@ -122,10 +125,37 @@ export const ROLE_OPTIONS: RoleOption[] = [
     category: 'operational'
   },
   {
+    slug: 'emergency',
+    portal: 'emergency',
+    title: 'Emergency & Trauma',
+    roleNumber: 11,
+    icon: <Siren className="w-4 h-4 text-rose-600" />,
+    description: 'ESI triage, resuscitation bays & 108 ambulance dispatch',
+    category: 'clinical'
+  },
+  {
+    slug: 'ot',
+    portal: 'ot',
+    title: 'Operation Theatre',
+    roleNumber: 12,
+    icon: <Scissors className="w-4 h-4 text-purple-600" />,
+    description: 'Surgical suites, WHO 3-phase checklist & anaesthesia',
+    category: 'clinical'
+  },
+  {
+    slug: 'group-admin',
+    portal: 'group-admin',
+    title: 'Hospital Group Admin',
+    roleNumber: 13,
+    icon: <Network className="w-4 h-4 text-indigo-700" />,
+    description: 'Multi-hospital chain operations, branch telemetry & EMPI',
+    category: 'administrative'
+  },
+  {
     slug: 'patient',
     portal: 'patient',
     title: 'Patient',
-    roleNumber: 11,
+    roleNumber: 14,
     icon: <Users className="w-4 h-4 text-sky-600" />,
     description: 'Self-service appointments, reports, e-prescriptions & bills',
     category: 'patient'

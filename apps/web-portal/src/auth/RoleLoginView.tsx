@@ -96,6 +96,18 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ roleSlug, onNaviga
         setEmail('inventory.store@apexcare.com');
         setPassword('Inventory@2026!');
         break;
+      case 'emergency':
+        setEmail('emergency.triage@apexcare.com');
+        setPassword('Emergency@2026!');
+        break;
+      case 'ot':
+        setEmail('ot.surgeon@apexcare.com');
+        setPassword('Surgery@2026!');
+        break;
+      case 'group-admin':
+        setEmail('group.director@apexcare.com');
+        setPassword('Group@2026!');
+        break;
       case 'patient':
         setPhone('9876543210');
         setPassword('Patient@2026!');
@@ -200,7 +212,7 @@ export const RoleLoginView: React.FC<RoleLoginViewProps> = ({ roleSlug, onNaviga
             lastName: 'Staff',
             hospitalId: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
             hospitalName: 'Apex Care Multi-Specialty Hospital',
-            userType: currentRole.slug === 'hospital-admin' ? 'hospital_admin' : currentRole.slug === 'patient' ? 'patient' : 'staff',
+            userType: currentRole.slug === 'hospital-admin' ? 'hospital_admin' : currentRole.slug === 'patient' ? 'patient' : currentRole.slug === 'group-admin' ? 'group_admin' : 'staff',
             assignedRoles: [currentRole.portal],
             authorizedPortals: [currentRole.portal]
           },
