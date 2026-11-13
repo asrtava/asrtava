@@ -351,6 +351,8 @@ export const analyticsAdvancedApi = {
   getExecutiveKpis: (params?: { beds?: number; days?: number }) =>
     apiClient.get('/analytics/advanced/executive-kpis', { params }),
   predictLace: (data: any) => apiClient.post('/analytics/advanced/predict/lace', data),
+  predictNoShow: (data: any) => apiClient.post('/analytics/advanced/predict/noshow', data),
+  predictBedSurge: (data: any) => apiClient.post('/analytics/advanced/predict/bed-surge', data),
 };
 
 export const telemedicineAdvancedApi = {
@@ -363,12 +365,25 @@ export const telemedicineAdvancedApi = {
 export const interopApi = {
   ingestHl7: (data: any) => apiClient.post('/interop/hl7/ingest', data),
   getCapabilityStatement: () => apiClient.get('/interop/fhir/$metadata'),
+  getDevices: () => apiClient.get('/interop/devices'),
+  mapTerminology: (data: any) => apiClient.post('/interop/terminology/map', data),
+  submitPreauthorization: (data: any) => apiClient.post('/interop/insurance/preauth', data),
+  approveDeviceResults: (packetId: string, data?: any) => apiClient.post(`/interop/devices/results/${packetId}/approve`, data),
 };
 
 export const federatedNetworkApi = {
   getParticipatingHospitals: (params?: any) => apiClient.get('/federated-network/participating-hospitals', { params }),
   publishBedAvailability: (data: any) => apiClient.post('/federated-network/bed-availability/publish', data),
   createTransfer: (data: any) => apiClient.post('/federated-network/transfers', data),
+};
+
+export const groupApi = {
+  getOrganizations: () => apiClient.get('/groups/organizations'),
+  getHierarchyTree: (orgId: string) => apiClient.get(`/groups/hierarchy-nodes/${orgId}`),
+  getDashboardTelemetry: (orgId: string, params?: any) => apiClient.get(`/groups/dashboard/${orgId}`, { params }),
+  requestLicenseExpansion: (data: any) => apiClient.post('/groups/licenses/expansion-request', data),
+  getFinancialConsolidation: (orgId: string) => apiClient.get(`/groups/financial-consolidation/${orgId}`),
+  initiateTransfer: (data: any) => apiClient.post('/groups/transfers', data),
 };
 
 // ============================================================

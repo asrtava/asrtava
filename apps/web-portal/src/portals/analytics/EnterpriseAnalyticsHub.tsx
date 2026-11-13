@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Badge, Button, Input, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { analyticsAdvancedApi } from '../../services/api';
 
 interface DepartmentMetrics {
   code: string;
@@ -79,6 +80,26 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
   const [noShowPaidOnline, setNoShowPaidOnline] = useState<boolean>(false);
   const [noShowFirstVisit, setNoShowFirstVisit] = useState<boolean>(true);
   const [noShowResult, setNoShowResult] = useState<{ prob: number; isHigh: boolean } | null>(null);
+
+  // Live Executive KPIs hydrated from Backend Star Schema Data Mart
+  const [executiveKpis, setExecutiveKpis] = useState<{
+    alos?: number;
+    borPercent?: number;
+    bedTurnoverRate?: number;
+    arDays?: number;
+    cleanClaimRate?: number;
+    totalNetRevenue?: number;
+  } | null>(null);
+
+  React.useEffect(() => {
+    analyticsAdvancedApi.getExecutiveKpis({ beds: beds.length || 100, days: 30 })
+      .then(res => {
+        if (res.data?.success && res.data.data) {
+          setExecutiveKpis(res.data.data);
+        }
+      })
+      .catch(() => {});
+  }, [beds.length]);
 
   // Dynamic Departmental Metrics derived from live hospital context
   const departments: DepartmentMetrics[] = React.useMemo(() => {
@@ -158,8 +179,31 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
     setAlerts(newAlerts);
   }, [beds, inventory]);
 
-  // Handle LACE Calculation
-  const runLaceCalculation = () => {
+  // Handle LACE Calculation with Live Backend Predictive ML Engine
+  const runLaceCalculation = async () => {
+    try {
+      const res = await analyticsAdvancedApi.predictLace({
+        lengthOfStayDays: laceLos,
+        isEmergencyAdmission: laceEmergency,
+        charlsonComorbidityScore: laceComorbidities,
+        emergencyVisitsPast6Months: laceEdVisits,
+      });
+      if (res.data?.success && res.data.data) {
+        const d = res.data.data;
+        const tier = d.riskTier || (d.score >= 10 ? 'HIGH' : d.score >= 5 ? 'MODERATE' : 'LOW');
+        const pct = d.readmissionRiskPercent || 11.2;
+        setLaceResult({ score: d.score, risk: tier, percent: pct });
+        showToast({
+          type: tier === 'HIGH' ? 'error' : 'info',
+          title: 'LACE+ Score Computed (Backend ML)',
+          message: `Score: ${d.score} | Tier: ${tier} Risk (${pct.toFixed(1)}% 30-day readmission probability)`
+        });
+        return;
+      }
+    } catch {
+      // Local fallback calculation if backend unreachable
+    }
+
     let lPts = 0;
     if (laceLos === 1) lPts = 1;
     else if (laceLos === 2) lPts = 2;
@@ -196,8 +240,33 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
     });
   };
 
-  // Handle No-Show Calculation
-  const runNoShowCalculation = () => {
+  // Handle No-Show Calculation with Live Backend Logistic Regression Classifier
+  const runNoShowCalculation = async () => {
+    try {
+      const res = await analyticsAdvancedApi.predictNoShow({
+        leadTimeDays: noShowLeadTime,
+        historicalNoShowRate: noShowHistoricalRate,
+        isPaidOnline: noShowPaidOnline,
+        isFirstVisit: noShowFirstVisit,
+      });
+      if (res.data?.success && res.data.data) {
+        const d = res.data.data;
+        const prob = d.noShowProbability ?? 0.2;
+        const isHigh = d.riskTier === 'HIGH' || prob > 0.40;
+        setNoShowResult({ prob, isHigh });
+        showToast({
+          type: isHigh ? 'warning' : 'success',
+          title: 'No-Show Probability (Backend ML)',
+          message: `${(prob * 100).toFixed(1)}% probability of patient absence. ${
+            isHigh ? 'Overbooking slot & SMS reminder recommended.' : 'Standard confirmation dispatched.'
+          }`
+        });
+        return;
+      }
+    } catch {
+      // Local fallback calculation if backend unreachable
+    }
+
     const z =
       -1.5 +
       0.05 * noShowLeadTime +
@@ -292,7 +361,9 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
             <Clock className="w-3.5 h-3.5 text-indigo-500" />
           </div>
           <div className="mt-2">
-            <span className="text-xl font-bold text-slate-900 font-mono">4.1</span>
+            <span className="text-xl font-bold text-slate-900 font-mono">
+              {executiveKpis?.alos ? executiveKpis.alos.toFixed(1) : '4.1'}
+            </span>
             <span className="text-xs text-slate-400 ml-1">Days</span>
           </div>
           <div className="mt-2 text-[10px] text-emerald-600 font-semibold flex items-center">

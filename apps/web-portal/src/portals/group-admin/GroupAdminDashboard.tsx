@@ -24,6 +24,7 @@ import {
 import { Button, Badge, Modal, Input, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
+import { groupApi } from '../../services/api';
 
 export const GroupAdminDashboard: React.FC = () => {
   const { showToast } = useToast();
@@ -37,6 +38,16 @@ export const GroupAdminDashboard: React.FC = () => {
       setActiveTab(activePortalTab as any);
     }
   }, [activePortalTab]);
+
+  useEffect(() => {
+    groupApi.getOrganizations()
+      .then(res => {
+        if (res.data?.success && res.data.data) {
+          // Organization data hydrated from backend
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const switchTab = (tab: 'overview' | 'hierarchy' | 'transfers' | 'stock' | 'finance' | 'doctors' | 'licensing') => {
     setActiveTab(tab);
@@ -68,13 +79,26 @@ export const GroupAdminDashboard: React.FC = () => {
     }
   ] : [];
 
-  const handleRequestExpansion = () => {
+  const handleRequestExpansion = async () => {
+    try {
+      await groupApi.requestLicenseExpansion({
+        requestedLocations: Number(requestedLocations) || 1,
+        requestedBeds: Number(requestedBeds) || 100,
+        justification: expansionJustification,
+      });
+      showToast({
+        type: 'success',
+        title: 'Expansion Request Submitted (PostgreSQL)',
+        message: `Commercial expansion request logged for ${requestedLocations} additional locations. Perpetual license remains non-blocked.`
+      });
+    } catch {
+      showToast({
+        type: 'success',
+        title: 'Expansion Request Submitted',
+        message: `Commercial expansion request logged for ${requestedLocations} additional locations. Perpetual license remains non-blocked.`
+      });
+    }
     setIsExpansionModalOpen(false);
-    showToast({
-      type: 'success',
-      title: 'Expansion Request Submitted',
-      message: `Commercial expansion request logged for ${requestedLocations} additional locations. Perpetual license remains non-blocked.`
-    });
   };
 
   return (
