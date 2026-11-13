@@ -45,6 +45,7 @@ import {
   Package,
   Home,
   Mail,
+  HardDrive,
 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 
@@ -84,6 +85,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     'inventory': { title: 'Central Inventory', subtitle: 'Purchase Orders & Warehouse', icon: <ClipboardList className="w-4 h-4" />, color: 'bg-orange-600', badgeColor: 'bg-orange-50 text-orange-700 border-orange-200' },
     'ot': { title: 'Operation Theatre', subtitle: 'Surgery Suites & Perioperative Care', icon: <Scissors className="w-4 h-4" />, color: 'bg-indigo-700', badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
     'emergency': { title: 'Emergency & Trauma', subtitle: 'ESI Triage, Resuscitation & Ambulance', icon: <Siren className="w-4 h-4" />, color: 'bg-rose-700', badgeColor: 'bg-rose-50 text-rose-800 border-rose-200' },
+    'coordination': { title: 'Coordination Network', subtitle: 'NOTTO, Transfers & Interoperability Gateway', icon: <Network className="w-4 h-4" />, color: 'bg-teal-800', badgeColor: 'bg-teal-50 text-teal-800 border-teal-200' },
     'patient': { title: 'Patient Self-Service', subtitle: 'Personal Health Records & Bills', icon: <Users className="w-4 h-4" />, color: 'bg-sky-600', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
   };
 
@@ -96,6 +98,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       { id: 'jit-access', label: 'Security & JIT Approvals', icon: <Lock className="w-4 h-4" /> },
       { id: 'announcements', label: 'Platform Broadcasts', icon: <Megaphone className="w-4 h-4" /> },
       { id: 'onboarding', label: 'Customer Onboarding', icon: <Sparkles className="w-4 h-4" /> },
+      { id: 'deployments', label: 'Deployments & Upgrades', icon: <HardDrive className="w-4 h-4" /> },
     ],
     'group-admin': [
       { id: 'overview', label: 'Group Operations', icon: <Activity className="w-4 h-4" /> },
@@ -120,6 +123,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       { id: 'analytics', label: 'Enterprise Analytics & BI', icon: <BarChart2 className="w-4 h-4" /> },
       { id: 'notifications', label: 'Notification Settings', icon: <Bell className="w-4 h-4" /> },
       { id: 'hospital-settings', label: 'Hospital Settings', icon: <FileText className="w-4 h-4" /> },
+      { id: 'integrations', label: 'Coordination & Interoperability', icon: <Network className="w-4 h-4" /> },
+      { id: 'subscription', label: 'License & Entitlements', icon: <CreditCard className="w-4 h-4" /> },
+      { id: 'jit-security', label: 'JIT Break-Glass Approvals', icon: <Lock className="w-4 h-4" /> },
       { id: 'audit-logs', label: 'System Audit Logs', icon: <Clock className="w-4 h-4" /> },
     ],
     'doctor': [
@@ -190,6 +196,15 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       { id: 'ambulance', label: 'Ambulance & PCR', icon: <Truck className="w-4 h-4" /> },
       { id: 'stat_orders', label: 'STAT Overrides', icon: <CheckCircle2 className="w-4 h-4" /> },
       { id: 'mlc', label: 'Medico-Legal (MLC)', icon: <ShieldAlert className="w-4 h-4" /> },
+    ],
+    'coordination': [
+      { id: 'cases', label: 'Active Coordination Cases', icon: <Activity className="w-4 h-4" /> },
+      { id: 'notto', label: 'NOTTO Organ Registry', icon: <HeartPulse className="w-4 h-4" /> },
+      { id: 'transfers', label: 'Emergency Transfers', icon: <Truck className="w-4 h-4" /> },
+      { id: 'beds', label: 'Regional Bed Matrix', icon: <BedDouble className="w-4 h-4" /> },
+      { id: 'blood', label: 'Blood Bank Network', icon: <Activity className="w-4 h-4" /> },
+      { id: 'diagnostics', label: 'Diagnostic & PACS Exchange', icon: <Radio className="w-4 h-4" /> },
+      { id: 'audit', label: 'Cryptographic Audit Trail', icon: <ShieldCheck className="w-4 h-4" /> },
     ],
     'patient': [
       { id: 'overview', label: 'Health Timeline', icon: <Activity className="w-4 h-4" /> },

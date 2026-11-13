@@ -90,7 +90,7 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onNavigate }) =>
               </button>
 
               <button
-                onClick={() => onNavigate('/login/hospital-admin')}
+                onClick={() => onNavigate('/login/coordination')}
                 className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-sky-800 to-indigo-900 hover:from-sky-700 hover:to-indigo-800 text-white font-bold rounded-xl border border-sky-500/40 flex items-center justify-center space-x-2 transition shadow-lg"
               >
                 <Network className="w-4 h-4 text-sky-300" />

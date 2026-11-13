@@ -17,6 +17,7 @@ import { HRDashboard } from './portals/hr/HRDashboard';
 import { InventoryDashboard } from './portals/inventory/InventoryDashboard';
 import { OTDashboard } from './portals/ot/OTDashboard';
 import { EmergencyDashboard } from './portals/emergency/EmergencyDashboard';
+import { CoordinationDashboard } from './portals/coordination/CoordinationDashboard';
 import { PatientDashboard } from './portals/patient/PatientDashboard';
 
 // Public & Role-Aware Authentication Views
@@ -182,6 +183,8 @@ const MainPortalView: React.FC = () => {
         return <OTDashboard />;
       case 'emergency':
         return <EmergencyDashboard />;
+      case 'coordination':
+        return <CoordinationDashboard />;
       case 'patient':
         return <PatientDashboard />;
       default:

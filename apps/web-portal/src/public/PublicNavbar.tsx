@@ -152,10 +152,19 @@ export const ROLE_OPTIONS: RoleOption[] = [
     category: 'administrative'
   },
   {
+    slug: 'coordination',
+    portal: 'coordination',
+    title: 'Coordination Network',
+    roleNumber: 15,
+    icon: <Network className="w-4 h-4 text-teal-600" />,
+    description: 'NOTTO organ allocation, emergency transfers & inter-hospital network',
+    category: 'operational'
+  },
+  {
     slug: 'patient',
     portal: 'patient',
     title: 'Patient',
-    roleNumber: 14,
+    roleNumber: 16,
     icon: <Users className="w-4 h-4 text-sky-600" />,
     description: 'Self-service appointments, reports, e-prescriptions & bills',
     category: 'patient'

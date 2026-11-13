@@ -16,6 +16,7 @@ export type PortalType =
   | 'inventory'
   | 'ot'
   | 'emergency'
+  | 'coordination'
   | 'patient';
 
 export interface UserSession {
@@ -67,6 +68,7 @@ export const getDefaultTabForPortal = (portal: PortalType): string => {
     case 'inventory': return 'advanced_procurement';
     case 'ot': return 'theatres';
     case 'emergency': return 'triage_board';
+    case 'coordination': return 'cases';
     case 'patient': return 'overview';
     default: return 'overview';
   }
