@@ -150,3 +150,4 @@ CREATE POLICY staff_provision_tenant_isolation ON hospital_staff_provisions
     WITH CHECK (
         app.is_super_admin() OR hospital_id = app.get_current_tenant_id()
     );
+
