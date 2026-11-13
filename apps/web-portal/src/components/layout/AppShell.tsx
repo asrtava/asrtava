@@ -233,9 +233,9 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
           <button
             type="button"
-            onClick={() => setCurrentAuthView('public-home')}
+            onClick={() => setActivePortalTab(portalNavs[activePortal]?.[0]?.id || 'overview')}
             className="flex items-center space-x-2.5 group cursor-pointer text-left focus:outline-none"
-            title="Back to Home page"
+            title="Return to Workspace Overview"
           >
             <img
               src="/asrtava-logo.png"
@@ -264,17 +264,17 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <span className="font-semibold text-white">{portalLabels[activePortal]?.title}</span>
         </div>
 
-        {/* Right: Quick Search + Multi-Role Switcher + Home + My Profile + Notifications + User Avatar */}
+        {/* Right: Quick Search + Multi-Role Switcher + Workspace Overview + My Profile + Notifications + User Avatar */}
         <div className="flex items-center space-x-2 md:space-x-2.5">
-          {/* Quick Home Navigation */}
+          {/* Quick Workspace Navigation */}
           <button
             type="button"
-            onClick={() => setCurrentAuthView('public-home')}
+            onClick={() => setActivePortalTab(portalNavs[activePortal]?.[0]?.id || 'overview')}
             className="flex items-center space-x-1.5 bg-navy-800 hover:bg-navy-700 text-slate-200 hover:text-white text-xs py-1.5 px-2.5 rounded-lg border border-navy-700 transition cursor-pointer"
-            title="Back to Public Homepage"
+            title="Return to Workspace Overview"
           >
             <Home className="w-3.5 h-3.5 text-brand-400" />
-            <span className="hidden md:inline font-medium">Home</span>
+            <span className="hidden md:inline font-medium">Workspace</span>
           </button>
 
           {/* Direct My Profile Button */}

@@ -131,6 +131,12 @@ export const authApi = {
     apiClient.post('/auth/mfa/verify', { code }),
   disableMfa: (data: { password: string; code: string }) =>
     apiClient.post('/auth/mfa/disable', data),
+  inviteStaff: (data: { hospitalId: string; email: string; phone?: string; firstName: string; lastName: string; roleIds: string[] }) =>
+    apiClient.post('/auth/users/invite', data),
+  activateAccount: (data: { token: string; password: string }) =>
+    apiClient.post('/auth/activate-account', data),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    apiClient.post('/auth/change-password', data),
 };
 
 // ============================================================

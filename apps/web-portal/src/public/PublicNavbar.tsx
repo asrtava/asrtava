@@ -172,14 +172,14 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
   const enterprisePortals = [
     {
       id: 'staff',
-      name: 'Hospital Staff Application',
-      subdomain: 'app.asrtava.com',
+      name: 'Hospital Staff Portal',
+      subdomain: 'staff.asrtava.com',
       path: '/login/staff',
       icon: <Building2 className="w-5 h-5 text-teal-400" />,
       badge: 'Hospital Employees',
       badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-      description: 'Doctors, Nurses, Reception, Pharmacy, Laboratory, Radiology, OT & Hospital Admin.',
-      roles: ['Doctor', 'Nurse', 'Front Desk', 'Pharmacist', 'Lab Tech', 'Admin']
+      description: 'Doctors, nurses, receptionists, pharmacists, lab staff, and hospital administrators.',
+      roles: ['Doctor', 'Nurse', 'Front Desk', 'Pharmacist', 'Lab Tech', 'Hospital Admin']
     },
     {
       id: 'patient',
@@ -189,30 +189,30 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
       icon: <Users className="w-5 h-5 text-blue-400" />,
       badge: 'Patients & Family',
       badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-      description: 'Appointments, health records, lab reports, e-prescriptions, bills and follow-ups.',
+      description: 'Access personal appointments, clinical records, e-prescriptions, lab reports and bills.',
       roles: ['Appointments', 'Prescriptions', 'Lab Scans', 'Invoices']
     },
     {
-      id: 'network',
-      name: 'Healthcare Coordination Network',
-      subdomain: 'network.asrtava.com',
-      path: '/login/coordination',
-      icon: <Network className="w-5 h-5 text-amber-400" />,
-      badge: 'Authorized Network',
-      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-      description: 'Inter-hospital emergency transfers, NOTTO organ donor matching & regional bed matrix.',
-      roles: ['NOTTO Nodal', 'Transfer Dispatch', 'Bed Matrix', 'Blood Grid']
+      id: 'onboarding',
+      name: 'Customer Onboarding Portal',
+      subdomain: 'onboarding.asrtava.com',
+      path: '/login/onboarding',
+      icon: <FileCheck2 className="w-5 h-5 text-emerald-400" />,
+      badge: 'Customer Implementation',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      description: 'Hospital customers participating in configuration, data migration, training & go-live.',
+      roles: ['Hospital Owner', 'IT Lead', 'Medical Director', 'Project Coordinator']
     },
     {
       id: 'admin',
-      name: 'Platform Administration Console',
+      name: 'ASRTAVA Administration',
       subdomain: 'admin.asrtava.com',
       path: '/super-admin/login',
       icon: <Shield className="w-5 h-5 text-purple-400" />,
       badge: 'ASRTAVA Internal',
       badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-      description: 'Customer organizations, perpetual license generation, deployment registry & zero-privilege audit.',
-      roles: ['License Engine', 'Tri-Model Registry', 'JIT Support', 'Telemetry']
+      description: 'Authorized ASRTAVA personnel managing customer orgs, perpetual licenses & platform operations.',
+      roles: ['License Engine', 'Tri-Model Registry', 'JIT Support', 'Platform Telemetry']
     }
   ];
 
@@ -267,7 +267,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
               }}
               className="hover:text-teal-400 transition cursor-pointer"
             >
-              Clinical Modules
+              Solutions
             </button>
             <button
               onClick={() => {
@@ -276,7 +276,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
               }}
               className="hover:text-teal-400 transition cursor-pointer"
             >
-              Deployment & Security
+              Products
             </button>
             <button
               onClick={() => {
@@ -288,22 +288,26 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
               Perpetual Licensing
             </button>
             <button
-              onClick={() => onNavigate('/onboarding')}
-              className="hover:text-teal-400 transition cursor-pointer flex items-center space-x-1"
+              onClick={() => {
+                if (activeRoute !== '/') onNavigate('/');
+                document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hover:text-teal-400 transition cursor-pointer"
             >
-              <FileCheck2 className="w-3.5 h-3.5 text-teal-400" />
-              <span>Hospital Onboarding</span>
+              About
             </button>
             <button
-              onClick={() => onNavigate('/login/coordination')}
-              className="hover:text-amber-400 transition cursor-pointer flex items-center space-x-1"
+              onClick={() => {
+                if (activeRoute !== '/') onNavigate('/');
+                document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hover:text-teal-400 transition cursor-pointer"
             >
-              <Network className="w-3.5 h-3.5 text-amber-400" />
-              <span>Coordination Network</span>
+              Contact
             </button>
           </nav>
 
-          {/* Right Action: Return to Workspace or Application Gateways */}
+          {/* Right Action: Return to Workspace or Portal Access Menu */}
           <div className="hidden sm:flex items-center space-x-3">
             {user ? (
               <button
@@ -322,7 +326,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                 aria-expanded={appsDropdownOpen}
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>Access Applications</span>
+                <span>Portal Access</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 transition-transform duration-200 ${
                     appsDropdownOpen ? 'rotate-180' : ''
@@ -330,16 +334,16 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                 />
               </button>
 
-              {/* 4-App Gateway Dropdown Menu */}
+              {/* 4-Portal Access Dropdown Menu */}
               {appsDropdownOpen && (
                 <div className="absolute right-0 mt-3 w-96 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-800 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between mb-2">
                     <div>
                       <span className="text-[11px] font-bold uppercase tracking-wider text-teal-400 block">
-                        Select ASRTAVA Entry Point
+                        Access Your Portal
                       </span>
                       <span className="text-[10px] text-slate-400">
-                        Dedicated secure portal for each stakeholder
+                        Choose the portal you are authorized to use
                       </span>
                     </div>
                     <span className="text-[10px] bg-slate-800 font-mono font-bold text-slate-300 px-2 py-0.5 rounded border border-slate-700">
@@ -382,7 +386,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                   </div>
 
                   <div className="mt-2.5 pt-2 border-t border-slate-800 px-2 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>New hospital deployment?</span>
+                    <span>New hospital implementation?</span>
                     <button
                       onClick={() => {
                         setAppsDropdownOpen(false);
@@ -390,7 +394,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                       }}
                       className="text-teal-400 hover:text-teal-300 font-bold hover:underline"
                     >
-                      Onboard Facility &rarr;
+                      Enquire / Register &rarr;
                     </button>
                   </div>
                 </div>

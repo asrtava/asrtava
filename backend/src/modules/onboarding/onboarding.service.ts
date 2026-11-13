@@ -29,6 +29,52 @@ export type ImplementationStage =
   | 'on_hold'
   | 'cancelled';
 
+export interface CustomerEnquiryRecord {
+  id: string;
+  enquiry_number: string;
+  hospital_name: string;
+  legal_entity_name: string;
+  hospital_type: 'multispeciality' | 'super_speciality' | 'trauma_center' | 'daycare_clinic' | 'hospital_group';
+  contact_person_name: string;
+  contact_email: string;
+  contact_phone: string;
+  designation?: string;
+  city: string;
+  state: string;
+  pincode?: string;
+  country: string;
+  bed_capacity: number;
+  branch_count: number;
+  department_count: number;
+  existing_hms: string;
+  approximate_users: number;
+  required_modules: string[];
+  preferred_deployment_model: 'cloud' | 'on_premises' | 'hybrid';
+  target_timeline_months?: number;
+  special_requirements?: string;
+  status: 'lead' | 'qualified' | 'disqualified' | 'converted';
+  assigned_lead_user_id?: string;
+  assigned_lead_name?: string;
+  qualification_checklist: Array<{
+    code: string;
+    label: string;
+    completed: boolean;
+    completed_by?: string;
+    completed_at?: string;
+    notes?: string;
+  }>;
+  sizing_estimates: {
+    concurrent_users: number;
+    annual_storage_gb: number;
+    recommended_vcpus: number;
+    recommended_ram_gb: number;
+    edge_appliances_needed: number;
+    tier_recommendation: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CustomerOrganizationRecord {
   id: string;
   customer_code: string;
@@ -133,6 +179,7 @@ export const MANDATORY_GO_LIVE_ITEMS = [
 
 export class OnboardingService {
   // In-memory state store for reliable unit testing and high-speed execution
+  private static enquiries = new Map<string, CustomerEnquiryRecord>();
   private static customers = new Map<string, CustomerOrganizationRecord>();
   private static implementations = new Map<string, HospitalImplementationRecord>();
   private static stageLogs: any[] = [];
@@ -145,6 +192,7 @@ export class OnboardingService {
   private static hypercareTickets = new Map<string, any[]>();
 
   public static clearState(): void {
+    this.enquiries.clear();
     this.customers.clear();
     this.implementations.clear();
     this.stageLogs = [];
@@ -155,6 +203,314 @@ export class OnboardingService {
     this.uatTestCases.clear();
     this.checklists.clear();
     this.hypercareTickets.clear();
+  }
+
+  // --------------------------------------------------------------------------
+  // 0. PHASE 1: CUSTOMER ENQUIRY & SIZING CALCULATION
+  // --------------------------------------------------------------------------
+
+  public static createEnquiry(params: {
+    hospitalName: string;
+    legalEntityName?: string;
+    hospitalType: CustomerEnquiryRecord['hospital_type'];
+    contactPersonName: string;
+    contactEmail: string;
+    contactPhone: string;
+    designation?: string;
+    city: string;
+    state: string;
+    pincode?: string;
+    country?: string;
+    bedCapacity: number;
+    branchCount?: number;
+    departmentCount?: number;
+    existingHms?: string;
+    approximateUsers?: number;
+    requiredModules?: string[];
+    preferredDeploymentModel: 'cloud' | 'on_premises' | 'hybrid';
+    targetTimelineMonths?: number;
+    specialRequirements?: string;
+    assignedLeadUserId?: string;
+    assignedLeadName?: string;
+  }): CustomerEnquiryRecord {
+    const id = `enq-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const year = new Date().getFullYear();
+    const randNum = Math.floor(100 + Math.random() * 900);
+    const code = `ENQ-${year}-${(params.city || 'BLR').substring(0, 3).toUpperCase()}-${randNum}`;
+
+    const beds = Number(params.bedCapacity) || 50;
+    const branches = Number(params.branchCount) || 1;
+    const modules = params.requiredModules && params.requiredModules.length > 0
+      ? params.requiredModules
+      : ['OPD', 'IPD', 'EMERGENCY', 'PHARMACY', 'LIS', 'BILLING'];
+
+    // Sizing computation formulas
+    const concurrentUsers = Math.max(10, Math.round(beds * 1.25));
+    const isRisIncluded = modules.includes('RIS') || modules.includes('PACS');
+    const annualStorageGb = Math.round(beds * (isRisIncluded ? 3.5 : 1.2));
+    const recommendedVcpus = beds >= 300 ? 32 : beds >= 100 ? 16 : 8;
+    const recommendedRamGb = beds >= 300 ? 128 : beds >= 100 ? 64 : 32;
+    const edgeAppliances = params.preferredDeploymentModel === 'hybrid' ? Math.max(1, branches) : 0;
+    const tier = beds >= 300 ? 'Enterprise Tier 3 (High-Availability Clustered)' : beds >= 100 ? 'Enterprise Tier 2 (Redundant Primary)' : 'Standard Hospital Tier 1';
+
+    const defaultChecklist = [
+      {
+        code: 'LEGAL_VERIFICATION',
+        label: 'Legal Operating Entity & Healthcare Registration Verified',
+        completed: false
+      },
+      {
+        code: 'BED_CAPACITY_VALIDATION',
+        label: 'Operational Bed Capacity & Department Matrix Validated',
+        completed: false
+      },
+      {
+        code: 'INFRASTRUCTURE_FIT',
+        label: 'Preferred Deployment Topology (Cloud / On-Prem / Hybrid) Assessed',
+        completed: false
+      },
+      {
+        code: 'SOL_ARCHITECT_ASSIGNED',
+        label: 'Solution Architect & Implementation Lead Assigned',
+        completed: !!params.assignedLeadName
+      }
+    ];
+
+    const record: CustomerEnquiryRecord = {
+      id,
+      enquiry_number: code,
+      hospital_name: params.hospitalName,
+      legal_entity_name: params.legalEntityName || params.hospitalName,
+      hospital_type: params.hospitalType || 'multispeciality',
+      contact_person_name: params.contactPersonName,
+      contact_email: params.contactEmail,
+      contact_phone: params.contactPhone,
+      designation: params.designation || 'Hospital Director',
+      city: params.city,
+      state: params.state,
+      pincode: params.pincode,
+      country: params.country || 'India',
+      bed_capacity: beds,
+      branch_count: branches,
+      department_count: Number(params.departmentCount) || 8,
+      existing_hms: params.existingHms || 'None / Paper-based',
+      approximate_users: Number(params.approximateUsers) || concurrentUsers,
+      required_modules: modules,
+      preferred_deployment_model: params.preferredDeploymentModel || 'cloud',
+      target_timeline_months: Number(params.targetTimelineMonths) || 2,
+      special_requirements: params.specialRequirements || '',
+      status: 'lead',
+      assigned_lead_user_id: params.assignedLeadUserId || 'usr-lead-asrtava-999',
+      assigned_lead_name: params.assignedLeadName || 'Dr. Vikram Malhotra (ASRTAVA Lead Architect)',
+      qualification_checklist: defaultChecklist,
+      sizing_estimates: {
+        concurrent_users: concurrentUsers,
+        annual_storage_gb: annualStorageGb,
+        recommended_vcpus: recommendedVcpus,
+        recommended_ram_gb: recommendedRamGb,
+        edge_appliances_needed: edgeAppliances,
+        tier_recommendation: tier
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    this.enquiries.set(record.id, record);
+    return record;
+  }
+
+  public static listEnquiries(filter?: { status?: string }): CustomerEnquiryRecord[] {
+    this.ensureSeedEnquiries();
+    const list = Array.from(this.enquiries.values());
+    if (filter?.status) {
+      return list.filter((e) => e.status === filter.status);
+    }
+    return list;
+  }
+
+  public static getEnquiryById(id: string): CustomerEnquiryRecord {
+    this.ensureSeedEnquiries();
+    const enq = this.enquiries.get(id);
+    if (!enq) {
+      throw new Error(`Enquiry ${id} not found.`);
+    }
+    return enq;
+  }
+
+  public static updateEnquiryChecklist(params: {
+    enquiryId: string;
+    code: string;
+    completed: boolean;
+    userId?: string;
+    notes?: string;
+  }): CustomerEnquiryRecord {
+    const enq = this.getEnquiryById(params.enquiryId);
+    const item = enq.qualification_checklist.find((c) => c.code === params.code);
+    if (item) {
+      item.completed = params.completed;
+      item.completed_by = params.completed ? (params.userId || 'Super Administrator') : undefined;
+      item.completed_at = params.completed ? new Date().toISOString() : undefined;
+      if (params.notes) item.notes = params.notes;
+    }
+    enq.updated_at = new Date().toISOString();
+    return enq;
+  }
+
+  public static async qualifyEnquiry(params: {
+    enquiryId: string;
+    actorId?: string;
+    actorName?: string;
+    notes?: string;
+  }): Promise<{
+    enquiry: CustomerEnquiryRecord;
+    customer: CustomerOrganizationRecord;
+    implementation: HospitalImplementationRecord;
+    message: string;
+  }> {
+    const enq = this.getEnquiryById(params.enquiryId);
+    enq.status = 'qualified';
+    enq.qualification_checklist.forEach((c) => {
+      c.completed = true;
+      if (!c.completed_by) c.completed_by = params.actorName || 'Super Administrator';
+      if (!c.completed_at) c.completed_at = new Date().toISOString();
+    });
+    enq.updated_at = new Date().toISOString();
+
+    // Auto-create customer organization record
+    const categoryMap: Record<string, CustomerOrganizationRecord['category']> = {
+      multispeciality: 'multi_specialty',
+      super_speciality: 'tertiary_teaching',
+      trauma_center: 'multi_specialty',
+      daycare_clinic: 'single_specialty',
+      hospital_group: 'clinic_chain'
+    };
+
+    const customer = await this.registerCustomer({
+      legalName: enq.legal_entity_name,
+      displayName: enq.hospital_name,
+      category: categoryMap[enq.hospital_type] || 'multi_specialty',
+      authorizedBranchesCount: enq.branch_count,
+      authorizedContactName: enq.contact_person_name,
+      authorizedContactEmail: enq.contact_email,
+      authorizedContactPhone: enq.contact_phone,
+      city: enq.city,
+      state: enq.state,
+      pincode: enq.pincode,
+      implementationPriority: enq.bed_capacity >= 300 ? 'high' : 'medium',
+      implementationOwnerUserId: enq.assigned_lead_user_id
+    });
+
+    // Auto-create implementation project in requirements_gathering stage (Phase 2 ready)
+    const hospitalId = `hosp-${enq.hospital_name.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15)}-${Math.floor(10 + Math.random() * 90)}`;
+    const implementation = await this.createImplementationProject({
+      customerId: customer.id,
+      hospitalId,
+      deploymentModel: enq.preferred_deployment_model,
+      actorId: params.actorId,
+      actorName: params.actorName || 'Super Administrator'
+    });
+
+    return {
+      enquiry: enq,
+      customer,
+      implementation,
+      message: `Enquiry ${enq.enquiry_number} qualified. Transitioned to Phase 2 (Requirement Assessment).`
+    };
+  }
+
+  private static ensureSeedEnquiries(): void {
+    if (this.enquiries.size === 0) {
+      const seed1: CustomerEnquiryRecord = {
+        id: 'enq-seed-manipal-01',
+        enquiry_number: 'ENQ-2026-BLR-042',
+        hospital_name: 'Manipal Super-Speciality Hospital',
+        legal_entity_name: 'Manipal Health Enterprises Private Limited',
+        hospital_type: 'super_speciality',
+        contact_person_name: 'Dr. Vikram Malhotra',
+        contact_email: 'vikram.malhotra@manipal.edu',
+        contact_phone: '+91 98450 11223',
+        designation: 'Group Medical Director',
+        city: 'Bangalore',
+        state: 'Karnataka',
+        pincode: '560017',
+        country: 'India',
+        bed_capacity: 350,
+        branch_count: 3,
+        department_count: 14,
+        existing_hms: 'Medix SQL v4.2 (Legacy Client-Server)',
+        approximate_users: 450,
+        required_modules: ['OPD', 'IPD', 'EMERGENCY', 'OT', 'LIS', 'RIS', 'PHARMACY', 'BILLING', 'TELEMEDICINE', 'HRMS'],
+        preferred_deployment_model: 'hybrid',
+        target_timeline_months: 3,
+        special_requirements: 'Requires hybrid edge gateway for zero-downtime operation during fiber cuts.',
+        status: 'lead',
+        assigned_lead_user_id: 'usr-lead-asrtava-999',
+        assigned_lead_name: 'Dr. Vikram Malhotra (ASRTAVA Lead Architect)',
+        qualification_checklist: [
+          { code: 'LEGAL_VERIFICATION', label: 'Legal Operating Entity & Healthcare Registration Verified', completed: true, completed_by: 'ASRTAVA Compliance', completed_at: '2026-11-01T10:00:00Z' },
+          { code: 'BED_CAPACITY_VALIDATION', label: 'Operational Bed Capacity & Department Matrix Validated', completed: true, completed_by: 'ASRTAVA Solution Architect', completed_at: '2026-11-02T11:30:00Z' },
+          { code: 'INFRASTRUCTURE_FIT', label: 'Preferred Deployment Topology (Cloud / On-Prem / Hybrid) Assessed', completed: true, completed_by: 'ASRTAVA Infrastructure Lead', completed_at: '2026-11-03T14:15:00Z' },
+          { code: 'SOL_ARCHITECT_ASSIGNED', label: 'Solution Architect & Implementation Lead Assigned', completed: true, completed_by: 'Super Administrator', completed_at: '2026-11-01T09:00:00Z' }
+        ],
+        sizing_estimates: {
+          concurrent_users: 438,
+          annual_storage_gb: 1225,
+          recommended_vcpus: 32,
+          recommended_ram_gb: 128,
+          edge_appliances_needed: 3,
+          tier_recommendation: 'Enterprise Tier 3 (High-Availability Clustered)'
+        },
+        created_at: '2026-11-01T08:30:00Z',
+        updated_at: '2026-11-03T15:00:00Z'
+      };
+
+      const seed2: CustomerEnquiryRecord = {
+        id: 'enq-seed-apollo-02',
+        enquiry_number: 'ENQ-2026-HYD-088',
+        hospital_name: 'Apollo Spectra Daycare Surgery',
+        legal_entity_name: 'Apollo Spectra Surgical Hospitals Ltd',
+        hospital_type: 'daycare_clinic',
+        contact_person_name: 'Dr. Ananya Rao',
+        contact_email: 'ananya.rao@apollospectra.in',
+        contact_phone: '+91 94401 55667',
+        designation: 'Chief of Surgical Operations',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        pincode: '500034',
+        country: 'India',
+        bed_capacity: 45,
+        branch_count: 1,
+        department_count: 6,
+        existing_hms: 'None / Paper-based',
+        approximate_users: 60,
+        required_modules: ['OPD', 'IPD', 'OT', 'PHARMACY', 'BILLING'],
+        preferred_deployment_model: 'cloud',
+        target_timeline_months: 1,
+        special_requirements: 'Rapid cloud onboarding for fast turnaround day surgeries.',
+        status: 'lead',
+        assigned_lead_user_id: 'usr-lead-asrtava-999',
+        assigned_lead_name: 'Dr. Vikram Malhotra (ASRTAVA Lead Architect)',
+        qualification_checklist: [
+          { code: 'LEGAL_VERIFICATION', label: 'Legal Operating Entity & Healthcare Registration Verified', completed: true, completed_by: 'ASRTAVA Compliance', completed_at: '2026-11-10T11:00:00Z' },
+          { code: 'BED_CAPACITY_VALIDATION', label: 'Operational Bed Capacity & Department Matrix Validated', completed: false },
+          { code: 'INFRASTRUCTURE_FIT', label: 'Preferred Deployment Topology (Cloud / On-Prem / Hybrid) Assessed', completed: false },
+          { code: 'SOL_ARCHITECT_ASSIGNED', label: 'Solution Architect & Implementation Lead Assigned', completed: true, completed_by: 'Super Administrator', completed_at: '2026-11-10T09:30:00Z' }
+        ],
+        sizing_estimates: {
+          concurrent_users: 56,
+          annual_storage_gb: 54,
+          recommended_vcpus: 8,
+          recommended_ram_gb: 32,
+          edge_appliances_needed: 0,
+          tier_recommendation: 'Standard Hospital Tier 1'
+        },
+        created_at: '2026-11-10T09:00:00Z',
+        updated_at: '2026-11-10T11:30:00Z'
+      };
+
+      this.enquiries.set(seed1.id, seed1);
+      this.enquiries.set(seed2.id, seed2);
+    }
   }
 
   // --------------------------------------------------------------------------

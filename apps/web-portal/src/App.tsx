@@ -20,12 +20,13 @@ import { EmergencyDashboard } from './portals/emergency/EmergencyDashboard';
 import { CoordinationDashboard } from './portals/coordination/CoordinationDashboard';
 import { PatientDashboard } from './portals/patient/PatientDashboard';
 
-// Public & 5-Application Entry Views
+// Public & 4-Portal Official Architecture Entry Views
 import { PublicHomePage } from './public/PublicHomePage';
 import { StaffLogin } from './auth/StaffLogin';
 import { PatientLogin } from './auth/PatientLogin';
-import { CoordinationLogin } from './auth/CoordinationLogin';
+import { OnboardingLogin } from './auth/OnboardingLogin';
 import { SuperAdminLogin } from './auth/SuperAdminLogin';
+import { StaffActivationView } from './auth/StaffActivationView';
 import { RoleLoginView } from './auth/RoleLoginView';
 import { HospitalRegistration } from './auth/HospitalRegistration';
 import { OnboardingWizard } from './auth/OnboardingWizard';
@@ -45,39 +46,15 @@ const MainPortalView: React.FC = () => {
         setCurrentAuthView('/login/staff');
       } else if (app === 'patient') {
         setCurrentAuthView('/login/patient');
-      } else if (app === 'network') {
-        setCurrentAuthView('/login/coordination');
+      } else if (app === 'onboarding') {
+        setCurrentAuthView('/login/onboarding');
       } else if (app === 'admin') {
         setCurrentAuthView('/super-admin/login');
       }
     }
   }, [user]);
 
-  // Authenticated user returning to view Public Homepage
-  if (user && (currentAuthView === 'public-home' || currentAuthView === '/')) {
-    return (
-      <div className="relative">
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={() => setCurrentAuthView(null)}
-            className="text-xs font-bold text-white bg-teal-700 hover:bg-teal-800 px-4 py-2.5 rounded-xl shadow-xl flex items-center space-x-2 border border-teal-500 transition cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Workspace ({user.firstName || 'Dashboard'})</span>
-          </button>
-        </div>
-        <PublicHomePage onNavigate={(route) => {
-          if (route === 'portal' || route === '/portal') {
-            setCurrentAuthView(null);
-          } else {
-            setCurrentAuthView(route);
-          }
-        }} />
-      </div>
-    );
-  }
-
-  // Authenticated user viewing Hospital Onboarding Workspace
+  // Authenticated customer coordinator viewing Hospital Onboarding Workspace
   if (user && (currentAuthView === '/onboarding' || currentAuthView === '/hospital-onboarding')) {
     return (
       <HospitalOnboardingWorkspace
@@ -92,7 +69,7 @@ const MainPortalView: React.FC = () => {
       return <PublicHomePage onNavigate={setCurrentAuthView} />;
     }
 
-    // App 2: Hospital Staff Application Login
+    // 01. Hospital Staff Portal Login
     if (currentAuthView === '/login/staff' || currentAuthView === '/app' || currentAuthView === '/staff') {
       return (
         <div className="relative">
@@ -102,7 +79,7 @@ const MainPortalView: React.FC = () => {
               className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Public Homepage</span>
+              <span>Public Corporate Homepage</span>
             </button>
           </div>
           <StaffLogin onSwitchPortal={setCurrentAuthView} />
@@ -110,7 +87,7 @@ const MainPortalView: React.FC = () => {
       );
     }
 
-    // App 3: Patient Portal Login
+    // 02. Patient Portal Login
     if (currentAuthView === '/login/patient' || currentAuthView === '/patient') {
       return (
         <div className="relative">
@@ -120,7 +97,7 @@ const MainPortalView: React.FC = () => {
               className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Public Homepage</span>
+              <span>Public Corporate Homepage</span>
             </button>
           </div>
           <PatientLogin onSwitchPortal={setCurrentAuthView} />
@@ -128,14 +105,28 @@ const MainPortalView: React.FC = () => {
       );
     }
 
-    // App 4: Healthcare Coordination Network Login
-    if (currentAuthView === '/login/coordination' || currentAuthView === '/network' || currentAuthView === '/coordination') {
+    // 03. Customer Onboarding Portal Login
+    if (currentAuthView === '/login/onboarding') {
       return (
-        <CoordinationLogin onSwitchPortal={setCurrentAuthView} />
+        <div className="relative">
+          <div className="fixed top-4 left-4 z-50">
+            <button
+              onClick={() => setCurrentAuthView('/')}
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Public Corporate Homepage</span>
+            </button>
+          </div>
+          <OnboardingLogin
+            onSwitchPortal={setCurrentAuthView}
+            onLoginSuccess={() => setCurrentAuthView('/onboarding')}
+          />
+        </div>
       );
     }
 
-    // App 5: Platform Administration Console Login
+    // 04. ASRTAVA Administration Portal Login
     if (currentAuthView === '/super-admin/login' || currentAuthView === '/admin' || currentAuthView === '/super-admin') {
       return (
         <div className="relative">
@@ -145,10 +136,24 @@ const MainPortalView: React.FC = () => {
               className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Public Homepage</span>
+              <span>Public Corporate Homepage</span>
             </button>
           </div>
           <SuperAdminLogin onSwitchPortal={setCurrentAuthView} />
+        </div>
+      );
+    }
+
+    // Staff Account Activation Flow (Invitation token password setup)
+    if (currentAuthView === '/activate-account' || currentAuthView.startsWith('/activate-account')) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const token = searchParams.get('token') || undefined;
+      return (
+        <div className="relative">
+          <StaffActivationView
+            onSwitchPortal={setCurrentAuthView}
+            token={token}
+          />
         </div>
       );
     }
@@ -168,7 +173,7 @@ const MainPortalView: React.FC = () => {
               className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Public Homepage</span>
+              <span>Public Corporate Homepage</span>
             </button>
           </div>
           <HospitalRegistration
@@ -182,6 +187,7 @@ const MainPortalView: React.FC = () => {
       );
     }
 
+    // Customer Onboarding Implementation Workspace
     if (currentAuthView === '/onboarding' || currentAuthView === '/hospital-onboarding') {
       return (
         <HospitalOnboardingWorkspace
