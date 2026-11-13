@@ -165,6 +165,14 @@ export const STANDARD_EDITION_ENTITLEMENTS: Record<SoftwareEdition, string[]> = 
 
 const LICENSING_SECRET = process.env.LICENSING_HMAC_SECRET || 'asrtava-perpetual-licensing-master-hmac-key-2026';
 
+export interface ClinicalContinuityContext {
+  operation?: 'read' | 'write' | 'admin' | 'emergency';
+  isExistingRecord?: boolean;
+  hasActiveEncounter?: boolean;
+  clinicalOverrideReason?: string;
+  clinicianId?: string;
+}
+
 export class LicenseService {
   // In-memory cache & mock fallback store to guarantee high-performance validation and self-contained testing
   private static licenses = new Map<string, SoftwareLicenseRecord>();
@@ -455,16 +463,47 @@ export class LicenseService {
    */
   public static checkModuleEntitlement(
     hospitalId: string,
-    moduleCode: string
+    moduleCode: string,
+    context?: ClinicalContinuityContext
   ): {
     allowed: boolean;
     reason: string;
     isFailSafeBypass?: boolean;
+    isClinicalContinuity?: boolean;
+    isClinicalOverride?: boolean;
     license?: SoftwareLicenseRecord;
   } {
-    // 1. Critical Clinical Safety Fail-Safe: Emergency workflow is never locked out
+    // 1. Critical Clinical Safety Fail-Safe: Emergency department and patient registry lookups are never locked out
     const CRITICAL_FAILSAFE_MODULES = ['module:emergency', 'module:patient_mgmt'];
     const isCritical = CRITICAL_FAILSAFE_MODULES.includes(moduleCode);
+
+    // 2. Clinical Continuity Invariant: Reading existing clinical records is NEVER blocked
+    // regardless of commercial license status to prevent clinician blindness and medical error.
+    if (context?.operation === 'read' || context?.isExistingRecord) {
+      return {
+        allowed: true,
+        isClinicalContinuity: true,
+        reason: 'Clinical continuity safeguard: Existing medical records, prescriptions, and diagnostic reports remain permanently accessible to authorized clinicians.'
+      };
+    }
+
+    // 3. Active Inpatient / Emergency Episode Continuity: Ongoing life-sustaining care cannot be interrupted mid-treatment
+    if (context?.hasActiveEncounter && context?.operation !== 'admin') {
+      return {
+        allowed: true,
+        isClinicalContinuity: true,
+        reason: 'Clinical continuity safeguard: Active inpatient/emergency episode treatments must be completed without interruption.'
+      };
+    }
+
+    // 4. Documented Emergency Clinical Safety Override
+    if (context?.clinicalOverrideReason) {
+      return {
+        allowed: true,
+        isClinicalOverride: true,
+        reason: `Emergency clinical override granted: ${context.clinicalOverrideReason}. Documented and audited.`
+      };
+    }
 
     // Locate active license for hospital
     let activeLicense: SoftwareLicenseRecord | undefined;

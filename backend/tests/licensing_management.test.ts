@@ -312,6 +312,32 @@ test('ASRTAVA Perpetual Software Licensing & Commercial Management Suite', async
       assert.strictEqual(check.allowed, false, `Module ${mod} must not be bypassed under emergency fail-safe`);
       assert.strictEqual(check.isFailSafeBypass, undefined, `Module ${mod} must not have failSafeBypass set`);
     }
+
+    // Clinical Continuity Safeguards:
+    // 1. Reading existing clinical records is ALWAYS permitted to prevent clinician blindness
+    const existingRxCheck = LicenseService.checkModuleEntitlement(UNLICENSED_HOSPITAL, 'module:pharmacy', {
+      operation: 'read',
+      isExistingRecord: true
+    });
+    assert.strictEqual(existingRxCheck.allowed, true);
+    assert.strictEqual(existingRxCheck.isClinicalContinuity, true);
+    assert.ok(existingRxCheck.reason.includes('Clinical continuity safeguard'));
+
+    // 2. Active inpatient episode care cannot be interrupted mid-treatment
+    const activeEncounterCheck = LicenseService.checkModuleEntitlement(UNLICENSED_HOSPITAL, 'module:lis', {
+      operation: 'write',
+      hasActiveEncounter: true
+    });
+    assert.strictEqual(activeEncounterCheck.allowed, true);
+    assert.strictEqual(activeEncounterCheck.isClinicalContinuity, true);
+
+    // 3. Documented emergency clinical safety override
+    const overrideCheck = LicenseService.checkModuleEntitlement(UNLICENSED_HOSPITAL, 'module:ot', {
+      operation: 'write',
+      clinicalOverrideReason: 'Immediate life-saving emergency craniotomy'
+    });
+    assert.strictEqual(overrideCheck.allowed, true);
+    assert.strictEqual(overrideCheck.isClinicalOverride, true);
   });
 
   // --------------------------------------------------------------------------
