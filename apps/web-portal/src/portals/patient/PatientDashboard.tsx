@@ -129,10 +129,19 @@ export const PatientDashboard: React.FC = () => {
 
   // Appointment Modal State
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState(doctors[0]?.name || 'Dr. Rajesh Sharma');
-  const [selectedSpecialty, setSelectedSpecialty] = useState(departments[0] || 'Cardiology');
+  const [selectedDoc, setSelectedDoc] = useState(doctors[0]?.name || '');
+  const [selectedSpecialty, setSelectedSpecialty] = useState(departments[0] || '');
   const [apptDate, setApptDate] = useState(new Date().toISOString().slice(0, 10));
   const [apptTime, setApptTime] = useState('11:30 AM');
+
+  useEffect(() => {
+    if (doctors.length > 0 && !selectedDoc) {
+      setSelectedDoc(doctors[0].name);
+    }
+    if (departments.length > 0 && !selectedSpecialty) {
+      setSelectedSpecialty(departments[0]);
+    }
+  }, [doctors, departments]);
 
   // Prescription View Modal
   const [isRxModalOpen, setIsRxModalOpen] = useState(false);
@@ -292,7 +301,14 @@ export const PatientDashboard: React.FC = () => {
                 </Button>
               </div>
 
-              {appointments.map((appt) => (
+              {appointments.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <Calendar className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">No appointments scheduled</p>
+                  <p className="text-xs text-slate-500">Book your next consultation with our specialists using the button above.</p>
+                </div>
+              ) : (
+                appointments.map((appt) => (
                 <div
                   key={appt.id}
                   className="p-4 rounded-xl border border-teal-200 bg-teal-50/20 flex flex-col sm:flex-row justify-between sm:items-center gap-3"
@@ -317,7 +333,7 @@ export const PatientDashboard: React.FC = () => {
                     {appt.status}
                   </Badge>
                 </div>
-              ))}
+              )))}
             </div>
 
             {/* Current Medications Strip */}
@@ -500,7 +516,14 @@ export const PatientDashboard: React.FC = () => {
       {activeTab === 'bills' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {bills.map((bill) => (
+            {bills.length === 0 ? (
+              <div className="col-span-full p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <CreditCard className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">No bills or invoices pending</p>
+                <p className="text-xs text-slate-500">All outpatient and inpatient hospital charges are cleared.</p>
+              </div>
+            ) : (
+              bills.map((bill) => (
               <div
                 key={bill.id}
                 className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between text-xs"
@@ -551,7 +574,7 @@ export const PatientDashboard: React.FC = () => {
                   )}
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}
@@ -583,14 +606,20 @@ export const PatientDashboard: React.FC = () => {
               <select
                 value={selectedSpecialty}
                 onChange={(e) => {
-                  setSelectedSpecialty(e.target.value);
-                  setSelectedDoc(e.target.value === 'Cardiology' ? 'Dr. Rajesh Sharma' : 'Dr. Ananya Roy');
+                  const newSpec = e.target.value;
+                  setSelectedSpecialty(newSpec);
+                  const matchingDoc = doctors.find((d) => d.dept === newSpec);
+                  if (matchingDoc) setSelectedDoc(matchingDoc.name);
                 }}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               >
-                <option value="Cardiology">Cardiology</option>
-                <option value="General Medicine">General Medicine</option>
-                <option value="Orthopedics">Orthopedics</option>
+                {departments.length > 0 ? (
+                  departments.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))
+                ) : (
+                  <option value="">General OPD</option>
+                )}
               </select>
             </div>
             <div>
@@ -600,9 +629,15 @@ export const PatientDashboard: React.FC = () => {
                 onChange={(e) => setSelectedDoc(e.target.value)}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               >
-                <option value="Dr. Rajesh Sharma">Dr. Rajesh Sharma (Cardiology)</option>
-                <option value="Dr. Ananya Roy">Dr. Ananya Roy (Gen Medicine)</option>
-                <option value="Dr. Vikram Sethi">Dr. Vikram Sethi (Orthopedics)</option>
+                {doctors.length > 0 ? (
+                  doctors
+                    .filter((d) => !selectedSpecialty || d.dept === selectedSpecialty || !d.dept)
+                    .map((doc) => (
+                      <option key={doc.id} value={doc.name}>{doc.name} ({doc.dept || 'Consultant'})</option>
+                    ))
+                ) : (
+                  <option value="">Assigned On-Duty Physician</option>
+                )}
               </select>
             </div>
           </div>

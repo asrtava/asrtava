@@ -79,12 +79,8 @@ export const ReceptionDashboard: React.FC = () => {
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState('All');
 
   // Dynamic Dropdown Lists from API / Context
-  const dynamicDepts = departments.length > 0 ? departments : ['Cardiology', 'General Medicine', 'Orthopedics', 'Pediatrics'];
-  const dynamicDoctors = doctors.length > 0 ? doctors : [
-    { id: 'doc-1', name: 'Dr. Rajesh Sharma', dept: 'Cardiology' },
-    { id: 'doc-2', name: 'Dr. Ananya Roy', dept: 'General Medicine' },
-    { id: 'doc-3', name: 'Dr. Vikram Sethi', dept: 'Orthopedics' },
-  ];
+  const dynamicDepts = departments;
+  const dynamicDoctors = doctors;
 
   // Registration Form State
   const [regFirstName, setRegFirstName] = useState('');
@@ -95,13 +91,13 @@ export const ReceptionDashboard: React.FC = () => {
   const [regBlood, setRegBlood] = useState('O+');
   const [regAddress, setRegAddress] = useState('');
   const [regEmergency, setRegEmergency] = useState('');
-  const [regDoctor, setRegDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
-  const [regDept, setRegDept] = useState(dynamicDepts[0] || 'Cardiology');
+  const [regDoctor, setRegDoctor] = useState(dynamicDoctors[0]?.name || '');
+  const [regDept, setRegDept] = useState(dynamicDepts[0] || '');
 
   // Appointment Modal State
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
   const [apptPatientName, setApptPatientName] = useState('');
-  const [apptDoctor, setApptDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
+  const [apptDoctor, setApptDoctor] = useState(dynamicDoctors[0]?.name || '');
   const [apptDate, setApptDate] = useState(new Date().toISOString().slice(0, 10));
   const [apptSlot, setApptSlot] = useState('11:00 AM');
 
@@ -125,11 +121,22 @@ export const ReceptionDashboard: React.FC = () => {
   const [admitSelectedWard, setAdmitSelectedWard] = useState('');
   const [admitSelectedBedId, setAdmitSelectedBedId] = useState('');
   const [admitDiagnosis, setAdmitDiagnosis] = useState('');
-  const [admitDoctor, setAdmitDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
+  const [admitDoctor, setAdmitDoctor] = useState(dynamicDoctors[0]?.name || '');
+
+  useEffect(() => {
+    if (dynamicDoctors.length > 0) {
+      if (!regDoctor) setRegDoctor(dynamicDoctors[0].name);
+      if (!apptDoctor) setApptDoctor(dynamicDoctors[0].name);
+      if (!admitDoctor) setAdmitDoctor(dynamicDoctors[0].name);
+    }
+    if (dynamicDepts.length > 0 && !regDept) {
+      setRegDept(dynamicDepts[0]);
+    }
+  }, [dynamicDoctors, dynamicDepts]);
 
   const wardNames = useMemo(() => {
     const set = new Set(beds.map((b) => b.wardName));
-    return set.size > 0 ? Array.from(set) : ['Cardiology ICU', 'General Male Ward', 'General Female Ward', 'Private Deluxe Suite'];
+    return Array.from(set);
   }, [beds]);
 
   const activeWard = admitSelectedWard || wardNames[0];
@@ -391,7 +398,7 @@ export const ReceptionDashboard: React.FC = () => {
       bedId: chosenBed.id,
       wardName: activeWard,
       diagnosis: admitDiagnosis || 'Inpatient Observation and Medical Management',
-      attendingDoctor: admitDoctor || dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma'
+      attendingDoctor: admitDoctor || dynamicDoctors[0]?.name || 'Attending Physician'
     });
 
     showToast({
@@ -523,9 +530,11 @@ export const ReceptionDashboard: React.FC = () => {
                 className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none"
               >
                 <option value="All">All Doctors</option>
-                <option value="Sharma">Dr. Rajesh Sharma (Cardio)</option>
-                <option value="Roy">Dr. Ananya Roy (Gen Med)</option>
-                <option value="Sethi">Dr. Vikram Sethi (Ortho)</option>
+                {dynamicDoctors.map((doc) => (
+                  <option key={doc.id} value={doc.name}>
+                    {doc.name} ({doc.dept})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -542,7 +551,14 @@ export const ReceptionDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {filteredQueue.map((item) => (
+              {filteredQueue.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                    No tokens found in OPD consultation queue. Book an appointment or register a walk-in patient above.
+                  </td>
+                </tr>
+              ) : (
+                filteredQueue.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3.5 px-4 font-mono font-bold text-teal-800">
                     <span className="bg-teal-50 border border-teal-200 px-2 py-1 rounded">
@@ -633,7 +649,7 @@ export const ReceptionDashboard: React.FC = () => {
                     </Button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

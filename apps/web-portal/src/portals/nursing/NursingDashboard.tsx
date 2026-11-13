@@ -130,36 +130,8 @@ export const NursingDashboard: React.FC = () => {
     }));
   }, [hospitalBeds]);
 
-  // Care Plans State
-  const [carePlans, setCarePlans] = useState<CarePlan[]>([
-    {
-      id: 'cp-1',
-      bedNumber: 'ICU-01',
-      patientName: 'Ramesh Patel',
-      diagnosis: 'Acute Coronary Syndrome, Risk of Re-infarction & Arrhythmia',
-      goals: 'Continuous cardiac rhythm monitoring; maintain BP < 140/90; pain scale 0/10.',
-      interventions: 'Continuous telemetric ECG monitoring; administer antiplatelet and beta-blocker as scheduled; restrict strenuous physical exertion.',
-      status: 'Active'
-    },
-    {
-      id: 'cp-2',
-      bedNumber: 'ICU-02',
-      patientName: 'Sunita Sharma',
-      diagnosis: 'Congestive Heart Failure, Fluid Volume Excess & Dyspnea',
-      goals: 'Negative fluid balance -500ml/24h; SpO2 > 95% on 2L O2; resolve peripheral edema.',
-      interventions: 'Strict intake/output charting; daily morning weights; elevate head of bed 45 degrees; IV Lasix push as ordered; sodium-restricted cardiac diet.',
-      status: 'Active'
-    },
-    {
-      id: 'cp-3',
-      bedNumber: 'ICU-03',
-      patientName: 'Vikram Joshi',
-      diagnosis: 'Post-CABG Day 2, Acute Surgical Wound Discomfort & Pulmonary Atelectasis',
-      goals: 'Incentive spirometry 10 breaths/hr; early ambulation to chair twice daily; surgical chest tube drainage < 100ml/shift.',
-      interventions: 'Assist with chest physiotherapy; monitor sternal incision for erythema/drainage; maintain sterile mediastinal tube dressing; administer multimodal analgesia.',
-      status: 'Active'
-    }
-  ]);
+  // Care Plans State - derived dynamically from occupied beds in HospitalContext
+  const [carePlans, setCarePlans] = useState<CarePlan[]>([]);
   const [isCarePlanModalOpen, setIsCarePlanModalOpen] = useState(false);
   const [newCarePlan, setNewCarePlan] = useState({
     patientName: '',
@@ -170,22 +142,11 @@ export const NursingDashboard: React.FC = () => {
     interventions: ''
   });
 
-  // Shift Handovers State
-  const [handovers, setHandovers] = useState<ShiftHandoverRecord[]>([
-    {
-      id: 'ho-1',
-      ward: 'ICU-A',
-      shift: 'Night to Morning',
-      nurse: 'Staff Nurse Priya S., RN',
-      occupied: 4,
-      criticalNotes: 'Bed ICU-02 (Sunita Sharma) required 2L O2 nasal cannula at 04:00 AM due to SpO2 dip to 91%. Dr. Sharma informed.',
-      pendingTasks: 'Collect 08:00 AM serum electrolytes for ICU-02; chest X-ray portable scheduled for ICU-03 at 10:00 AM.',
-      timestamp: '07:00 AM'
-    }
-  ]);
+  // Shift Handovers State - initialized dynamic from zero
+  const [handovers, setHandovers] = useState<ShiftHandoverRecord[]>([]);
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
   const [handoverShift, setHandoverShift] = useState('Morning to Evening');
-  const [handoverIncomingNurse, setHandoverIncomingNurse] = useState('Staff Nurse Kavita R., RN');
+  const [handoverIncomingNurse, setHandoverIncomingNurse] = useState('Charge Nurse, RN');
   const [handoverCriticalNotes, setHandoverCriticalNotes] = useState('');
   const [handoverPendingTasks, setHandoverPendingTasks] = useState('');
 
@@ -198,12 +159,37 @@ export const NursingDashboard: React.FC = () => {
   const [outputDrain, setOutputDrain] = useState('50');
   const [outputVomitus, setOutputVomitus] = useState('0');
 
-  const [medicationsDue, setMedicationsDue] = useState<MedicationDue[]>([
-    { id: 'm1', bedNumber: 'ICU-01', patientName: 'Ramesh Patel', drug: 'Aspirin 75mg', dosage: '1 Tab Enteric-Coated', route: 'Oral', dueTime: '12:00 PM', status: 'Due' },
-    { id: 'm2', bedNumber: 'ICU-02', patientName: 'Sunita Sharma', drug: 'Furosemide (Lasix) 40mg', dosage: '40mg IV Push slowly over 2m', route: 'IV Slow Push', dueTime: '11:30 AM', status: 'Due' },
-    { id: 'm3', bedNumber: 'ICU-03', patientName: 'Vikram Joshi', drug: 'Ceftriaxone 1g', dosage: '1g in 100ml Normal Saline', route: 'IV Piggyback', dueTime: '02:00 PM', status: 'Due' },
-    { id: 'm4', bedNumber: 'ICU-06', patientName: 'Meena Saxena', drug: 'Levofloxacin 500mg', dosage: '500mg IV Infusion over 60m', route: 'IV Infusion', dueTime: '01:00 PM', status: 'Due' }
-  ]);
+  // e-MAR Medications Due State - derived dynamically from occupied beds
+  const [medicationsDue, setMedicationsDue] = useState<MedicationDue[]>([]);
+
+  useEffect(() => {
+    const occupied = hospitalBeds.filter(b => b.status === 'Occupied' && b.patient);
+    if (occupied.length > 0) {
+      setCarePlans(occupied.map((b, idx) => ({
+        id: `cp-${idx + 1}`,
+        bedNumber: b.bedNumber,
+        patientName: b.patient!.name,
+        diagnosis: b.patient!.diagnosis || 'Inpatient Clinical Care Plan',
+        goals: 'Maintain hemodynamic stability; vitals within normal parameters.',
+        interventions: 'Continuous bedside telemetry; scheduled vitals assessment; nurse shift monitoring.',
+        status: 'Active'
+      })));
+
+      setMedicationsDue(occupied.map((b, idx) => ({
+        id: `m-${idx + 1}`,
+        bedNumber: b.bedNumber,
+        patientName: b.patient!.name,
+        drug: 'Prescribed Ward Inpatient Medication',
+        dosage: '1 Dose as per e-MAR chart',
+        route: 'Oral / IV as charted',
+        dueTime: 'Next Scheduled Dose',
+        status: 'Due'
+      })));
+    } else {
+      setCarePlans([]);
+      setMedicationsDue([]);
+    }
+  }, [hospitalBeds]);
 
   // Modal States
   const [selectedBed, setSelectedBed] = useState<InpatientBed | null>(null);
@@ -640,7 +626,14 @@ export const NursingDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {medicationsDue.map((item) => (
+              {medicationsDue.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-sm text-slate-500">
+                    No medications scheduled for administration. All prescribed doses are up to date.
+                  </td>
+                </tr>
+              ) : (
+                medicationsDue.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-slate-900">{item.patientName}</div>
@@ -678,7 +671,7 @@ export const NursingDashboard: React.FC = () => {
                     )}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
@@ -713,7 +706,14 @@ export const NursingDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-3">
-            {carePlans.map((cp) => (
+            {carePlans.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <ClipboardList className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">No active care plans created yet</p>
+                <p className="text-xs text-slate-500">Create a new individualized nursing care plan for an admitted patient above.</p>
+              </div>
+            ) : (
+              carePlans.map((cp) => (
               <div key={cp.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -739,7 +739,7 @@ export const NursingDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}
@@ -763,7 +763,14 @@ export const NursingDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {handovers.map((h) => (
+            {handovers.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <ArrowRightLeft className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">No shift handovers logged yet</p>
+                <p className="text-xs text-slate-500">Record a shift handover report using the button above.</p>
+              </div>
+            ) : (
+              handovers.map((h) => (
               <div key={h.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -784,7 +791,7 @@ export const NursingDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}

@@ -525,7 +525,7 @@ export const HospitalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 gender: 'Male',
                 admittedDate: b.allocated_from ? b.allocated_from.slice(0, 10) : new Date().toISOString().slice(0, 10),
                 diagnosis: b.initial_diagnosis || 'Under Inpatient Observation',
-                attendingDoctor: 'Dr. Rajesh Sharma',
+                attendingDoctor: b.attending_doctor || 'Attending Physician',
                 vitals: {
                   bp: '122 / 80 mmHg',
                   hr: '76 bpm',

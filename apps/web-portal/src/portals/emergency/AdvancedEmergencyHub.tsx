@@ -84,59 +84,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
   };
 
   // 1. Live ED Patients - synchronized with HospitalContext
-  const [patients, setPatients] = useState<EmergencyPatient[]>([
-    {
-      id: 'ed-1',
-      encounterNumber: 'ED-2026-9011',
-      patientName: 'Unidentified Male (Found Unconscious)',
-      uhid: 'TEMP-UHID-ED-88412',
-      isUnknownIdentity: true,
-      age: '~35',
-      gender: 'M',
-      arrivalMode: 'AMBULANCE',
-      presentingComplaint: 'High-speed motor vehicle collision, severe head trauma, flail chest',
-      esiLevel: 1,
-      zone: 'RED_RESUS',
-      vitals: { hr: 138, bp: '78/42', rr: 32, spo2: 84, gcs: 6 },
-      arrivalTime: '10:45 AM (8 mins ago)',
-      isMedicoLegal: true,
-      status: 'IN_RESUS',
-    },
-    {
-      id: 'ed-2',
-      encounterNumber: 'ED-2026-9012',
-      patientName: 'Kavita Sundaram',
-      uhid: 'APEX-2026-00088',
-      isUnknownIdentity: false,
-      age: 62,
-      gender: 'F',
-      arrivalMode: 'WALK_IN',
-      presentingComplaint: 'Crushing retrosternal chest pain radiating to left jaw, diaphoresis',
-      esiLevel: 2,
-      zone: 'YELLOW_ACUTE',
-      vitals: { hr: 96, bp: '154/92', rr: 20, spo2: 95, gcs: 15 },
-      arrivalTime: '10:30 AM (23 mins ago)',
-      isMedicoLegal: false,
-      status: 'UNDER_OBSERVATION',
-    },
-    {
-      id: 'ed-3',
-      encounterNumber: 'ED-2026-9013',
-      patientName: 'Arjun Mehta',
-      uhid: 'APEX-2026-00109',
-      isUnknownIdentity: false,
-      age: 28,
-      gender: 'M',
-      arrivalMode: 'WALK_IN',
-      presentingComplaint: 'Colles fracture right wrist after fall from two-wheeler',
-      esiLevel: 4,
-      zone: 'GREEN_FAST_TRACK',
-      vitals: { hr: 78, bp: '122/80', rr: 16, spo2: 99, gcs: 15 },
-      arrivalTime: '10:15 AM (38 mins ago)',
-      isMedicoLegal: true,
-      status: 'UNDER_OBSERVATION',
-    },
-  ]);
+  const [patients, setPatients] = useState<EmergencyPatient[]>([]);
 
   useEffect(() => {
     if (emergencyPatients.length > 0) {
@@ -151,7 +99,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
       vehicleNumber: 'MH-12-ED-1081',
       type: 'ALS (Advanced Life Support Mobile ICU)',
       status: 'EN_ROUTE_HOSPITAL',
-      paramedic: 'Paramedic Rahul Sharma',
+      paramedic: 'Lead Paramedic (ALS-1)',
       driver: 'Mahesh Patil',
       currentLocation: 'Western Express Highway (4.2 km away)',
       activeTripEta: '6 mins remaining',
@@ -161,7 +109,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
       vehicleNumber: 'MH-12-ED-1082',
       type: 'ALS (Advanced Life Support)',
       status: 'AVAILABLE',
-      paramedic: 'Paramedic Sunita Rao',
+      paramedic: 'Lead Paramedic (ALS-2)',
       driver: 'Anil Kadam',
       currentLocation: 'Hospital Base Station Bay 2',
     },
@@ -170,7 +118,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
       vehicleNumber: 'MH-12-ED-1083',
       type: 'BLS (Basic Life Support)',
       status: 'AVAILABLE',
-      paramedic: 'EMT Vikram Shinde',
+      paramedic: 'EMT Specialist (BLS-1)',
       driver: 'Pravin Pawar',
       currentLocation: 'Hospital Base Station Bay 3',
     },
@@ -349,7 +297,14 @@ export const AdvancedEmergencyHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600">
-                {patients.map((p) => (
+                {patients.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                      No emergency patients currently awaiting triage or resuscitation in the Emergency Department.
+                    </td>
+                  </tr>
+                ) : (
+                  patients.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50/60">
                     <td className="py-3.5 px-4">
                       <span
@@ -396,7 +351,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
                       </Button>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>
@@ -413,7 +368,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
                 <h3 className="font-bold text-slate-900 text-base">ATLS Primary Survey & Resuscitation Checklist</h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Active Case: Unidentified Male (TEMP-UHID-ED-88412) · Red Resus Bay 1
+                Active Case: {patients[0]?.patientName || 'Emergency Patient'} ({patients[0]?.uhid || 'UHID-ED'}) · {patients[0]?.zone?.replace(/_/g, ' ') || 'Red Resus Bay 1'}
               </p>
             </div>
             <span className="px-3 py-1 bg-rose-100 text-rose-800 font-bold rounded-lg text-xs animate-pulse">

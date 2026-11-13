@@ -41,7 +41,7 @@ interface Invoice {
 export const FinanceDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
-  const { invoices: hospitalInvoices, createInvoice, collectInvoicePayment } = useHospital();
+  const { invoices: hospitalInvoices, patients, createInvoice, collectInvoicePayment } = useHospital();
   const [activeTab, setActiveTab] = useState<'invoices' | 'insurance' | 'rcm'>('invoices');
 
   useEffect(() => {
@@ -83,10 +83,10 @@ export const FinanceDashboard: React.FC = () => {
 
   // Generate Invoice Modal State
   const [isNewInvoiceOpen, setIsNewInvoiceOpen] = useState(false);
-  const [newInvPatient, setNewInvPatient] = useState('Vikram Joshi');
-  const [newInvUhid, setNewInvUhid] = useState('APEX-2026-00051');
+  const [newInvPatient, setNewInvPatient] = useState('');
+  const [newInvUhid, setNewInvUhid] = useState('');
   const [newInvType, setNewInvType] = useState('IPD Surgery & Ward Care');
-  const [newInvAmount, setNewInvAmount] = useState(35000);
+  const [newInvAmount, setNewInvAmount] = useState(0);
 
   // Refund Modal State
   const [refundInvoice, setRefundInvoice] = useState<Invoice | null>(null);
@@ -96,17 +96,13 @@ export const FinanceDashboard: React.FC = () => {
   const [supervisorPin, setSupervisorPin] = useState('AUTH-MGR-88');
 
   // TPA Claims State
-  const [tpaClaims, setTpaClaims] = useState([
-    { tpa: 'Star Health & Allied', patient: 'Sunita Sharma', claimId: 'CLM-STAR-8812', amount: '₹ 71,400', status: 'Pre-Auth Approved (85%)' },
-    { tpa: 'ICICI Lombard Health', patient: 'Vikram Joshi', claimId: 'CLM-ICICI-4410', amount: '₹ 1,20,000', status: 'Initial Query Raised' },
-    { tpa: 'Ayushman Bharat (PM-JAY)', patient: 'Mohan Das', claimId: 'CLM-PMJAY-1940', amount: '₹ 38,000', status: 'Approved 100%' }
-  ]);
+  const [tpaClaims, setTpaClaims] = useState<{ tpa: string; patient: string; claimId: string; amount: string; status: string }[]>([]);
   const [isTpaModalOpen, setIsTpaModalOpen] = useState(false);
   const [tpaInsurer, setTpaInsurer] = useState('Star Health & Allied Insurance');
-  const [tpaPatientName, setTpaPatientName] = useState('Ramesh Patel');
-  const [tpaPolicyNo, setTpaPolicyNo] = useState('POL-SH-2026-99124');
-  const [tpaEstCost, setTpaEstCost] = useState(65000);
-  const [tpaDiagnosis, setTpaDiagnosis] = useState('Coronary Angiography & Medical Stabilization');
+  const [tpaPatientName, setTpaPatientName] = useState('');
+  const [tpaPolicyNo, setTpaPolicyNo] = useState('');
+  const [tpaEstCost, setTpaEstCost] = useState(0);
+  const [tpaDiagnosis, setTpaDiagnosis] = useState('');
 
   const handleOpenPayment = (inv: Invoice) => {
     setSelectedInvoice(inv);
@@ -429,7 +425,14 @@ export const FinanceDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {tpaClaims.map((claim, idx) => (
+            {tpaClaims.length === 0 ? (
+              <div className="col-span-full p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">No active TPA pre-authorization claims</p>
+                <p className="text-xs text-slate-500">Submit a new pre-authorization request with an insurance provider above.</p>
+              </div>
+            ) : (
+              tpaClaims.map((claim, idx) => (
               <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-900">{claim.tpa}</span>
@@ -453,7 +456,7 @@ export const FinanceDashboard: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         </div>
       )}
@@ -556,10 +559,24 @@ export const FinanceDashboard: React.FC = () => {
               <label className="block text-slate-700 font-semibold mb-1">Patient Full Name</label>
               <input
                 type="text"
+                list="billing-patients"
+                placeholder="Type or select patient"
                 value={newInvPatient}
-                onChange={(e) => setNewInvPatient(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewInvPatient(val);
+                  const matched = patients.find((p) => p.name.toLowerCase() === val.toLowerCase());
+                  if (matched) {
+                    setNewInvUhid(matched.uhid);
+                  }
+                }}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               />
+              <datalist id="billing-patients">
+                {patients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.uhid}</option>
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-slate-700 font-semibold mb-1">UHID</label>
@@ -715,10 +732,17 @@ export const FinanceDashboard: React.FC = () => {
               <label className="block text-slate-700 font-semibold mb-1">Patient Full Name</label>
               <input
                 type="text"
+                list="tpa-patients"
+                placeholder="Type or select patient"
                 value={tpaPatientName}
                 onChange={(e) => setTpaPatientName(e.target.value)}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               />
+              <datalist id="tpa-patients">
+                {patients.map((p) => (
+                  <option key={p.id} value={p.name}>{p.uhid}</option>
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-slate-700 font-semibold mb-1">Estimated Inpatient Cost (₹)</label>

@@ -117,50 +117,7 @@ export const AdvancedOTHub: React.FC = () => {
   ]);
 
   // 2. Surgery Schedule
-  const [schedules, setSchedules] = useState<ScheduledSurgery[]>([
-    {
-      id: 'surg-1',
-      patientName: 'Ramesh Verma',
-      uhid: 'APEX-2026-00084',
-      age: 58,
-      gender: 'M',
-      procedureName: 'Off-Pump Coronary Artery Bypass (CABG)',
-      primarySurgeon: 'Dr. Vikram Sethi (CTVS)',
-      anaesthetist: 'Dr. Ananya Roy (Chief Cardiac Anaesthetist)',
-      theatreName: 'OT-Suite 1 (Modular)',
-      scheduledTime: '08:30 AM - 12:30 PM',
-      priority: 'ELECTIVE',
-      status: 'IN_THEATRE',
-    },
-    {
-      id: 'surg-2',
-      patientName: 'Kavita Patel',
-      uhid: 'APEX-2026-00087',
-      age: 41,
-      gender: 'F',
-      procedureName: 'Laparoscopic Cholecystectomy',
-      primarySurgeon: 'Dr. Rajesh Sharma',
-      anaesthetist: 'Dr. Suresh Nair',
-      theatreName: 'OT-Suite 3 (Endosuite)',
-      scheduledTime: '11:00 AM - 12:15 PM',
-      priority: 'ELECTIVE',
-      status: 'IN_PREOP',
-    },
-    {
-      id: 'surg-3',
-      patientName: 'Deepak Chopra',
-      uhid: 'APEX-2026-00104',
-      age: 34,
-      gender: 'M',
-      procedureName: 'Emergency Laparotomy (Blunt Abdominal Trauma)',
-      primarySurgeon: 'Dr. Vikram Sethi',
-      anaesthetist: 'Dr. Ananya Roy',
-      theatreName: 'OT-Suite 4 (Emergency)',
-      scheduledTime: 'STAT (Immediate)',
-      priority: 'STAT_EMERGENCY',
-      status: 'SCHEDULED',
-    },
-  ]);
+  const [schedules, setSchedules] = useState<ScheduledSurgery[]>([]);
 
   useEffect(() => {
     if (otSurgeries.length > 0) {
@@ -390,7 +347,14 @@ export const AdvancedOTHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {schedules.map((s) => (
+              {schedules.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                    No surgical procedures currently scheduled in Operating Theatres.
+                  </td>
+                </tr>
+              ) : (
+                schedules.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50/60">
                   <td className="py-3.5 px-4">
                     <span
@@ -440,7 +404,7 @@ export const AdvancedOTHub: React.FC = () => {
                     </Button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
@@ -506,7 +470,7 @@ export const AdvancedOTHub: React.FC = () => {
                 </label>
               </div>
               <div className="pt-2 border-t border-emerald-200 text-[11px] text-emerald-800 font-medium">
-                Verified at 08:35 AM by Dr. Ananya Roy (Anaesthetist)
+                Verified by {schedules[0]?.anaesthetist || 'Attending Anaesthesiologist'}
               </div>
             </div>
 
@@ -548,7 +512,7 @@ export const AdvancedOTHub: React.FC = () => {
                   </Button>
                 ) : (
                   <span className="text-[11px] text-emerald-800 font-medium">
-                    Verified at 08:58 AM by Dr. Vikram Sethi & Team
+                    Verified by {schedules[0]?.primarySurgeon || 'Lead Surgeon'} & Surgical Team
                   </span>
                 )}
               </div>

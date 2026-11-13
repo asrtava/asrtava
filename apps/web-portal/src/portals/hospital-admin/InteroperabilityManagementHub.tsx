@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Activity,
   Layers,
@@ -19,10 +19,33 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Button, Badge, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 export const InteroperabilityManagementHub: React.FC = () => {
   const { showToast } = useToast();
+  const { patients, appointments, prescriptions, labOrders, radiologyOrders, invoices } = useHospital();
   const [activeSubTab, setActiveSubTab] = useState<'hl7' | 'fhir' | 'dicom' | 'devices' | 'terminology' | 'insurance' | 'dlq'>('hl7');
+
+  const fhirResources = useMemo(() => [
+    { res: 'Patient', count: `${patients.length.toLocaleString()} Records`, desc: 'Demographics, UHID, ABHA address & contacts' },
+    { res: 'Encounter', count: `${appointments.length.toLocaleString()} Visits`, desc: 'OPD consults, IPD admissions & triage episodes' },
+    { res: 'Observation', count: `${labOrders.length.toLocaleString()} Analytes`, desc: 'Vital signs, lab bio-reference values & flags' },
+    { res: 'DiagnosticReport', count: `${radiologyOrders.length.toLocaleString()} Reports`, desc: 'Hematology, biochemistry & radiology PACS' },
+    { res: 'MedicationRequest', count: `${prescriptions.length.toLocaleString()} Rx`, desc: 'Prescriptions, dosages & frequencies' },
+    { res: 'Coverage & Claim', count: `${invoices.length.toLocaleString()} Filings`, desc: 'Insurance policies, pre-auth & NHCX claims' },
+  ], [patients.length, appointments.length, labOrders.length, radiologyOrders.length, prescriptions.length, invoices.length]);
+
+  const dicomWorklist = useMemo(() => {
+    return radiologyOrders.map((ro) => ({
+      acc: ro.orderNumber,
+      uhid: ro.uhid,
+      name: ro.patientName,
+      mod: (ro.procedures && ro.procedures[0]?.includes('MRI')) ? 'MR' : (ro.procedures && ro.procedures[0]?.includes('CT')) ? 'CT' : (ro.procedures && ro.procedures[0]?.includes('Ultrasound')) ? 'US' : 'XR',
+      desc: (ro.procedures && ro.procedures.join(', ')) || 'Diagnostic Imaging Study',
+      aet: 'PACS_MODALITY_01',
+      status: ro.status === 'Reported & Signed' ? 'COMPLETED' : 'SCHEDULED'
+    }));
+  }, [radiologyOrders]);
 
   // HL7 Simulator State
   const [hl7Input, setHl7Input] = useState(
@@ -270,14 +293,7 @@ export const InteroperabilityManagementHub: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { res: 'Patient', count: '1,420 Records', desc: 'Demographics, UHID, ABHA address & contacts' },
-              { res: 'Encounter', count: '890 Visits', desc: 'OPD consults, IPD admissions & triage episodes' },
-              { res: 'Observation', count: '3,150 Analytes', desc: 'Vital signs, lab bio-reference values & flags' },
-              { res: 'DiagnosticReport', count: '740 Reports', desc: 'Hematology, biochemistry & radiology PACS' },
-              { res: 'MedicationRequest', count: '2,110 Rx', desc: 'Prescriptions, dosages & frequencies' },
-              { res: 'Coverage & Claim', count: '194 Filings', desc: 'Insurance policies, pre-auth & NHCX claims' },
-            ].map((f) => (
+            {fhirResources.map((f) => (
               <div key={f.res} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-mono font-bold text-teal-800 text-sm">{f.res}</span>
@@ -316,11 +332,14 @@ export const InteroperabilityManagementHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {[
-                  { acc: 'ACC-20261109-101', uhid: 'UHID-2026-9081', name: 'Arjun Verma', mod: 'CT', desc: 'CT Brain Plain - Emergency Trauma Evaluation', aet: 'CT_CONSOLE_01', status: 'SCHEDULED' },
-                  { acc: 'ACC-20261109-102', uhid: 'UHID-2026-9082', name: 'Kavita Nair', mod: 'MR', desc: 'MRI Lumbar Spine with Contrast', aet: 'MR_CONSOLE_02', status: 'SCHEDULED' },
-                  { acc: 'ACC-20261109-103', uhid: 'UHID-2026-9083', name: 'Rohan Mehra', mod: 'US', desc: 'Ultrasound Whole Abdomen', aet: 'US_PORTABLE_01', status: 'IN_PROGRESS' },
-                ].map((row) => (
+                {dicomWorklist.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                      No DICOM Modality Worklist (MWL) entries pending. Orders placed by physicians populate this worklist automatically.
+                    </td>
+                  </tr>
+                ) : (
+                  dicomWorklist.map((row) => (
                   <tr key={row.acc} className="hover:bg-slate-50/60">
                     <td className="py-3 px-3 font-mono font-bold text-teal-700">{row.acc}</td>
                     <td className="py-3 px-3 font-mono">{row.uhid}</td>
@@ -334,7 +353,7 @@ export const InteroperabilityManagementHub: React.FC = () => {
                       <Badge variant="success" size="sm">{row.status}</Badge>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

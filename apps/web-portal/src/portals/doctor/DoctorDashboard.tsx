@@ -99,6 +99,8 @@ export const DoctorDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { user, activePortalTab, setActivePortalTab } = useAuth();
   const {
+    appointments: hospitalAppointments,
+    beds: hospitalBeds,
     addPrescription: hospitalAddPrescription,
     orderLabTests: hospitalOrderLabTests,
     orderRadiology: hospitalOrderRadiology,
@@ -269,6 +271,60 @@ export const DoctorDashboard: React.FC = () => {
   useEffect(() => {
     fetchAllDoctorData();
   }, []);
+
+  // Synchronize Doctor's Patient Queue reactively with HospitalContext.appointments
+  useEffect(() => {
+    if (hospitalAppointments && hospitalAppointments.length > 0) {
+      const liveQueue: PatientQueueItem[] = hospitalAppointments.map((a, idx) => ({
+        id: a.patientId || a.id,
+        appointmentId: a.id,
+        token: a.token || `T-${String(idx + 1).padStart(3, '0')}`,
+        name: a.patientName,
+        uhid: a.uhid,
+        age: a.age || 35,
+        gender: a.gender || 'Male',
+        phone: a.phone,
+        time: a.time || '10:00 AM',
+        complaint: a.complaint || 'Outpatient clinical consultation.',
+        status: a.status === 'Completed' ? 'Completed' : a.status === 'In Consultation' ? 'In Consultation' : 'Waiting',
+        vitals: { bp: '120 / 80 mmHg', hr: '74 bpm', temp: '98.6 °F', spo2: '99%', sugar: '105 mg/dL' },
+        notes: a.complaint ? `Chief Complaint: ${a.complaint}` : 'Routine OPD consultation.',
+        diagnosis: '',
+        prescriptions: []
+      }));
+      setPatients(liveQueue);
+      if (liveQueue.length > 0 && !selectedPatientId) {
+        const firstWaiting = liveQueue.find(p => p.status !== 'Completed') || liveQueue[0];
+        setSelectedPatientId(firstWaiting.id);
+      }
+    }
+  }, [hospitalAppointments]);
+
+  // Synchronize Inpatients for rounds reactively with HospitalContext.beds
+  useEffect(() => {
+    const occupied = hospitalBeds.filter(b => b.status === 'Occupied' && b.patient);
+    if (occupied.length > 0) {
+      const liveIpd: InpatientItem[] = occupied.map((b, idx) => ({
+        id: b.id || `adm-${idx + 1}`,
+        admissionId: b.patient?.admissionNumber || `ADM-${b.bedNumber}`,
+        name: b.patient?.name || `Inpatient ${b.bedNumber}`,
+        uhid: b.patient?.uhid || `UHID-INP-${idx + 1}`,
+        bed: b.bedNumber,
+        ward: b.wardName,
+        diagnosis: b.patient?.diagnosis || 'Under Clinical Observation',
+        vitals: `BP: ${b.patient?.vitals?.bp || '120/80'} | HR: ${b.patient?.vitals?.hr || '76'} | SpO2: ${b.patient?.vitals?.spo2 || '99%'}`,
+        roundNote: 'Vitals stable. Continuing physician observation and prescribed ward medications.',
+        status: 'Admitted'
+      }));
+      setIpdPatients(liveIpd);
+      if (liveIpd.length > 0 && !selectedIpdPatientId) {
+        setSelectedIpdPatientId(liveIpd[0].id);
+        setActiveIpdRoundNote(liveIpd[0].roundNote);
+      }
+    } else {
+      setIpdPatients([]);
+    }
+  }, [hospitalBeds]);
 
   const handleManualRefresh = () => {
     setRefreshing(true);
