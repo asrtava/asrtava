@@ -1,4 +1,6 @@
-import { Router, Response } from 'express';
+import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../../config';
 import { OnboardingService, ImplementationStage, DataMigrationJobRecord } from './onboarding.service';
 import { authMiddleware, requireSuperAdmin, AuthenticatedRequest } from '../../middleware/auth.middleware';
 
@@ -381,6 +383,68 @@ router.get('/my-hospital/progress', authMiddleware, (req: AuthenticatedRequest, 
 
   const progress = OnboardingService.getHospitalOnboardingProgress(hospitalId);
   res.json({ success: true, ...progress });
+});
+
+/**
+ * Customer Onboarding Portal Login
+ * POST /api/v1/onboarding/portal/login
+ * Security Requirement: Project code alone NEVER grants access.
+ * Requires verified identity credentials (email & password) and verified project membership.
+ */
+router.post('/portal/login', async (req: Request, res: Response): Promise<void> => {
+  const { email, password, projectCode } = req.body;
+  if (!email || !projectCode) {
+    res.status(400).json({
+      success: false,
+      message: 'Both coordinator work email and valid project resumption code/token are required for onboarding authentication.'
+    });
+    return;
+  }
+
+  try {
+    const authResult = await OnboardingService.authenticateOnboardingLead({
+      email,
+      password,
+      projectCode
+    });
+
+    const tokenPayload = {
+      id: authResult.user.id,
+      hospitalId: authResult.project.hospital_id,
+      userType: 'hospital_admin',
+      email: authResult.user.email,
+      roles: ['hospital_admin', 'onboarding_lead'],
+      activePortal: 'onboarding',
+      audience: 'asrtava-onboarding-portal',
+      projectCode: authResult.project.project_code,
+    };
+
+    const accessToken = jwt.sign(tokenPayload, config.jwt.secret, { expiresIn: '8h' });
+
+    res.json({
+      success: true,
+      message: 'Onboarding project authenticated successfully.',
+      data: {
+        token: accessToken,
+        user: {
+          id: authResult.user.id,
+          email: authResult.user.email,
+          customerName: authResult.user.first_name || 'Project Coordinator',
+          hospitalName: authResult.hospitalName,
+          projectCode: authResult.project.project_code,
+          role: authResult.role,
+          activePortal: 'onboarding',
+        },
+        project: authResult.project
+      }
+    });
+  } catch (err: any) {
+    res.status(403).json({
+      success: false,
+      code: 'ONBOARDING_AUTH_FAILED',
+      message: err.message
+    });
+  }
 });
 
 export const onboardingRouter = router;

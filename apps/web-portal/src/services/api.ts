@@ -133,6 +133,8 @@ export const authApi = {
     apiClient.post('/auth/mfa/disable', data),
   inviteStaff: (data: { hospitalId: string; email: string; phone?: string; firstName: string; lastName: string; roleIds: string[] }) =>
     apiClient.post('/auth/users/invite', data),
+  loginOnboardingPortal: (data: { email: string; password?: string; projectCode: string }) =>
+    apiClient.post('/onboarding/portal/login', data),
   activateAccount: (data: { token: string; password: string }) =>
     apiClient.post('/auth/activate-account', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>

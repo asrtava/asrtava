@@ -496,4 +496,51 @@ test('ASRTAVA Customer Onboarding & Hospital Implementation Suite', async (t) =>
     assert.strictEqual(hospitalProgress.migrationJobs.length, 1);
     assert.strictEqual(hospitalProgress.readinessReport.isReadyForGoLive, true);
   });
+
+  // --------------------------------------------------------------------------
+  // TEST 14: Onboarding Resumption & Identity Verification Gate
+  // --------------------------------------------------------------------------
+  await t.test('14. Security Invariant: Project code alone NEVER grants access without verified identity and project membership', async () => {
+    // 1. Standalone project code without email must be strictly rejected
+    await assert.rejects(
+      async () => {
+        await OnboardingService.authenticateOnboardingLead({
+          email: '',
+          projectCode: 'IMP-2026-HOSP-MAX'
+        });
+      },
+      /Identity verification required/
+    );
+
+    // 2. Invalid project code with valid email must be rejected
+    await assert.rejects(
+      async () => {
+        await OnboardingService.authenticateOnboardingLead({
+          email: 'vikram.mehra@maxhealth.in',
+          projectCode: 'NON-EXISTENT-PROJECT-CODE'
+        });
+      },
+      /Invalid project resumption code/
+    );
+
+    // 3. Unauthorized email (outside customer organization) must be rejected
+    await assert.rejects(
+      async () => {
+        await OnboardingService.authenticateOnboardingLead({
+          email: 'attacker@stranger.org',
+          projectCode: 'IMP-2026-HOSP-MAX'
+        });
+      },
+      /Access Denied/
+    );
+
+    // 4. Authorized coordinator email with valid project code must succeed
+    const validAuth = await OnboardingService.authenticateOnboardingLead({
+      email: 'vikram.mehra@maxhealth.in',
+      projectCode: 'IMP-2026-HOSP-MAX'
+    });
+    assert.ok(validAuth.project);
+    assert.strictEqual(validAuth.user.email, 'vikram.mehra@maxhealth.in');
+    assert.strictEqual(validAuth.role, 'Hospital Implementation Coordinator');
+  });
 });

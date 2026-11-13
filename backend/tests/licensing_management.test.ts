@@ -294,9 +294,24 @@ test('ASRTAVA Perpetual Software Licensing & Commercial Management Suite', async
     assert.strictEqual(ptCheck.allowed, true);
     assert.strictEqual(ptCheck.isFailSafeBypass, true);
 
-    // Non-critical module (e.g. HR or Inventory) is appropriately blocked
-    const hrCheck = LicenseService.checkModuleEntitlement(UNLICENSED_HOSPITAL, 'module:hr');
-    assert.strictEqual(hrCheck.allowed, false);
+    // Non-critical modules are strictly blocked (fail-safe does NOT grant unauthorized access)
+    const blockedModules = [
+      'module:pharmacy',
+      'module:billing',
+      'module:lis',
+      'module:ris',
+      'module:ot',
+      'module:telemedicine',
+      'module:hr',
+      'module:inventory',
+      'module:analytics'
+    ];
+
+    for (const mod of blockedModules) {
+      const check = LicenseService.checkModuleEntitlement(UNLICENSED_HOSPITAL, mod);
+      assert.strictEqual(check.allowed, false, `Module ${mod} must not be bypassed under emergency fail-safe`);
+      assert.strictEqual(check.isFailSafeBypass, undefined, `Module ${mod} must not have failSafeBypass set`);
+    }
   });
 
   // --------------------------------------------------------------------------

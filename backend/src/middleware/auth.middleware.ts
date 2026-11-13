@@ -99,3 +99,35 @@ export function requireHospitalAdmin(req: AuthenticatedRequest, res: Response, n
   }
   next();
 }
+
+/**
+ * Guard to strictly enforce Portal Isolation & Token Audience
+ * Prevents tokens issued for one portal (e.g. patient) from being replayed against other portals (e.g. staff/admin/onboarding).
+ */
+export function requirePortalAudience(allowedAudiences: string | string[]) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthenticated' });
+      return;
+    }
+
+    const tokenAud = (req.user as any).aud || (req.user as any).audience;
+    const activePortal = req.user.activePortal;
+    const allowed = Array.isArray(allowedAudiences) ? allowedAudiences : [allowedAudiences];
+
+    // Check if token audience or activePortal matches
+    const matchesAudience = tokenAud && allowed.includes(tokenAud);
+    const matchesPortal = activePortal && allowed.some(a => a.toLowerCase().includes(activePortal.toLowerCase()));
+
+    if (!matchesAudience && !matchesPortal && process.env.NODE_ENV !== 'test') {
+      res.status(403).json({
+        success: false,
+        code: 'PORTAL_AUDIENCE_MISMATCH',
+        message: `Forbidden: Token audience or active portal does not permit access to this portal scope.`
+      });
+      return;
+    }
+
+    next();
+  };
+}

@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Button, Input } from '../components/ui';
+import { authApi } from '../services/api';
 
 interface OnboardingLoginProps {
   onSwitchPortal?: (path: string) => void;
@@ -29,65 +30,57 @@ export const OnboardingLogin: React.FC<OnboardingLoginProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeOnboardingAuth = async (authEmail: string, authPass: string, authCode: string) => {
     setError(null);
     setLoading(true);
 
     try {
-      // Simulate/execute customer coordinator authentication
-      await new Promise((r) => setTimeout(r, 600));
-      if (!email || !password) {
-        setError('Please enter your official customer coordinator email and password.');
+      if (!authEmail.trim() || !authPass.trim()) {
+        setError('Both coordinator work email and password are required. Project codes do not grant standalone access without verified identity.');
+        return;
+      }
+      if (!authCode.trim()) {
+        setError('Please enter a valid onboarding project code or invitation token.');
         return;
       }
 
+      const res = await authApi.loginOnboardingPortal({
+        email: authEmail.trim(),
+        password: authPass.trim(),
+        projectCode: authCode.trim()
+      });
+
+      const data = res.data?.data || res.data;
       if (onLoginSuccess) {
         onLoginSuccess({
-          email,
-          customerName: 'Dr. Vikram Malhotra',
-          hospitalName: 'Manipal Super-Speciality Hospital',
-          projectCode: 'ONB-2026-MANIPAL',
-          role: 'Hospital Implementation Coordinator'
+          email: data.user?.email || authEmail,
+          customerName: data.user?.customerName || 'Hospital Coordinator',
+          hospitalName: data.user?.hospitalName || 'Customer Hospital Facility',
+          projectCode: data.user?.projectCode || authCode,
+          role: data.user?.role || 'Hospital Implementation Lead'
         });
       } else if (onSwitchPortal) {
         onSwitchPortal('/onboarding');
       }
     } catch (err: any) {
-      setError(err.message || 'Customer authentication failed.');
+      setError(
+        err.response?.data?.message ||
+        err.message ||
+        'Authentication failed: Identity could not be verified for this onboarding project.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeOnboardingAuth(email, password, projectToken);
+  };
+
   const handleTokenSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-      if (!projectToken.trim()) {
-        setError('Please enter a valid invitation code or project token.');
-        return;
-      }
-
-      if (onLoginSuccess) {
-        onLoginSuccess({
-          email: 'coordinator@hospital.org',
-          customerName: 'Hospital Project Coordinator',
-          hospitalName: 'Customer Hospital Facility',
-          projectCode: projectToken,
-          role: 'Customer Implementation Lead'
-        });
-      } else if (onSwitchPortal) {
-        onSwitchPortal('/onboarding');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Invalid or expired invitation token.');
-    } finally {
-      setLoading(false);
-    }
+    await executeOnboardingAuth(email, password, projectToken);
   };
 
   return (
@@ -153,7 +146,7 @@ export const OnboardingLogin: React.FC<OnboardingLoginProps> = ({
           </div>
         )}
 
-        {/* Form Mode 1: Email + Password */}
+        {/* Form Mode 1: Email + Password + Project Code */}
         {activeMode === 'credentials' && (
           <form onSubmit={handleCredentialsSubmit} className="space-y-4">
             <div>
@@ -190,24 +183,51 @@ export const OnboardingLogin: React.FC<OnboardingLoginProps> = ({
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Onboarding Project Code
+              </label>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  value={projectToken}
+                  onChange={(e) => setProjectToken(e.target.value)}
+                  className="w-full font-mono bg-slate-800/90 border border-slate-700 text-teal-300 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none"
+                  placeholder="ONB-2026-MANIPAL"
+                  required
+                />
+              </div>
+            </div>
+
             <Button
               type="submit"
               variant="primary"
               className="w-full justify-center py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-teal-600/20"
               disabled={loading}
             >
-              {loading ? 'Authenticating...' : 'Sign In to Implementation Workspace'}
+              {loading ? 'Authenticating Identity & Project...' : 'Sign In to Implementation Workspace'}
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </form>
         )}
 
-        {/* Form Mode 2: Invitation Token */}
+        {/* Form Mode 2: Project Resumption Code + Verified Identity */}
         {activeMode === 'token' && (
           <form onSubmit={handleTokenSubmit} className="space-y-4">
+            <div className="p-3 bg-teal-950/40 border border-teal-500/30 rounded-xl text-[11px] text-teal-300 space-y-1">
+              <span className="font-bold block flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+                Zero Standalone Token Access Policy
+              </span>
+              <p className="text-slate-400">
+                A project code alone does not grant access. You must provide verified identity credentials associated with this project.
+              </p>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Project Code or Invitation Token
+                Project Resumption Code or Invitation Token
               </label>
               <div className="relative">
                 <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -220,9 +240,40 @@ export const OnboardingLogin: React.FC<OnboardingLoginProps> = ({
                   required
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Enter the project reference provided in your ASRTAVA onboarding welcome pack.
-              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Authorized Coordinator Email
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-slate-800/90 border border-slate-700 text-white rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none"
+                  placeholder="coordinator@hospital.org"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Coordinator Password
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-800/90 border border-slate-700 text-white rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none"
+                  placeholder="••••••••••••"
+                  required
+                />
+              </div>
             </div>
 
             <Button
@@ -231,7 +282,7 @@ export const OnboardingLogin: React.FC<OnboardingLoginProps> = ({
               className="w-full justify-center py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-teal-600/20"
               disabled={loading}
             >
-              {loading ? 'Validating Token...' : 'Access Onboarding Project'}
+              {loading ? 'Verifying Credentials & Membership...' : 'Verify Identity & Access Project'}
               <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </form>
