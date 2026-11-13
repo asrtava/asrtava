@@ -293,6 +293,17 @@ export const otApi = {
     apiClient.patch(`/ot/schedules/${id}/operative-notes`, data),
 };
 
+export const otAdvancedApi = {
+  getTheatres: (hospitalId?: string) => apiClient.get('/ot/advanced/theatres', { params: { hospitalId } }),
+  registerTheatre: (data: any) => apiClient.post('/ot/advanced/theatres', data),
+  scheduleSurgery: (data: any) => apiClient.post('/ot/advanced/schedules', data),
+  recordWhoChecklist: (data: any) => apiClient.post('/ot/advanced/who-checklist', data),
+  reconcileCounts: (data: any) => apiClient.post('/ot/advanced/surgical-counts', data),
+  admitToPacu: (data: any) => apiClient.post('/ot/advanced/pacu/admit', data),
+  evaluateAldreteScore: (data: any) => apiClient.post('/ot/advanced/pacu/aldrete-score', data),
+  dischargeFromPacu: (data: any) => apiClient.post('/ot/advanced/pacu/discharge', data),
+};
+
 // ============================================================
 // Emergency Department (ED)
 // ============================================================
@@ -301,6 +312,53 @@ export const emergencyApi = {
   triagePatient: (data: any) => apiClient.post('/emergency/triage', data),
   updateDisposition: (id: string, data: any) =>
     apiClient.patch(`/emergency/${id}/disposition`, data),
+};
+
+export const emergencyAdvancedApi = {
+  registerEncounter: (data: any) => apiClient.post('/emergency/advanced/encounters', data),
+  performTriage: (data: any) => apiClient.post('/emergency/advanced/triage', data),
+  activateTraumaTeam: (data: any) => apiClient.post('/emergency/advanced/trauma-activations', data),
+  recordResuscitation: (data: any) => apiClient.post('/emergency/advanced/resuscitation-checklist', data),
+  placeStatOrder: (data: any) => apiClient.post('/emergency/advanced/stat-orders', data),
+  registerMedicoLegalCase: (data: any) => apiClient.post('/emergency/advanced/medico-legal', data),
+  dispatchAmbulance: (data: any) => apiClient.post('/emergency/advanced/ambulances/dispatch', data),
+  transmitMobilePcr: (data: any) => apiClient.post('/emergency/advanced/ambulances/pcr', data),
+  recordDisposition: (data: any) => apiClient.post('/emergency/advanced/dispositions', data),
+};
+
+// ============================================================
+// Advanced Nursing Operations (Nursing Advanced)
+// ============================================================
+export const nursingAdvancedApi = {
+  assignNurse: (data: any) => apiClient.post('/nursing/advanced/assignments', data),
+  getWorkload: (nurseId: string) => apiClient.get(`/nursing/advanced/workload/${nurseId}`),
+  recordVitals: (data: any) => apiClient.post('/nursing/advanced/vitals', data),
+  acknowledgeVitalAlert: (alertId: string, actionNotes: string) =>
+    apiClient.post(`/nursing/advanced/vitals/alerts/${alertId}/acknowledge`, { actionNotes }),
+  recordAssessment: (data: any) => apiClient.post('/nursing/advanced/assessments', data),
+  administerEmar: (data: any) => apiClient.post('/nursing/advanced/emar/administer', data),
+  recordFluidBalance: (data: any) => apiClient.post('/nursing/advanced/fluid-balance', data),
+  submitSbarHandover: (data: any) => apiClient.post('/nursing/advanced/sbar-handover', data),
+  acknowledgeSbarHandover: (handoverId: string) =>
+    apiClient.post(`/nursing/advanced/sbar-handover/${handoverId}/acknowledge`),
+};
+
+// ============================================================
+// Advanced Ward & Bed Management (Ward Advanced)
+// ============================================================
+export const wardAdvancedApi = {
+  getAvailabilityGrid: (hospitalId?: string) =>
+    apiClient.get('/inpatient/ward/advanced/beds/availability', { params: { hospitalId } }),
+  createAdmissionRequest: (data: any) => apiClient.post('/inpatient/ward/advanced/admission-requests', data),
+  reserveBed: (data: any) => apiClient.post('/inpatient/ward/advanced/beds/reserve', data),
+  formalizeAdmission: (data: any) => apiClient.post('/inpatient/ward/advanced/admissions', data),
+  transferPatientBed: (data: any) => apiClient.post('/inpatient/ward/advanced/transfers', data),
+  createHousekeepingTask: (data: any) => apiClient.post('/inpatient/ward/advanced/housekeeping/tasks', data),
+  completeCleaningTask: (taskId: string, cleaningNotes?: string) =>
+    apiClient.post(`/inpatient/ward/advanced/housekeeping/tasks/${taskId}/complete`, { cleaningNotes }),
+  inspectAndReleaseBed: (data: any) => apiClient.post('/inpatient/ward/advanced/housekeeping/inspect', data),
+  upsertDischargePlan: (data: any) => apiClient.post('/inpatient/ward/advanced/discharge-plan', data),
+  executeDischarge: (data: any) => apiClient.post('/inpatient/ward/advanced/discharge/execute', data),
 };
 
 // ============================================================
