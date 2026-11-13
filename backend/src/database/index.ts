@@ -33,13 +33,20 @@ export const db: Knex = knex({
 export async function withTenantContext<T>(
   tenantId: string | null,
   isSuperAdmin: boolean,
-  callback: (trx: Knex.Transaction) => Promise<T>
+  callback: (trx: Knex.Transaction) => Promise<T>,
+  hasClinicalJitGrant: boolean = false
 ): Promise<T> {
   return db.transaction(async (trx) => {
     if (isSuperAdmin) {
       await trx.raw(`SET LOCAL app.is_super_admin = 'true';`);
+      if (hasClinicalJitGrant) {
+        await trx.raw(`SET LOCAL app.has_clinical_jit_grant = 'true';`);
+      } else {
+        await trx.raw(`SET LOCAL app.has_clinical_jit_grant = 'false';`);
+      }
     } else if (tenantId) {
       await trx.raw(`SET LOCAL app.is_super_admin = 'false';`);
+      await trx.raw(`SET LOCAL app.has_clinical_jit_grant = 'false';`);
       await trx.raw(`SET LOCAL app.current_tenant_id = ?;`, [tenantId]);
     }
     return callback(trx);
