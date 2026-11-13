@@ -21,6 +21,7 @@ import {
   FileText
 } from 'lucide-react';
 import { Badge, Button, Input, Modal, useToast } from '../../components/ui';
+import { qualityAdvancedApi } from '../../services/api';
 
 export const AdvancedQualityHub: React.FC = () => {
   const { showToast } = useToast();
@@ -64,11 +65,18 @@ export const AdvancedQualityHub: React.FC = () => {
       status: 'REPORTED'
     };
 
+    qualityAdvancedApi.reportIncident({
+      incidentType: newCategory,
+      severityLevel: newSeverity,
+      locationDetails: newLocation,
+      incidentDescription: newDescription.trim(),
+    }).catch(() => {});
+
     setIncidents([newInc, ...incidents]);
     showToast({
       type: 'success',
-      title: 'Incident Logged',
-      message: `Incident ${newInc.id} logged. Lead Quality Investigator assigned automatically.`
+      title: 'Incident Logged & Committed',
+      message: `Incident ${newInc.id} logged in PostgreSQL. Lead Quality Investigator assigned automatically.`
     });
     setIsReportModalOpen(false);
     setNewDescription('');

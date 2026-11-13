@@ -273,6 +273,33 @@ export const diagnosticsApi = {
   recordRadiologyReport: (data: any) => apiClient.post('/diagnostics/radiology/reports', data),
 };
 
+export const lisAdvancedApi = {
+  createDepartment: (data: any) => apiClient.post('/diagnostics/lis/advanced/departments', data),
+  registerTestParameter: (data: any) => apiClient.post('/diagnostics/lis/advanced/parameters', data),
+  accessionSpecimen: (data: any) => apiClient.post('/diagnostics/lis/advanced/specimens/accession', data),
+  rejectSpecimen: (id: string, reason: string, notes?: string) =>
+    apiClient.post(`/diagnostics/lis/advanced/specimens/${id}/reject`, { reason, notes }),
+  recordResult: (data: any) => apiClient.post('/diagnostics/lis/advanced/results', data),
+  validateResult: (id: string) => apiClient.post(`/diagnostics/lis/advanced/results/${id}/validate`),
+  authorizeReport: (id: string) => apiClient.post(`/diagnostics/lis/advanced/results/${id}/authorize`),
+  amendReport: (id: string, newValue: any, reason: string) =>
+    apiClient.post(`/diagnostics/lis/advanced/results/${id}/amend`, { newValue, reason }),
+  recordQcMeasurement: (data: any) => apiClient.post('/diagnostics/lis/advanced/qc/measurements', data),
+};
+
+export const risAdvancedApi = {
+  registerModality: (data: any) => apiClient.post('/diagnostics/ris/advanced/modalities', data),
+  createImagingOrder: (data: any) => apiClient.post('/diagnostics/ris/advanced/orders', data),
+  scheduleAppointment: (data: any) => apiClient.post('/diagnostics/ris/advanced/appointments', data),
+  recordPatientScreening: (data: any) => apiClient.post('/diagnostics/ris/advanced/screenings', data),
+  indexPACSStudy: (data: any) => apiClient.post('/diagnostics/ris/advanced/pacs/studies', data),
+  createReport: (data: any) => apiClient.post('/diagnostics/ris/advanced/reports', data),
+  authorizeReport: (id: string) => apiClient.post(`/diagnostics/ris/advanced/reports/${id}/authorize`),
+  amendReport: (id: string, addendumNotes: string) =>
+    apiClient.post(`/diagnostics/ris/advanced/reports/${id}/amend`, { addendumNotes }),
+  recordContrast: (data: any) => apiClient.post('/diagnostics/ris/advanced/contrast', data),
+};
+
 // ============================================================
 // Billing, Invoicing & Payments
 // ============================================================
@@ -280,6 +307,68 @@ export const billingApi = {
   createInvoice: (data: any) => apiClient.post('/billing/invoices', data),
   collectPayment: (data: any) => apiClient.post('/billing/payments', data),
   requestRefund: (data: any) => apiClient.post('/billing/refunds', data),
+};
+
+export const rcmAdvancedApi = {
+  captureCharge: (data: any) => apiClient.post('/rcm/charges/capture', data),
+  submitClaim: (data: any) => apiClient.post('/rcm/insurance/claims', data),
+  generateLedgerReport: () => apiClient.get('/rcm/accounting/ledger-report'),
+  splitSettlePayment: (data: any) => apiClient.post('/rcm/payments/split-settle', data),
+  closeCashierShift: (data: any) => apiClient.post('/rcm/cashier/close', data),
+};
+
+export const pharmacyAdvancedApi = {
+  searchDrugs: (search?: string) => apiClient.get('/pharmacy/advanced/drugs', { params: { search } }),
+  registerDrug: (data: any) => apiClient.post('/pharmacy/advanced/drugs', data),
+  checkSafety: (data: any) => apiClient.post('/pharmacy/advanced/safety/check', data),
+  dispensePrescription: (data: any) => apiClient.post('/pharmacy/advanced/dispense', data),
+  logColdChainBreach: (data: any) => apiClient.post('/pharmacy/advanced/coldchain/breach', data),
+  recordNarcoticTransaction: (data: any) => apiClient.post('/pharmacy/advanced/narcotics/transaction', data),
+};
+
+export const hrmsAdvancedApi = {
+  getMetrics: (hospitalId?: string) => apiClient.get('/hr/advanced/metrics', { params: { hospitalId } }),
+  createEmployee: (data: any) => apiClient.post('/hr/advanced/employees', data),
+  recordAttendancePunch: (data: any) => apiClient.post('/hr/advanced/attendance/punch', data),
+  assignRoster: (data: any) => apiClient.post('/hr/advanced/rosters/shifts', data),
+};
+
+export const procurementAdvancedApi = {
+  getMetrics: (hospitalId?: string) => apiClient.get('/procurement/advanced/metrics', { params: { hospitalId } }),
+  registerVendor: (data: any) => apiClient.post('/procurement/advanced/vendors', data),
+  createPurchaseOrder: (data: any) => apiClient.post('/procurement/advanced/orders', data),
+  recordGoodsReceipt: (data: any) => apiClient.post('/procurement/advanced/goods-receipt', data),
+};
+
+export const qualityAdvancedApi = {
+  reportIncident: (data: any) => apiClient.post('/quality/incidents', data),
+  assignInvestigation: (id: string, data: any) => apiClient.post(`/quality/incidents/${id}/investigate`, data),
+  performRca: (id: string, data: any) => apiClient.post(`/quality/incidents/${id}/rca`, data),
+  createCapaAction: (id: string, data: any) => apiClient.post(`/quality/incidents/${id}/capa`, data),
+};
+
+export const analyticsAdvancedApi = {
+  getExecutiveKpis: (params?: { beds?: number; days?: number }) =>
+    apiClient.get('/analytics/advanced/executive-kpis', { params }),
+  predictLace: (data: any) => apiClient.post('/analytics/advanced/predict/lace', data),
+};
+
+export const telemedicineAdvancedApi = {
+  getServices: () => apiClient.get('/telemedicine/services'),
+  getDoctors: (params?: any) => apiClient.get('/telemedicine/doctors/discovery', { params }),
+  scheduleSession: (data: any) => apiClient.post('/telemedicine/sessions/schedule', data),
+  recordConsent: (data: any) => apiClient.post('/telemedicine/consent', data),
+};
+
+export const interopApi = {
+  ingestHl7: (data: any) => apiClient.post('/interop/hl7/ingest', data),
+  getCapabilityStatement: () => apiClient.get('/interop/fhir/$metadata'),
+};
+
+export const federatedNetworkApi = {
+  getParticipatingHospitals: (params?: any) => apiClient.get('/federated-network/participating-hospitals', { params }),
+  publishBedAvailability: (data: any) => apiClient.post('/federated-network/bed-availability/publish', data),
+  createTransfer: (data: any) => apiClient.post('/federated-network/transfers', data),
 };
 
 // ============================================================

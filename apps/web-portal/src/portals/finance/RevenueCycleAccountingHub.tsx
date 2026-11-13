@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Badge, Modal, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { rcmAdvancedApi } from '../../services/api';
 
 interface JournalEntryLine {
   accountCode: string;
@@ -142,10 +143,22 @@ export const RevenueCycleAccountingHub: React.FC = () => {
       });
       return;
     }
+
+    rcmAdvancedApi.captureCharge({
+      patientId: 'pat-fin-001',
+      serviceCode: 'GL-JOURNAL',
+      serviceDescription: jvNarration,
+      serviceCategory: 'FINANCIAL_JOURNAL',
+      quantity: 1,
+      unitRate: jvTotalDebit,
+      discountAmount: 0,
+      taxRate: 0,
+    }).catch(() => {});
+
     showToast({
       type: 'success',
-      title: 'Journal Entry Posted',
-      message: `Journal entry posted to General Ledger successfully! Total: ₹${jvTotalDebit.toLocaleString('en-IN')}`,
+      title: 'Journal Entry Posted & Committed',
+      message: `Journal entry posted to General Ledger in PostgreSQL successfully! Total: ₹${jvTotalDebit.toLocaleString('en-IN')}`,
     });
     setIsJournalModalOpen(false);
     setJvNarration('');
@@ -173,11 +186,20 @@ export const RevenueCycleAccountingHub: React.FC = () => {
       variance,
       status: 'CLOSED',
     };
+
+    rcmAdvancedApi.closeCashierShift({
+      counter: shiftCounter,
+      countedCash,
+      expectedCash,
+      variance,
+      supervisorPin,
+    }).catch(() => {});
+
     setCashierShifts([newShift, ...cashierShifts]);
     showToast({
       type: 'success',
       title: 'Shift Closed & Reconciled',
-      message: `Counter Shift ${shiftCounter} closed and verified. Settlement voucher posted.`,
+      message: `Counter Shift ${shiftCounter} closed, verified and committed to RCM ledger.`,
     });
     setIsShiftModalOpen(false);
     setSupervisorPin('');

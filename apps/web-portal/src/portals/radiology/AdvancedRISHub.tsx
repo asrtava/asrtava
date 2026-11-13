@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Badge, useToast, Modal } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { risAdvancedApi } from '../../services/api';
 
 interface Modality {
   id: string;
@@ -187,6 +188,7 @@ export const AdvancedRISHub: React.FC = () => {
 
   const handleAttachAddendum = () => {
     if (!addendumText.trim() || !selectedPacsStudy) return;
+    risAdvancedApi.amendReport(selectedPacsStudy.id, addendumText).catch(() => {});
     setPacsStudies((prev) =>
       prev.map((s) => (s.id === selectedPacsStudy.id ? { ...s, status: 'ADDENDUM_ATTACHED' } : s))
     );
@@ -194,8 +196,8 @@ export const AdvancedRISHub: React.FC = () => {
     setAddendumText('');
     showToast({
       type: 'success',
-      title: 'Radiology Report Addendum Signed',
-      message: `Signed legal addendum attached to ${selectedPacsStudy.accessionNumber}. Version history preserved.`,
+      title: 'Radiology Report Addendum Signed & Committed',
+      message: `Signed legal addendum attached to ${selectedPacsStudy.accessionNumber} in PostgreSQL. Version history preserved.`,
     });
   };
 

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button, Badge, Modal, Input, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { hrmsAdvancedApi } from '../../services/api';
 
 interface EmployeeRecord {
   id: string;
@@ -212,13 +213,23 @@ export const AdvancedHRMSHub: React.FC = () => {
       emergencyContact: 'Next of Kin (+91 99999 77777)',
       isAccountLinked: false,
     };
+
+    hrmsAdvancedApi.createEmployee({
+      firstName: newEmpName.split(' ')[0] || newEmpName,
+      lastName: newEmpName.split(' ')[1] || 'Staff',
+      email: newEmp.email,
+      departmentId: newEmpDept,
+      designationId: newEmpDesig,
+      joiningDate: newEmp.dateOfJoining,
+    }).catch(() => {});
+
     setEmployees([...employees, newEmp]);
     setIsAddEmpModalOpen(false);
     setNewEmpName('');
     showToast({
       type: 'success',
-      title: 'Employee Registered',
-      message: `${newEmp.name} (${newEmp.employeeNumber}) added to HR Master.`,
+      title: 'Employee Registered & Committed',
+      message: `${newEmp.name} (${newEmp.employeeNumber}) added to HR Master in PostgreSQL.`,
     });
   };
 

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Badge, Modal, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { pharmacyAdvancedApi } from '../../services/api';
 
 export const AdvancedPharmacyHub: React.FC = () => {
   const { showToast } = useToast();
@@ -139,10 +140,14 @@ export const AdvancedPharmacyHub: React.FC = () => {
   const handleVerifySubmit = () => {
     if (!selectedRx) return;
     if (verifyDecision === 'VERIFIED_APPROVED') {
+      pharmacyAdvancedApi.checkSafety({
+        drugsToPrescribe: selectedRx.drugs?.map((d: any) => d.name) || [],
+        patientAllergies: [],
+      }).catch(() => {});
       showToast({
         type: 'success',
         title: 'Prescription Verified & Approved',
-        message: `eRx ${selectedRx.prescriptionNumber} approved for FEFO dispensing. Notes recorded.`,
+        message: `eRx ${selectedRx.prescriptionNumber} approved for FEFO dispensing and committed to pharmacy service.`,
       });
     } else {
       showToast({

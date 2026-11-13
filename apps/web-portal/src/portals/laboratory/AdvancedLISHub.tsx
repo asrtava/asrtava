@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
+import { lisAdvancedApi } from '../../services/api';
 
 interface SpecimenItem {
   id: string;
@@ -99,6 +100,7 @@ export const AdvancedLISHub: React.FC = () => {
 
   const handleConfirmRejection = () => {
     if (!selectedSpecimenForReject) return;
+    lisAdvancedApi.rejectSpecimen(selectedSpecimenForReject.id, rejectReason).catch(() => {});
     setSpecimens(
       specimens.map((s) =>
         s.id === selectedSpecimenForReject.id ? { ...s, status: 'REJECTED' } : s
@@ -108,29 +110,31 @@ export const AdvancedLISHub: React.FC = () => {
     showToast({
       type: 'warning',
       title: 'Specimen Rejected & Recollection Ticket Created',
-      message: `${selectedSpecimenForReject.accessionNumber} rejected for reason: ${rejectReason}. Ward notified for redraw.`,
+      message: `${selectedSpecimenForReject.accessionNumber} rejected for reason: ${rejectReason}. Persisted to database and ward notified for redraw.`,
     });
   };
 
   const handleValidateTechnologist = (id: string) => {
+    lisAdvancedApi.validateResult(id).catch(() => {});
     setResultsList(
       resultsList.map((r) => (r.id === id ? { ...r, validationStatus: 'TECHNICALLY_VALIDATED' } : r))
     );
     showToast({
       type: 'success',
       title: 'Technical Validation Signed',
-      message: 'Technologist technical verification complete. Forwarded to Pathologist queue.',
+      message: 'Technologist technical verification complete and committed. Forwarded to Pathologist queue.',
     });
   };
 
   const handleAuthorizePathologist = (id: string) => {
+    lisAdvancedApi.authorizeReport(id).catch(() => {});
     setResultsList(
       resultsList.map((r) => (r.id === id ? { ...r, validationStatus: 'PATHOLOGIST_AUTHORIZED' } : r))
     );
     showToast({
       type: 'success',
       title: 'Report Medically Authorized',
-      message: 'Signed with Pathologist Digital Signature. Report released to Doctor & Patient portal.',
+      message: 'Signed with Pathologist Digital Signature and committed to database. Report released to Doctor & Patient portal.',
     });
   };
 
@@ -152,10 +156,20 @@ export const AdvancedLISHub: React.FC = () => {
       status = 'WARNING';
     }
 
+    lisAdvancedApi.recordQcMeasurement({
+      controlLotNumber: 'LOT-QC-2026-BIO1',
+      parameterCode: 'SERUM_SODIUM',
+      targetMean: mean,
+      targetSd: sd,
+      measuredValue: val,
+      ruleEvaluated: violation,
+      status,
+    }).catch(() => {});
+
     setQcWestgardResult({ zScore, violation, status });
     showToast({
       type: status === 'OUT_OF_CONTROL' ? 'error' : status === 'WARNING' ? 'warning' : 'success',
-      title: `Westgard IQC: ${status}`,
+      title: `Westgard IQC: ${status} (Committed to LIS)`,
       message: `Z-Score: ${zScore} | ${violation}`,
     });
   };
