@@ -79,3 +79,4 @@ The P1-02 implementation enforces:
 
 - [ ] **Hospital Medical Executive Committee Approval:** Approval of the standard operating procedure (SOP) requiring laboratory technologists to execute verbal read-back before filing critical reports.
 - [ ] **Hospital PBX / Intercom Integration:** Physical PBX intercom wiring to nursing stations must be audited during Phase 2.4 on-site installation.
+

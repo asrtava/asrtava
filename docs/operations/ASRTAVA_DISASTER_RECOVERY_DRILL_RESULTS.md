@@ -63,3 +63,4 @@ The drill validated:
 1. **Volume Limitations:** This staging drill was conducted with synthetic staging datasets. Physical restoration on terabyte-scale historical imaging PACS stores must be validated on physical hospital pilot hardware during Phase 2.4.
 2. **Multi-AZ Failover:** Active-passive automated database failover using streaming replication requires cloud / on-premise hardware provisioning prior to pilot sign-off.
 3. **Approval Required:** The physical disaster recovery drill protocol and key escrow custody procedures require formal sign-off from Hospital IT Director and Chief Information Security Officer (CISO).
+

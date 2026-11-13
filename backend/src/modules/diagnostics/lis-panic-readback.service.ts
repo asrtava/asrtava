@@ -277,3 +277,4 @@ export class LisPanicReadbackService {
     return Array.from(this.alerts.values()).filter(a => a.hospitalId === hospitalId);
   }
 }
+

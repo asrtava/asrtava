@@ -59,3 +59,4 @@ Before ASRTAVA can be connected to the live ABDM production gateway at a hospita
 1. **CERT-In Empanelled Security Audit:** Formal penetration testing and application security assessment report must be submitted to NHA.
 2. **NHA Production Keys:** Official production `client_id` and RSA-2048 signing certificates must be issued by the National Health Authority.
 3. **Hospital Registration:** The pilot hospital must possess an active Health Facility Registry (HFR) ID.
+

@@ -45,3 +45,4 @@
     { "order": 39, "filename": "038_hybrid_sync_and_clinical_conflict_queue.sql", "category": "deployment", "description": "Offline edge outbox and clinical conflict reconciliation queue" }
   ]
 }
+

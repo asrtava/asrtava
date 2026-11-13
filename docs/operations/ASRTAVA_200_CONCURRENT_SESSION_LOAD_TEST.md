@@ -68,3 +68,4 @@ Process Post-Load Recovery:            Immediate (< 1.5ms)
 2. **Zero Duplicate Keys:** Every generated record key was verified unique; duplicate counter remained strictly 0 across all 200 parallel executions.
 3. **Memory Stability:** Pre-test heap was 198MB; post-test heap was 198.51MB, demonstrating that Node.js garbage collection reliably freed event loop closures without memory leaks.
 4. **Distinction from Phase 2.4 Pre-Pilot Test:** This test establishes the **200-session staging baseline**. The separate **500-concurrent-clinician physical hardware test** will be conducted during Phase 2.4 across clustered worker processes and distributed PostgreSQL instances.
+

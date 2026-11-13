@@ -59,3 +59,4 @@ The evaluation specifically tested whether a clinician, administrative clerk, or
 
 1. **DICOM PACS Viewer:** The interactive DICOM imaging canvas (pan, zoom, window-level adjust) cannot be fully controlled via screen readers alone. An accessible text-based alternative (showing radiologist clinical impression and measurement summary) has been provided alongside the image viewport.
 2. **Phase 2.4 Hospital User Testing:** Blind and low-vision healthcare workers must participate in departmental UAT during Phase 2.4 to certify final on-site workflow ergonomics.
+
