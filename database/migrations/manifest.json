@@ -42,7 +42,8 @@
     { "order": 36, "filename": "036_enterprise_cross_module_integration_views.sql", "category": "views", "description": "Inter-departmental unified reporting and analytics views" },
     { "order": 37, "filename": "036_tenant_row_level_security.sql", "category": "security", "description": "PostgreSQL Row Level Security (RLS) policies for tenant isolation" },
     { "order": 38, "filename": "037_federated_inter_hospital_coordination_network.sql", "category": "federation", "description": "Inter-hospital coordination, organ transplant, blood bank" },
-    { "order": 39, "filename": "038_hybrid_sync_and_clinical_conflict_queue.sql", "category": "deployment", "description": "Offline edge outbox and clinical conflict reconciliation queue" }
+    { "order": 39, "filename": "038_hybrid_sync_and_clinical_conflict_queue.sql", "category": "deployment", "description": "Offline edge outbox and clinical conflict reconciliation queue" },
+    { "order": 40, "filename": "039_dynamic_hospital_configuration.sql", "category": "provisioning", "description": "12-section discovery questionnaire, bespoke HMS blueprint generation, and staff credential provisioning" }
   ]
 }
 

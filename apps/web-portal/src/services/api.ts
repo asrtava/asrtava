@@ -539,6 +539,20 @@ export const onboardingApi = {
     apiClient.post(`/onboarding/migration/${jobId}/execute`),
   bulkOnboardStaff: (id: string, data: any) =>
     apiClient.post(`/onboarding/projects/${id}/staff/bulk`, data),
+  submitDiscoverySection: (data: { hospitalId?: string; sectionNumber: number; payload: any }) =>
+    apiClient.post('/onboarding/discovery/section', data),
+  getDiscoverySections: (hospitalId: string) =>
+    apiClient.get(`/onboarding/discovery/${hospitalId}`),
+  generateBlueprint: (hospitalId: string) =>
+    apiClient.post(`/onboarding/blueprint/${hospitalId}/generate`),
+  getBlueprint: (hospitalId: string) =>
+    apiClient.get(`/onboarding/blueprint/${hospitalId}`),
+  signBlueprint: (hospitalId: string, data: { role: string; notes?: string }) =>
+    apiClient.post(`/onboarding/blueprint/${hospitalId}/sign`, data),
+  provisionStaff: (data: { hospitalId?: string; implementationId?: string; staffList: any[] }) =>
+    apiClient.post('/onboarding/staff/provision', data),
+  getStaffManifest: (hospitalId: string) =>
+    apiClient.get(`/onboarding/staff/manifest/${hospitalId}`),
   createTrainingProgram: (id: string, data: any) =>
     apiClient.post(`/onboarding/projects/${id}/training/programs`, data),
   recordAttendance: (programId: string, data: any) =>

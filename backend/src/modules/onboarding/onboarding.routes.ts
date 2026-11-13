@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config';
 import { OnboardingService, ImplementationStage, DataMigrationJobRecord } from './onboarding.service';
+import { DynamicHospitalConfigService } from './dynamic-hospital-config.service';
 import { authMiddleware, requireSuperAdmin, AuthenticatedRequest } from '../../middleware/auth.middleware';
 
 const router = Router();
@@ -444,6 +445,157 @@ router.post('/portal/login', async (req: Request, res: Response): Promise<void> 
       code: 'ONBOARDING_AUTH_FAILED',
       message: err.message
     });
+  }
+});
+
+// ============================================================================
+// DYNAMIC HOSPITAL DISCOVERY & BESPOKE CONFIGURATION ENGINE ENDPOINTS
+// ============================================================================
+
+/**
+ * Submit or update a discovery questionnaire section
+ * POST /api/v1/onboarding/discovery/section
+ */
+router.post('/discovery/section', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { hospitalId, sectionNumber, payload } = req.body;
+    const targetHospitalId = hospitalId || req.user?.hospitalId;
+
+    if (!targetHospitalId) {
+      res.status(400).json({ success: false, message: 'hospitalId is required.' });
+      return;
+    }
+
+    const section = await DynamicHospitalConfigService.submitDiscoverySection({
+      hospitalId: targetHospitalId,
+      sectionNumber: Number(sectionNumber),
+      payload: payload || {},
+      actorId: req.user?.id
+    });
+
+    res.status(201).json({ success: true, message: `Discovery section ${sectionNumber} submitted.`, section });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Retrieve all 12 discovery sections and completeness metrics
+ * GET /api/v1/onboarding/discovery/:hospitalId
+ */
+router.get('/discovery/:hospitalId', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const hospitalId = getParamId(req.params.hospitalId);
+    const discovery = await DynamicHospitalConfigService.getDiscoverySubmissions(hospitalId);
+    res.json({ success: true, ...discovery });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Generate bespoke HMS configuration blueprint from discovery questionnaire
+ * POST /api/v1/onboarding/blueprint/:hospitalId/generate
+ */
+router.post('/blueprint/:hospitalId/generate', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const hospitalId = getParamId(req.params.hospitalId);
+    const blueprint = await DynamicHospitalConfigService.generateBlueprint(hospitalId, req.user?.id);
+    res.status(201).json({ success: true, message: 'Bespoke HMS Blueprint generated successfully.', blueprint });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Get current configuration blueprint for hospital
+ * GET /api/v1/onboarding/blueprint/:hospitalId
+ */
+router.get('/blueprint/:hospitalId', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const hospitalId = getParamId(req.params.hospitalId);
+    const blueprint = await DynamicHospitalConfigService.generateBlueprint(hospitalId, req.user?.id);
+    res.json({ success: true, blueprint });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Execute cryptographic sign-off on hospital blueprint
+ * POST /api/v1/onboarding/blueprint/:hospitalId/sign
+ */
+router.post('/blueprint/:hospitalId/sign', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const hospitalId = getParamId(req.params.hospitalId);
+    const { role, notes } = req.body;
+
+    if (!role || (role !== 'asrtava_lead' && role !== 'hospital_director')) {
+      res.status(400).json({ success: false, message: 'role must be either asrtava_lead or hospital_director.' });
+      return;
+    }
+
+    const signerName = `${req.user?.firstName || 'Authorized'} ${req.user?.lastName || 'Signer'}`.trim();
+    const updated = await DynamicHospitalConfigService.signBlueprint({
+      hospitalId,
+      role,
+      signerId: req.user?.id || 'sys-signer',
+      signerName,
+      notes
+    });
+
+    res.json({ success: true, message: `Cryptographic sign-off executed for ${role}.`, blueprint: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Provision staff accounts with NIST-compliant credentials & generate distribution manifest
+ * POST /api/v1/onboarding/staff/provision
+ */
+router.post('/staff/provision', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { hospitalId, implementationId, staffList } = req.body;
+    const targetHospitalId = hospitalId || req.user?.hospitalId;
+
+    if (!targetHospitalId) {
+      res.status(400).json({ success: false, message: 'hospitalId is required.' });
+      return;
+    }
+    if (!Array.isArray(staffList) || staffList.length === 0) {
+      res.status(400).json({ success: false, message: 'staffList is required and must not be empty.' });
+      return;
+    }
+
+    const result = await DynamicHospitalConfigService.provisionStaffAccounts({
+      hospitalId: targetHospitalId,
+      implementationId,
+      staffList,
+      provisionedByAdminId: req.user?.id
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully provisioned ${result.accountsCreated} staff accounts.`,
+      ...result
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * Get staff credential manifest for Hospital Admin distribution
+ * GET /api/v1/onboarding/staff/manifest/:hospitalId
+ */
+router.get('/staff/manifest/:hospitalId', authMiddleware, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const hospitalId = getParamId(req.params.hospitalId);
+    const manifest = await DynamicHospitalConfigService.getStaffManifest(hospitalId);
+    res.json({ success: true, totalCount: manifest.length, manifest });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
