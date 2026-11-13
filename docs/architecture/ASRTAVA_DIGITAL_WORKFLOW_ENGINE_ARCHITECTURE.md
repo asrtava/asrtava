@@ -159,3 +159,4 @@ classDiagram
 1. **Anti-Circumvention Rule**: A user cannot approve their own submission unless explicitly defined in a self-declaration stage (e.g., initial timesheet declaration). The engine validates `actor_user_id != requester_user_id` for all approval actions.
 2. **Deterministic Precedence**: Rejection by any mandatory tier halts the entire workflow immediately. No subsequent approval tier can override a prior rejection without formal re-initiation.
 3. **Cryptographic Proof of Sign-Off**: Every approval state transition generates an HMAC-SHA256 signature combining the workflow instance ID, stage index, actor ID, timestamp, and decision notes, logged into the tamper-resistant audit trail.
+

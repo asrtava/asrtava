@@ -146,3 +146,4 @@ Every signed document output (PDF) contains an embedded **Cryptographic Verifica
 Scanning the QR code performs an instant integrity check against the hospital database:
 - **Valid & Unaltered**: Displays green checkmark with signer credentials and exact timestamp.
 - **Modified / Tampered**: If even a single character in the document has been altered, the SHA-256 hash fails, displaying an immediate red tamper alert.
+

@@ -95,3 +95,4 @@ flowchart TD
 1. **Non-Destructive Parallel Run**: During initial departmental rollout, legacy paper records may be maintained concurrently for 7 days until the Medical Board certifies digital workflow stability.
 2. **Emergency Paper Fallback Contingency**: In the event of catastrophic power or physical hardware failure, approved physical paper emergency forms may be utilized. When system availability is restored, authorized personnel must back-enter the physical records with timestamped provenance (`PAPER_CONTINGENCY_BACK_ENTRY`).
 3. **Database Migration Rollback Plan**: Every new schema migration (`039_...`) must include an exact, tested `down.sql` script to undo changes without corrupting historical tables.
+

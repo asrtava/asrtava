@@ -101,3 +101,4 @@ When a document reaches the end of its statutory retention period and is not und
    - Without the DEK, raw stored ciphertext becomes mathematically unrecoverable.
 3. **Disposal Certificate**:
    - A tamper-evident **Document Destruction Certificate** is committed to `enterprise_document_destruction_audit`, recording: Document UUID, Document Title, Category, Creation Date, Destruction Date, Statutory Mandate, Signer IDs, and SHA-256 Digest of the pre-destruction metadata.
+

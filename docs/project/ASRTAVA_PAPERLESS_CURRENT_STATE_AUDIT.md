@@ -144,3 +144,4 @@ To transition all 19 areas into fully paperless operations, ASRTAVA requires six
 | **Central Document Storage (DMS)** | Patient Documents Table Only | Unified Enterprise DMS (Patient, Staff, Ops, Policy) |
 | **Digital Signature Support** | Basic Checksum & Hash | Full Electronic & PKI Digital Signatures |
 | **Multi-Department Approval Engine** | Siloed Service Functions | Reusable Declarative Workflow Engine |
+

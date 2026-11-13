@@ -90,3 +90,4 @@ graph TD
 - **Pre-Signed Token Generation**: $\le 15\text{ ms}$ under concurrent load of 500 requests/second.
 - **Workflow State Transition**: $\le 25\text{ ms}$ per approval transition including HMAC state hash computation and database commit.
 - **Audit Verification Latency**: $\le 5\text{ ms}$ per block validation.
+

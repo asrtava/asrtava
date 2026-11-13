@@ -181,3 +181,4 @@ classDiagram
 1. **Zero Cross-Tenant Leakage**: All DMS queries must include `WHERE hospital_id = ?` and pass through PostgreSQL Row-Level Security (RLS). Cross-hospital searches return empty results.
 2. **Super Admin Clinical Isolation**: Platform Super Admins have zero standing access to patient clinical files. Support troubleshooting requires an approved JIT session with explicit time bounds and clinical justification.
 3. **Integrity Guarantees**: Any file fetched from storage must match its stored SHA-256 checksum before presentation. A checksum mismatch aborts retrieval and triggers a critical security alert (`DATA_INTEGRITY_TAMPER_ALERT`).
+
