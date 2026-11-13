@@ -41,3 +41,4 @@ The Gate 3D peripheral validation established that:
 
 - **Wristband-to-Medication Cross-Match:** Administration is blocked if the nurse scans the medication before scanning the patient wristband.
 - **High-Alert Dual Check:** Scanning a narcotic barcode (e.g. Fentanyl or Morphine) automatically triggers the dual-nurse modal and requires a distinct second staff login before the dispense button is enabled.
+

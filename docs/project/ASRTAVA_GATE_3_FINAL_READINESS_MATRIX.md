@@ -40,3 +40,4 @@
 | **PRQ-03** | Regulatory | External CERT-In security audit submission for ABDM production empanelment | CERT-In Empanelled Auditor & NHA | **BLOCKED (SANDBOX ONLY)** |
 | **PRQ-04** | Peripherals | On-site pairing and testing of physical USB/Bluetooth barcode scanners and label printers | Hospital Biomedical & IT Engineering | **PENDING ON-SITE SETUP** |
 | **PRQ-05** | Legal & Executive | Hospital Pilot Execution Agreement & Written Authorization to Commence Pilot | Hospital CEO / Managing Director | **PENDING FINAL APPROVAL** |
+

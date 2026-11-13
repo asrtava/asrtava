@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
@@ -17,6 +17,10 @@ import { DurableOfflineJournalService } from '../src/modules/deployment/durable-
 describe('ASRTAVA Gate 3C: Durable Offline Journal & Hybrid Recovery Suite', () => {
   const hospitalAlpha = 'hosp-pilot-main-01';
   const hospitalBeta = 'hosp-pilot-beta-02';
+
+  before(() => {
+    DurableOfflineJournalService.resetForTesting();
+  });
 
   it('1. Persists clinical transaction with authenticated AES-256-GCM encryption on disk', () => {
     const rawPayload = {
@@ -118,3 +122,4 @@ describe('ASRTAVA Gate 3C: Durable Offline Journal & Hybrid Recovery Suite', () 
     assert.ok(!alphaEntries.some(e => e.entityId === 'con-beta-999'), 'Hospital Alpha must never observe Beta journal entries');
   });
 });
+

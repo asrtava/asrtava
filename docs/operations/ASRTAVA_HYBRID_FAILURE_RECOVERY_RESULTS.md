@@ -88,3 +88,4 @@ When edge and cloud nodes experience concurrent updates during a WAN outage:
 - **Immutable Provenance:** Both `originalLocalPayload` and `originalCloudPayload` are preserved in JSONB columns.
 - **Clinical Schema Guardrails:** Merged payloads cannot modify immutable identifiers (`patientId`, `uhid`, `hospitalId`).
 - **Mandatory Justification:** Supervisor resolution strictly requires $\ge 15$ characters of clinical reasoning before committing.
+

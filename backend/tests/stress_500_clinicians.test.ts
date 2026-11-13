@@ -197,3 +197,4 @@ describe('ASRTAVA Gate 3B: 500-Concurrent-Clinician Target Stress Test Suite', (
     assert.ok(cpuCount >= 2, 'Clustered multi-core target hardware verified');
   });
 });
+

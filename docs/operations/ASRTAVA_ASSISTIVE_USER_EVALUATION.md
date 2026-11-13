@@ -42,3 +42,4 @@ Automated ARIA checkers alone were not relied upon; interactive task walkthrough
    - Non-critical notifications (e.g. *"Autosaved draft consultation"*) use `aria-live="polite"` so they do not interrupt clinical dictation.
    - Critical clinical alerts (e.g. *"NEWS2 score 9 - Impending shock"*) use `aria-live="assertive"` to immediately notify the clinician.
 3. **High Contrast & Scalability:** At 200% zoom, text reflows cleanly into a single-column layout without horizontal scrollbars, and buttons maintain minimum touch targets of $44 \times 44\text{ pixels}$.
+

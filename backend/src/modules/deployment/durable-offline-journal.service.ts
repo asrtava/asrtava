@@ -56,6 +56,21 @@ export class DurableOfflineJournalService {
   // Replay idempotency cache
   private static processedJournalIds: Set<string> = new Set();
 
+  /**
+   * Resets processed set and clears journal file for clean test suite runs.
+   */
+  public static resetForTesting(): void {
+    this.processedJournalIds.clear();
+    this.ensureJournalDirectory();
+    if (fs.existsSync(this.journalFile)) {
+      try {
+        fs.unlinkSync(this.journalFile);
+      } catch (e) {
+        // Ignored
+      }
+    }
+  }
+
   private static ensureJournalDirectory(): void {
     if (!fs.existsSync(this.journalDir)) {
       fs.mkdirSync(this.journalDir, { recursive: true, mode: 0o700 });

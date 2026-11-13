@@ -62,51 +62,43 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onNavigate }) =>
               ASRTAVA empowers healthcare systems with 12 unified role-based workspaces, strict PostgreSQL Row-Level Security, FEFO pharmacy automation, and end-to-end clinical compliance.
             </p>
 
-            {/* Call to Actions */}
+            {/* Canonical 3 Public Portals Call to Actions */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <button
-                onClick={() => onNavigate('/login/hospital-admin')}
-                className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white font-bold rounded-xl shadow-xl shadow-teal-700/25 border border-teal-500/30 flex items-center justify-center space-x-2 transition"
+                onClick={() => onNavigate('/login/staff')}
+                className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white font-bold rounded-xl shadow-xl shadow-teal-700/25 border border-teal-500/30 flex items-center justify-center space-x-2 transition cursor-pointer"
               >
                 <Building2 className="w-4 h-4" />
-                <span>Hospital Admin Portal</span>
+                <span>Hospital Staff Portal</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
               <button
-                onClick={() => onNavigate('/login/doctor')}
-                className="w-full sm:w-auto px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 flex items-center justify-center space-x-2 transition"
-              >
-                <Stethoscope className="w-4 h-4 text-blue-400" />
-                <span>Doctor Workspace</span>
-              </button>
-
-              <button
                 onClick={() => onNavigate('/login/patient')}
-                className="w-full sm:w-auto px-6 py-3.5 bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 font-bold rounded-xl border border-sky-800/60 flex items-center justify-center space-x-2 transition"
+                className="w-full sm:w-auto px-6 py-3.5 bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 font-bold rounded-xl border border-sky-800/60 flex items-center justify-center space-x-2 transition cursor-pointer"
               >
                 <Users className="w-4 h-4" />
                 <span>Patient Portal</span>
               </button>
 
               <button
-                onClick={() => onNavigate('/login/coordination')}
-                className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-sky-800 to-indigo-900 hover:from-sky-700 hover:to-indigo-800 text-white font-bold rounded-xl border border-sky-500/40 flex items-center justify-center space-x-2 transition shadow-lg"
+                onClick={() => onNavigate('/login/onboarding')}
+                className="w-full sm:w-auto px-6 py-3.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 font-bold rounded-xl border border-emerald-800/60 flex items-center justify-center space-x-2 transition cursor-pointer"
               >
-                <Network className="w-4 h-4 text-sky-300" />
-                <span>Coordination Network</span>
+                <ShieldCheck className="w-4 h-4" />
+                <span>Customer Onboarding</span>
               </button>
             </div>
 
-            {/* Quick Metrics */}
+            {/* Architectural Highlights */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-12 border-t border-slate-800 text-left">
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800">
-                <div className="text-2xl font-bold text-teal-400">12 Portals</div>
-                <div className="text-xs text-slate-400 mt-1">Role-Specific Workspaces</div>
+                <div className="text-2xl font-bold text-teal-400">12 Workspaces</div>
+                <div className="text-xs text-slate-400 mt-1">Role-Specific Interfaces</div>
               </div>
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800">
-                <div className="text-2xl font-bold text-emerald-400">100% Dynamic</div>
-                <div className="text-xs text-slate-400 mt-1">Real Database Hydration</div>
+                <div className="text-2xl font-bold text-emerald-400">Multi-Tier State</div>
+                <div className="text-xs text-slate-400 mt-1">Controlled API & Journaling</div>
               </div>
               <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800">
                 <div className="text-2xl font-bold text-cyan-400">Kernel RLS</div>
@@ -330,10 +322,10 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onNavigate }) =>
                   Hospital staff must access portals using their authorized official credentials issued by their Hospital Administrator.
                 </p>
                 <button
-                  onClick={() => onNavigate('/login/hospital-admin')}
-                  className="w-full py-2.5 px-4 bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold rounded-xl transition shadow-md"
+                  onClick={() => onNavigate('/login/staff')}
+                  className="w-full py-2.5 px-4 bg-teal-500 hover:bg-teal-400 text-slate-900 font-bold rounded-xl transition shadow-md cursor-pointer"
                 >
-                  Sign In as Hospital Administrator →
+                  Sign In to Hospital Staff Portal →
                 </button>
               </div>
             </div>

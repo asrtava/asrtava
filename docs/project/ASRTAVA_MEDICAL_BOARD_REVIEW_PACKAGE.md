@@ -60,3 +60,4 @@ ASRTAVA's clinical architecture has been engineered under strict patient-first s
 | **Nursing Superintendent** | Sister Sunita Paul, MSc Nursing | [ ] APPROVED<br>[ ] REJECTED | ____________________ | — |
 | **Head of Pathology & LIS** | Dr. Anita Sengupta, MD (Path) | [ ] APPROVED<br>[ ] REJECTED | ____________________ | — |
 | **Chief Pharmacist** | Mr. K. V. Raman, M.Pharm | [ ] APPROVED<br>[ ] REJECTED | ____________________ | — |
+
