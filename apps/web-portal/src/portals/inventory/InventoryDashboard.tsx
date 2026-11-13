@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ClipboardList,
   Package,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { pharmacyApi } from '../../services/api';
 import { AdvancedProcurementHub } from './AdvancedProcurementHub';
 
@@ -29,6 +30,7 @@ interface PurchaseOrder {
 export const InventoryDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { inventory: hospitalInventory, transferInventoryStock } = useHospital();
   const [activeTab, setActiveTab] = useState<'orders' | 'alerts' | 'catalog' | 'advanced_procurement'>('advanced_procurement');
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export const InventoryDashboard: React.FC = () => {
   };
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Item Catalog & Internal Stock State
+  // Item Catalog & Internal Stock State derived dynamically from HospitalContext
   const [catalogItems, setCatalogItems] = useState([
     { id: 'cat-1', name: 'Atorvastatin 20mg', sku: 'MED-ATO-020', category: 'Cardiology', stock: 450, unit: 'Tablets', bin: 'BIN-WH-A01', reorderLevel: 100 },
     { id: 'cat-2', name: 'Ceftriaxone 1g Injection', sku: 'MED-CEF-001', category: 'Antibiotic', stock: 18, unit: 'Vials', bin: 'BIN-WH-C04', reorderLevel: 50 },
@@ -52,9 +54,27 @@ export const InventoryDashboard: React.FC = () => {
     { id: 'cat-5', name: 'Normal Saline 0.9% 500ml', sku: 'INF-NS-500', category: 'IV Fluids', stock: 620, unit: 'Bottles', bin: 'BIN-WH-F02', reorderLevel: 100 }
   ]);
 
+  // Synchronize catalog items from hospital inventory when available
+  useEffect(() => {
+    if (hospitalInventory.length > 0) {
+      setCatalogItems(
+        hospitalInventory.map((item, idx) => ({
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          category: item.category,
+          stock: item.stock,
+          unit: item.unit,
+          bin: `BIN-WH-${String.fromCharCode(65 + (idx % 6))}${String((idx % 10) + 1).padStart(2, '0')}`,
+          reorderLevel: item.reorderLevel
+        }))
+      );
+    }
+  }, [hospitalInventory]);
+
   // Stock Transfer / Consumption Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [transferItem, setTransferItem] = useState('Surgical Gloves 7.5 (Sterile)');
+  const [transferItem, setTransferItem] = useState(catalogItems[0]?.name || 'Surgical Gloves 7.5 (Sterile)');
   const [transferDestDept, setTransferDestDept] = useState('Operation Theatre (OT-1)');
   const [transferQty, setTransferQty] = useState(25);
   const [transferRecipient, setTransferRecipient] = useState('Staff Nurse Kavita R.');
@@ -66,20 +86,6 @@ export const InventoryDashboard: React.FC = () => {
     { id: 'po3', poId: 'PO-2026-0091', vendor: 'Apollo Diagnostics Reagents', items: 'Lipid & Troponin High-Sensitivity Test Cartridges', amount: 245000, status: 'Pending Approval', orderDate: '08 Nov 2026' },
     { id: 'po4', poId: 'PO-2026-0084', vendor: 'Cipla Healthcare Ltd', items: 'Antibiotics & Respiratory Inhalers', amount: 140000, status: 'Received & Stocked', orderDate: '01 Nov 2026' }
   ]);
-
-  useEffect(() => {
-    const fetchLiveInventory = async () => {
-      try {
-        const res = await pharmacyApi.getMedicines();
-        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
-          // Live items confirmed available from pharmacy inventory
-        }
-      } catch (err) {
-        console.warn('Inventory sync fallback active:', err);
-      }
-    };
-    fetchLiveInventory();
-  }, []);
 
   // Create PO Modal State
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
@@ -209,8 +215,8 @@ export const InventoryDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Active Purchase Orders</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{orders.length + 12}</div>
-          <span className="text-[11px] text-slate-400">Total ₹ 8,92,000</span>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{orders.length}</div>
+          <span className="text-[11px] text-slate-400">Total ₹ {orders.reduce((sum, o) => sum + o.amount, 0).toLocaleString()}</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-blue-600 font-medium">Shipments in Transit</span>
@@ -221,12 +227,16 @@ export const InventoryDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-rose-600 font-medium">Reorder Level Alerts</span>
-          <div className="text-2xl font-bold text-rose-600 mt-1">6</div>
+          <div className="text-2xl font-bold text-rose-600 mt-1">
+            {catalogItems.filter((c) => c.stock <= c.reorderLevel).length}
+          </div>
           <span className="text-[11px] text-rose-600">Below safety threshold</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Approved Suppliers</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">28</div>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
+            {Array.from(new Set(orders.map((o) => o.vendor))).length}
+          </div>
           <span className="text-[11px] text-emerald-600">Active vendor contracts</span>
         </div>
       </div>

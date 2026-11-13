@@ -1,5 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { HospitalProvider } from './context/HospitalContext';
 import { ToastProvider } from './components/ui/Toast';
 import { AppShell } from './components/layout/AppShell';
 import { SuperAdminDashboard } from './portals/super-admin/SuperAdminDashboard';
@@ -206,9 +207,11 @@ const MainPortalView: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <MainPortalView />
-      </ToastProvider>
+      <HospitalProvider>
+        <ToastProvider>
+          <MainPortalView />
+        </ToastProvider>
+      </HospitalProvider>
     </AuthProvider>
   );
 };

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Badge, useToast, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 
 interface EmergencyPatient {
   id: string;
@@ -68,6 +69,7 @@ interface AmbulanceUnit {
 export const AdvancedEmergencyHub: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { emergencyPatients, registerEmergencyPatient } = useHospital();
   const [activeTab, setActiveTab] = useState<'triage_board' | 'trauma_resus' | 'ambulance' | 'stat_orders' | 'mlc'>('triage_board');
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export const AdvancedEmergencyHub: React.FC = () => {
     setActivePortalTab(tab);
   };
 
-  // 1. Live ED Patients
+  // 1. Live ED Patients - synchronized with HospitalContext
   const [patients, setPatients] = useState<EmergencyPatient[]>([
     {
       id: 'ed-1',
@@ -136,6 +138,12 @@ export const AdvancedEmergencyHub: React.FC = () => {
     },
   ]);
 
+  useEffect(() => {
+    if (emergencyPatients.length > 0) {
+      setPatients(emergencyPatients);
+    }
+  }, [emergencyPatients]);
+
   // 2. Ambulance Fleet
   const [ambulances, setAmbulances] = useState<AmbulanceUnit[]>([
     {
@@ -173,28 +181,24 @@ export const AdvancedEmergencyHub: React.FC = () => {
   const [tempComplaint, setTempComplaint] = useState('Severe polytrauma, unresponsive at scene');
   const [tempArrivalMode, setTempArrivalMode] = useState<'AMBULANCE' | 'POLICE_BRING_IN' | 'WALK_IN'>('AMBULANCE');
 
-  const handleIssueTempUhid = () => {
+  const handleIssueTempUhid = async () => {
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const newTempUhid = `TEMP-UHID-ED-${randomSuffix}`;
-    const newEnc = {
-      id: `ed-${Date.now()}`,
-      encounterNumber: `ED-2026-${randomSuffix}`,
+
+    const newEnc = await registerEmergencyPatient({
       patientName: `Unidentified Emergency Patient (${newTempUhid})`,
       uhid: newTempUhid,
       isUnknownIdentity: true,
-      age: 'Unknown',
+      age: '~35',
       gender: 'U',
       arrivalMode: tempArrivalMode,
       presentingComplaint: tempComplaint,
       esiLevel: 1,
-      zone: 'RED_RESUS' as const,
       vitals: { hr: 120, bp: '85/50', rr: 28, spo2: 89, gcs: 7 },
-      arrivalTime: 'Just now',
       isMedicoLegal: true,
-      status: 'IN_RESUS' as const,
-    };
+    });
 
-    setPatients([newEnc, ...patients]);
+    setPatients((prev) => [newEnc, ...prev]);
     setIsTempUhidModalOpen(false);
     showToast({
       type: 'success',

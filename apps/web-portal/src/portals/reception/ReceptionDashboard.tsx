@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   Users,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital, SharedAppointment } from '../../context/HospitalContext';
 import { patientApi, appointmentApi, hospitalAdminApi, billingApi } from '../../services/api';
 
 interface QueueItem {
@@ -59,16 +60,31 @@ export const ReceptionDashboard: React.FC = () => {
     setActiveTab(tab);
     setActivePortalTab(tab);
   };
+  const {
+    patients,
+    appointments,
+    beds,
+    departments,
+    doctors,
+    registerPatient,
+    bookAppointment,
+    updateAppointmentStatus,
+    admitPatientToBed,
+    createInvoice,
+    collectInvoicePayment,
+    invoices
+  } = useHospital();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState('All');
 
-  // Dynamic Dropdown Lists from API
-  const [dynamicDepts, setDynamicDepts] = useState<string[]>(['Cardiology', 'General Medicine', 'Orthopedics', 'Pediatrics']);
-  const [dynamicDoctors, setDynamicDoctors] = useState<{ id: string; name: string; dept: string }[]>([
+  // Dynamic Dropdown Lists from API / Context
+  const dynamicDepts = departments.length > 0 ? departments : ['Cardiology', 'General Medicine', 'Orthopedics', 'Pediatrics'];
+  const dynamicDoctors = doctors.length > 0 ? doctors : [
     { id: 'doc-1', name: 'Dr. Rajesh Sharma', dept: 'Cardiology' },
     { id: 'doc-2', name: 'Dr. Ananya Roy', dept: 'General Medicine' },
     { id: 'doc-3', name: 'Dr. Vikram Sethi', dept: 'Orthopedics' },
-  ]);
+  ];
 
   // Registration Form State
   const [regFirstName, setRegFirstName] = useState('');
@@ -79,20 +95,20 @@ export const ReceptionDashboard: React.FC = () => {
   const [regBlood, setRegBlood] = useState('O+');
   const [regAddress, setRegAddress] = useState('');
   const [regEmergency, setRegEmergency] = useState('');
-  const [regDoctor, setRegDoctor] = useState('Dr. Rajesh Sharma');
-  const [regDept, setRegDept] = useState('Cardiology');
+  const [regDoctor, setRegDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
+  const [regDept, setRegDept] = useState(dynamicDepts[0] || 'Cardiology');
 
   // Appointment Modal State
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
   const [apptPatientName, setApptPatientName] = useState('');
-  const [apptDoctor, setApptDoctor] = useState('Dr. Rajesh Sharma');
-  const [apptDate, setApptDate] = useState('2026-11-09');
+  const [apptDoctor, setApptDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
+  const [apptDate, setApptDate] = useState(new Date().toISOString().slice(0, 10));
   const [apptSlot, setApptSlot] = useState('11:00 AM');
 
   // Reschedule & Cancel Modal State
   const [selectedQueueItem, setSelectedQueueItem] = useState<QueueItem | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
-  const [rescheduleDate, setRescheduleDate] = useState('2026-11-10');
+  const [rescheduleDate, setRescheduleDate] = useState(new Date().toISOString().slice(0, 10));
   const [rescheduleSlot, setRescheduleSlot] = useState('02:00 PM');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [cancellationReason, setCancellationReason] = useState('');
@@ -102,81 +118,49 @@ export const ReceptionDashboard: React.FC = () => {
   const [billingPatient, setBillingPatient] = useState<QueueItem | null>(null);
   const [consultationFee, setConsultationFee] = useState(500);
   const [paymentMode, setPaymentMode] = useState<'UPI' | 'Cash' | 'Card'>('UPI');
-  const [paidTokens, setPaidTokens] = useState<Record<string, string>>({
-    'q1': 'INV-2026-0819',
-    'q2': 'INV-2026-0820'
-  });
+  const [paidTokens, setPaidTokens] = useState<Record<string, string>>({});
+
+  // Inpatient Admission State
+  const [admitSearchUhid, setAdmitSearchUhid] = useState('');
+  const [admitSelectedWard, setAdmitSelectedWard] = useState('');
+  const [admitSelectedBedId, setAdmitSelectedBedId] = useState('');
+  const [admitDiagnosis, setAdmitDiagnosis] = useState('');
+  const [admitDoctor, setAdmitDoctor] = useState(dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma');
+
+  const wardNames = useMemo(() => {
+    const set = new Set(beds.map((b) => b.wardName));
+    return set.size > 0 ? Array.from(set) : ['Cardiology ICU', 'General Male Ward', 'General Female Ward', 'Private Deluxe Suite'];
+  }, [beds]);
+
+  const activeWard = admitSelectedWard || wardNames[0];
+  const availableBedsInWard = useMemo(
+    () => beds.filter((b) => b.wardName === activeWard && b.status === 'Available'),
+    [beds, activeWard]
+  );
 
   // Existing Patient Search & Verification State
   const [verifySearchQuery, setVerifySearchQuery] = useState('');
   const [verifiedPatientResult, setVerifiedPatientResult] = useState<any | null>(null);
 
-  const [queue, setQueue] = useState<QueueItem[]>([
-    { id: 'q1', token: 'T-019', patient: 'Rahul Verma', uhid: 'APEX-2026-00084', age: 34, gender: 'M', doctor: 'Dr. Rajesh Sharma', dept: 'Cardiology', time: '10:15 AM', status: 'In Consultation', phone: '+91 98765 43210' },
-    { id: 'q2', token: 'T-020', patient: 'Priya Iyer', uhid: 'APEX-2026-00085', age: 29, gender: 'F', doctor: 'Dr. Ananya Roy', dept: 'General Medicine', time: '10:30 AM', status: 'Waiting', phone: '+91 98765 43211' },
-    { id: 'q3', token: 'T-021', patient: 'Mohan Das', uhid: 'APEX-2026-00086', age: 62, gender: 'M', doctor: 'Dr. Rajesh Sharma', dept: 'Cardiology', time: '10:45 AM', status: 'Waiting', phone: '+91 98765 43212' },
-    { id: 'q4', token: 'T-022', patient: 'Kavita Patel', uhid: 'APEX-2026-00087', age: 41, gender: 'F', doctor: 'Dr. Vikram Sethi', dept: 'Orthopedics', time: '11:00 AM', status: 'Checked In', phone: '+91 98765 43213' },
-    { id: 'q5', token: 'T-023', patient: 'Sameer Khan', uhid: 'APEX-2026-00088', age: 25, gender: 'M', doctor: 'Dr. Ananya Roy', dept: 'General Medicine', time: '11:15 AM', status: 'Checked In', phone: '+91 98765 43214' }
-  ]);
+  // Derive dynamic OPD queue directly from appointments in HospitalContext
+  const queue: QueueItem[] = useMemo(() => {
+    return appointments.map((a) => ({
+      id: a.id,
+      token: a.token,
+      patient: a.patientName,
+      uhid: a.uhid,
+      age: a.age,
+      gender: a.gender === 'Female' ? 'F' : 'M',
+      doctor: a.doctorName,
+      dept: a.department,
+      time: a.time,
+      status: a.status === 'Cancelled' ? 'Waiting' : a.status,
+      phone: a.phone
+    }));
+  }, [appointments]);
 
-  // Load dynamic departments, doctors, and appointments from PostgreSQL on mount
-  useEffect(() => {
-    const loadDynamicOptions = async () => {
-      try {
-        const [deptRes, docRes, apptRes] = await Promise.allSettled([
-          hospitalAdminApi.getDepartments(),
-          hospitalAdminApi.getDoctors(),
-          appointmentApi.getAppointments(),
-        ]);
-
-        if (deptRes.status === 'fulfilled' && deptRes.value.data?.data?.length > 0) {
-          const deptNames = deptRes.value.data.data.map((d: any) => d.name);
-          setDynamicDepts(deptNames);
-          if (deptNames.length > 0) setRegDept(deptNames[0]);
-        }
-
-        if (docRes.status === 'fulfilled' && docRes.value.data?.data?.length > 0) {
-          const docList = docRes.value.data.data.map((doc: any) => ({
-            id: doc.id,
-            name: `Dr. ${doc.first_name} ${doc.last_name}`,
-            dept: doc.department_name || 'General Medicine',
-          }));
-          setDynamicDoctors(docList);
-          if (docList.length > 0) {
-            setRegDoctor(docList[0].name);
-            setApptDoctor(docList[0].name);
-          }
-        }
-
-        if (apptRes.status === 'fulfilled' && apptRes.value.data?.data?.length > 0) {
-          const mappedQueue: QueueItem[] = apptRes.value.data.data.map((a: any) => ({
-            id: a.id,
-            token: `T-${String(a.queue_token_number || 10).padStart(3, '0')}`,
-            patient: `${a.patient_first_name} ${a.patient_last_name}`,
-            uhid: a.patient_number || 'APEX-2026-00001',
-            age: 35,
-            gender: 'M',
-            doctor: `Dr. ${a.doctor_first_name} ${a.doctor_last_name}`,
-            dept: a.department_name || 'General Medicine',
-            time: a.start_time || '10:00 AM',
-            status: a.status === 'completed' ? 'Completed' : a.status === 'in_consultation' ? 'In Consultation' : a.status === 'checked_in' ? 'Checked In' : 'Waiting',
-            phone: a.patient_phone || '+91 98765 00000',
-          }));
-          setQueue(mappedQueue);
-        }
-      } catch (err) {
-        // Retain initial configuration on network fault
-      }
-    };
-    loadDynamicOptions();
-  }, []);
-
-  const handleCallToken = (token: QueueItem) => {
-    setQueue((prev) =>
-      prev.map((item) =>
-        item.id === token.id ? { ...item, status: 'In Consultation' } : item
-      )
-    );
+  const handleCallToken = async (token: QueueItem) => {
+    await updateAppointmentStatus(token.id, 'In Consultation');
     showToast({
       type: 'info',
       title: `Calling Token ${token.token}`,
@@ -191,47 +175,32 @@ export const ReceptionDashboard: React.FC = () => {
       return;
     }
 
-    const tokenNum = queue.length + 20;
-    const newToken = `T-0${tokenNum}`;
-    let newUhid = `APEX-2026-000${Math.floor(100 + Math.random() * 900)}`;
-    const fullName = `${regFirstName.trim()} ${regLastName.trim()}`;
+    const calculatedAge = Math.max(1, new Date().getFullYear() - new Date(regDob).getFullYear());
+    const newPt = await registerPatient({
+      firstName: regFirstName.trim(),
+      lastName: regLastName.trim() || 'Patient',
+      age: calculatedAge,
+      gender: regGender,
+      phone: regPhone.trim(),
+      bloodGroup: regBlood,
+      address: regAddress.trim() || 'Address On File'
+    });
 
-    // Attempt real database patient registration via backend API
-    try {
-      const res = await patientApi.registerPatient({
-        firstName: regFirstName.trim(),
-        lastName: regLastName.trim() || 'Patient',
-        phone: regPhone.trim(),
-        dateOfBirth: regDob,
-        gender: regGender.toLowerCase(),
-        bloodGroup: regBlood,
-        address: regAddress.trim() || 'Address On File',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-      });
-
-      if (res.data?.data?.patient_number) {
-        newUhid = res.data.data.patient_number;
-      }
-    } catch (err: any) {
-      // Graceful fallback to local queue state
-    }
-
-    const newQueueItem: QueueItem = {
-      id: 'q-' + Date.now(),
-      token: newToken,
-      patient: fullName,
-      uhid: newUhid,
-      age: 35,
-      gender: regGender === 'Male' ? 'M' : 'F',
-      doctor: regDoctor,
-      dept: regDept,
+    const targetDoc = dynamicDoctors.find((d) => d.name === regDoctor) || dynamicDoctors[0];
+    const newAppt = await bookAppointment({
+      patientId: newPt.id,
+      patientName: newPt.name,
+      uhid: newPt.uhid,
+      age: newPt.age,
+      gender: newPt.gender,
+      phone: newPt.phone,
+      doctorId: targetDoc.id,
+      doctorName: targetDoc.name,
+      department: targetDoc.dept || regDept,
+      date: new Date().toISOString().slice(0, 10),
       time: 'Now',
-      status: 'Waiting',
-      phone: regPhone
-    };
-
-    setQueue([newQueueItem, ...queue]);
+      complaint: 'OPD Walk-in Registration'
+    });
 
     // Reset Form
     setRegFirstName('');
@@ -243,7 +212,7 @@ export const ReceptionDashboard: React.FC = () => {
     showToast({
       type: 'success',
       title: 'Patient Registered & Token Issued',
-      message: `${fullName} assigned UHID ${newUhid} and Token ${newToken}. Added to live OPD queue.`
+      message: `${newPt.name} assigned UHID ${newPt.uhid} and Token ${newAppt.token}. Added to live OPD queue.`
     });
   };
 
@@ -253,32 +222,51 @@ export const ReceptionDashboard: React.FC = () => {
       return;
     }
 
-    const tokenNum = queue.length + 21;
-    const newToken = `T-0${tokenNum}`;
-    const generatedUhid = `APEX-2026-000${Math.floor(100 + Math.random() * 900)}`;
+    const targetDoc = dynamicDoctors.find((d) => d.name === apptDoctor) || dynamicDoctors[0];
+    const existingPt = patients.find(
+      (p) => p.name.toLowerCase() === apptPatientName.trim().toLowerCase()
+    );
 
-    const newApptItem: QueueItem = {
-      id: 'q-' + Date.now(),
-      token: newToken,
-      patient: apptPatientName,
-      uhid: generatedUhid,
-      age: 38,
-      gender: 'M',
-      doctor: apptDoctor,
-      dept: apptDoctor.includes('Sharma') ? 'Cardiology' : 'General Medicine',
+    let ptId = existingPt?.id;
+    let ptUhid = existingPt?.uhid;
+    let ptAge = existingPt?.age || 38;
+    let ptGender = existingPt?.gender || 'Male';
+    let ptPhone = existingPt?.phone || '+91 98765 00000';
+
+    if (!existingPt) {
+      const created = await registerPatient({
+        firstName: apptPatientName.trim(),
+        lastName: '',
+        age: 38,
+        gender: 'Male',
+        phone: '+91 98765 00000'
+      });
+      ptId = created.id;
+      ptUhid = created.uhid;
+    }
+
+    const newAppt = await bookAppointment({
+      patientId: ptId || 'pt-new',
+      patientName: apptPatientName.trim(),
+      uhid: ptUhid || 'UHID-NEW',
+      age: ptAge,
+      gender: ptGender,
+      phone: ptPhone,
+      doctorId: targetDoc.id,
+      doctorName: targetDoc.name,
+      department: targetDoc.dept || 'General Medicine',
+      date: apptDate,
       time: apptSlot,
-      status: 'Checked In',
-      phone: '+91 98765 00000'
-    };
+      complaint: 'Scheduled consultation'
+    });
 
-    setQueue([...queue, newApptItem]);
     setIsApptModalOpen(false);
     setApptPatientName('');
 
     showToast({
       type: 'success',
       title: 'Appointment Scheduled & Checked In',
-      message: `Appointment for ${apptPatientName} with ${apptDoctor} confirmed for ${apptDate} at ${apptSlot}.`
+      message: `Token ${newAppt.token} for ${apptPatientName} confirmed for ${apptDate} at ${apptSlot}.`
     });
   };
 
@@ -292,13 +280,7 @@ export const ReceptionDashboard: React.FC = () => {
       });
     } catch (err) {}
 
-    setQueue((prev) =>
-      prev.map((q) =>
-        q.id === selectedQueueItem.id
-          ? { ...q, time: `${rescheduleDate} ${rescheduleSlot}`, status: 'Waiting' }
-          : q
-      )
-    );
+    await updateAppointmentStatus(selectedQueueItem.id, 'Waiting');
     setIsRescheduleModalOpen(false);
     showToast({
       type: 'success',
@@ -313,7 +295,7 @@ export const ReceptionDashboard: React.FC = () => {
       await appointmentApi.updateStatus(selectedQueueItem.id, 'cancelled', cancellationReason || 'Cancelled at front desk');
     } catch (err) {}
 
-    setQueue((prev) => prev.filter((q) => q.id !== selectedQueueItem.id));
+    await updateAppointmentStatus(selectedQueueItem.id, 'Cancelled');
     setIsRescheduleModalOpen(false);
     showToast({
       type: 'warning',
@@ -324,56 +306,55 @@ export const ReceptionDashboard: React.FC = () => {
 
   const handleCollectOpdFee = async () => {
     if (!billingPatient) return;
-    const invNumber = `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    try {
-      await billingApi.createInvoice({
-        patientId: billingPatient.uhid,
-        items: [{ itemName: 'OPD Consultation Fee', rate: consultationFee, quantity: 1, amount: consultationFee }],
-        paymentMode,
-        totalAmount: consultationFee
-      });
-    } catch (err) {}
+    const inv = await createInvoice({
+      patientId: billingPatient.id,
+      patientName: billingPatient.patient,
+      uhid: billingPatient.uhid,
+      category: 'OPD Consultation Fee',
+      items: [
+        {
+          description: `OPD Consultation with ${billingPatient.doctor} (${billingPatient.dept})`,
+          quantity: 1,
+          unitRate: consultationFee,
+          amount: consultationFee
+        }
+      ]
+    });
 
-    setPaidTokens((prev) => ({ ...prev, [billingPatient.id]: invNumber }));
+    const receiptNumber = await collectInvoicePayment(inv.id, consultationFee, paymentMode);
+    setPaidTokens((prev) => ({ ...prev, [billingPatient.id]: receiptNumber }));
     setIsBillingModalOpen(false);
+
     showToast({
       type: 'success',
       title: 'OPD Consultation Fee Collected',
-      message: `Receipt ${invNumber} generated for ${billingPatient.patient} (₹${consultationFee} via ${paymentMode}).`
+      message: `Receipt ${receiptNumber} generated for ${billingPatient.patient} (₹${consultationFee} via ${paymentMode}).`
     });
   };
 
   const handleLookupExistingPatient = async () => {
     if (!verifySearchQuery.trim()) return;
-    try {
-      const res = await patientApi.getPatients({ search: verifySearchQuery.trim() });
-      if (res.data?.data && res.data.data.length > 0) {
-        const found = res.data.data[0];
-        setVerifiedPatientResult({
-          uhid: found.patient_number || 'APEX-2026-00045',
-          name: `${found.first_name} ${found.last_name}`,
-          phone: found.phone || verifySearchQuery,
-          gender: found.gender || 'Male',
-          age: found.age || 42,
-          registeredDate: found.created_at?.slice(0, 10) || '01 Nov 2026'
-        });
-        showToast({
-          type: 'success',
-          title: 'Existing Patient Record Found',
-          message: `${found.first_name} ${found.last_name} matches UHID ${found.patient_number}.`
-        });
-        return;
-      }
-    } catch (err) {}
+    const q = verifySearchQuery.trim().toLowerCase();
+    const found = patients.find(
+      (p) =>
+        p.uhid.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        p.phone.includes(verifySearchQuery.trim())
+    );
 
-    if (verifySearchQuery.includes('98765') || verifySearchQuery.toLowerCase().includes('rahul') || verifySearchQuery.toLowerCase().includes('priya')) {
+    if (found) {
       setVerifiedPatientResult({
-        uhid: 'APEX-2026-00084',
-        name: 'Rahul Verma',
-        phone: '+91 98765 43210',
-        gender: 'Male',
-        age: 34,
-        registeredDate: '15 Oct 2026'
+        uhid: found.uhid,
+        name: found.name,
+        phone: found.phone,
+        gender: found.gender,
+        age: found.age,
+        registeredDate: found.registeredDate
+      });
+      showToast({
+        type: 'success',
+        title: 'Existing Patient Record Found',
+        message: `${found.name} matches UHID ${found.uhid}.`
       });
     } else {
       setVerifiedPatientResult(null);
@@ -383,6 +364,43 @@ export const ReceptionDashboard: React.FC = () => {
         message: 'No existing patient matches this search query. Proceed with New Patient Registration.'
       });
     }
+  };
+
+  const handleConfirmAdmission = async () => {
+    if (!admitSearchUhid.trim()) {
+      showToast({ type: 'warning', title: 'Input Required', message: 'Please enter a Patient UHID or Name to admit.' });
+      return;
+    }
+    const pt = patients.find(
+      (p) =>
+        p.uhid.toLowerCase() === admitSearchUhid.trim().toLowerCase() ||
+        p.name.toLowerCase().includes(admitSearchUhid.trim().toLowerCase())
+    );
+    const chosenBed = beds.find((b) => b.id === admitSelectedBedId) || availableBedsInWard[0];
+    if (!chosenBed) {
+      showToast({ type: 'warning', title: 'No Available Bed', message: 'No available bed found in the selected ward.' });
+      return;
+    }
+
+    await admitPatientToBed({
+      patientId: pt?.id || 'pt-' + Date.now(),
+      patientName: pt?.name || admitSearchUhid.trim(),
+      uhid: pt?.uhid || `UHID-INP-${Math.floor(1000 + Math.random() * 9000)}`,
+      age: pt?.age || 45,
+      gender: pt?.gender || 'Male',
+      bedId: chosenBed.id,
+      wardName: activeWard,
+      diagnosis: admitDiagnosis || 'Inpatient Observation and Medical Management',
+      attendingDoctor: admitDoctor || dynamicDoctors[0]?.name || 'Dr. Rajesh Sharma'
+    });
+
+    showToast({
+      type: 'success',
+      title: 'Inpatient Bed Allocated',
+      message: `Assigned ${pt?.name || admitSearchUhid} to ${chosenBed.bedNumber} (${activeWard}). Nursing and Inpatient notified.`
+    });
+    setAdmitSearchUhid('');
+    setAdmitDiagnosis('');
   };
 
   const filteredQueue = queue.filter((item) => {
@@ -430,23 +448,25 @@ export const ReceptionDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-slate-500">Today's Total Registrations</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{queue.length + 84}</div>
-          <span className="text-[11px] text-slate-400">18 Walk-ins today</span>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{patients.length}</div>
+          <span className="text-[11px] text-slate-400">{appointments.length} Total visits booked</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-amber-600">Currently Waiting</span>
           <div className="text-2xl font-bold text-amber-600 mt-1">{waitingCount}</div>
-          <span className="text-[11px] text-amber-600/80">Avg wait: 12 mins</span>
+          <span className="text-[11px] text-amber-600/80">In OPD Queue</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-teal-600">In Active Consultation</span>
           <div className="text-2xl font-bold text-teal-600 mt-1">{inConsultCount}</div>
-          <span className="text-[11px] text-teal-600/80">Across 6 OPD rooms</span>
+          <span className="text-[11px] text-teal-600/80">Across OPD rooms</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs font-medium text-emerald-600">Completed & Discharged</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">68</div>
-          <span className="text-[11px] text-emerald-600/80">Checked out</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
+            {appointments.filter((a) => a.status === 'Completed').length}
+          </div>
+          <span className="text-[11px] text-emerald-600/80">Consultations finished</span>
         </div>
       </div>
 
@@ -657,28 +677,26 @@ export const ReceptionDashboard: React.FC = () => {
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={() => {
-                    const tokenNum = queue.length + 20;
-                    const newToken = `T-0${tokenNum}`;
-                    const newQueueItem: QueueItem = {
-                      id: 'q-' + Date.now(),
-                      token: newToken,
-                      patient: verifiedPatientResult.name,
+                  onClick={async () => {
+                    const newAppt = await bookAppointment({
+                      patientId: verifiedPatientResult.id,
+                      patientName: verifiedPatientResult.name,
                       uhid: verifiedPatientResult.uhid,
                       age: verifiedPatientResult.age,
-                      gender: verifiedPatientResult.gender === 'Male' ? 'M' : 'F',
-                      doctor: regDoctor,
-                      dept: regDept,
+                      gender: verifiedPatientResult.gender,
+                      phone: verifiedPatientResult.phone,
+                      doctorId: 'doc-auto-opd',
+                      doctorName: regDoctor,
+                      department: regDept,
+                      date: new Date().toISOString().slice(0, 10),
                       time: 'Now',
-                      status: 'Waiting',
-                      phone: verifiedPatientResult.phone
-                    };
-                    setQueue([newQueueItem, ...queue]);
+                      complaint: 'OPD Consultation Check-in'
+                    });
                     setActiveTab('queue');
                     showToast({
                       type: 'success',
                       title: 'Existing Patient Checked In',
-                      message: `${verifiedPatientResult.name} (${verifiedPatientResult.uhid}) issued Token ${newToken} for ${regDoctor}.`
+                      message: `${verifiedPatientResult.name} (${verifiedPatientResult.uhid}) issued Token ${newAppt.token} for ${regDoctor}.`
                     });
                   }}
                 >
@@ -773,13 +791,16 @@ export const ReceptionDashboard: React.FC = () => {
                 value={regDoctor}
                 onChange={(e) => {
                   setRegDoctor(e.target.value);
-                  setRegDept(e.target.value.includes('Sharma') ? 'Cardiology' : e.target.value.includes('Roy') ? 'General Medicine' : 'Orthopedics');
+                  const doc = dynamicDoctors.find((d) => d.name === e.target.value);
+                  if (doc?.dept) setRegDept(doc.dept);
                 }}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
               >
-                <option value="Dr. Rajesh Sharma">Dr. Rajesh Sharma (Cardiology)</option>
-                <option value="Dr. Ananya Roy">Dr. Ananya Roy (General Medicine)</option>
-                <option value="Dr. Vikram Sethi">Dr. Vikram Sethi (Orthopedics)</option>
+                {dynamicDoctors.map((doc) => (
+                  <option key={doc.id} value={doc.name}>
+                    {doc.name} ({doc.dept})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -811,40 +832,90 @@ export const ReceptionDashboard: React.FC = () => {
       {activeTab === 'admit' && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
           <h2 className="text-sm font-bold text-slate-900 mb-1">Inpatient (IPD) Admission Desk</h2>
-          <p className="text-xs text-slate-500 mb-6">Allocate ward, room and bed with real-time occupancy locking.</p>
+          <p className="text-xs text-slate-500 mb-6">Allocate ward, room and bed with real-time occupancy locking across hospital workspaces.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block text-slate-700 font-medium mb-1">Patient UHID / Search</label>
-              <input type="text" placeholder="e.g. APEX-2026-00084" defaultValue="APEX-2026-00084" className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg" />
+              <label className="block text-slate-700 font-medium mb-1">Patient UHID or Name *</label>
+              <input
+                type="text"
+                placeholder="Search patient UHID or name..."
+                value={admitSearchUhid}
+                onChange={(e) => setAdmitSearchUhid(e.target.value)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
             </div>
             <div>
               <label className="block text-slate-700 font-medium mb-1">Target Ward</label>
-              <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                <option>Cardiology ICU (5 beds free)</option>
-                <option>General Male Ward (12 beds free)</option>
-                <option>General Female Ward (8 beds free)</option>
-                <option>Private Deluxe Suite (2 beds free)</option>
+              <select
+                value={activeWard}
+                onChange={(e) => {
+                  setAdmitSelectedWard(e.target.value);
+                  setAdmitSelectedBedId('');
+                }}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                {wardNames.map((w) => {
+                  const freeCount = beds.filter((b) => b.wardName === w && b.status === 'Available').length;
+                  return (
+                    <option key={w} value={w}>
+                      {w} ({freeCount} beds available)
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
-              <label className="block text-slate-700 font-medium mb-1">Bed Selection</label>
-              <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                <option>BED-ICU-04 (Oxygen + Cardiac Monitor)</option>
-                <option>BED-ICU-05 (Oxygen + Ventilator Ready)</option>
+              <label className="block text-slate-700 font-medium mb-1">Available Bed Selection *</label>
+              <select
+                value={admitSelectedBedId}
+                onChange={(e) => setAdmitSelectedBedId(e.target.value)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                {availableBedsInWard.length === 0 ? (
+                  <option value="">No beds available in {activeWard}</option>
+                ) : (
+                  availableBedsInWard.map((bed) => (
+                    <option key={bed.id} value={bed.id}>
+                      {bed.bedNumber} ({bed.bedType} - ₹{bed.dailyRate}/day)
+                    </option>
+                  ))
+                )}
               </select>
             </div>
+
+            <div>
+              <label className="block text-slate-700 font-medium mb-1">Attending Physician</label>
+              <select
+                value={admitDoctor}
+                onChange={(e) => setAdmitDoctor(e.target.value)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              >
+                {dynamicDoctors.map((doc) => (
+                  <option key={doc.id} value={doc.name}>
+                    {doc.name} ({doc.dept})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-slate-700 font-medium mb-1">Initial Provisional Diagnosis</label>
+              <input
+                type="text"
+                placeholder="e.g. Acute Coronary Syndrome, Unstable Angina"
+                value={admitDiagnosis}
+                onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
           </div>
+
           <div className="mt-6 flex justify-end">
             <Button
               variant="primary"
-              onClick={() => {
-                showToast({
-                  type: 'success',
-                  title: 'Inpatient Bed Allocated',
-                  message: 'Assigned to BED-ICU-04. IPD admission number IPD-2026-0062 generated.'
-                });
-              }}
+              onClick={handleConfirmAdmission}
+              disabled={availableBedsInWard.length === 0}
             >
               Confirm Bed Allocation & Issue IPD Number
             </Button>
@@ -889,9 +960,11 @@ export const ReceptionDashboard: React.FC = () => {
                 onChange={(e) => setApptDoctor(e.target.value)}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               >
-                <option value="Dr. Rajesh Sharma">Dr. Rajesh Sharma (Cardio)</option>
-                <option value="Dr. Ananya Roy">Dr. Ananya Roy (Gen Med)</option>
-                <option value="Dr. Vikram Sethi">Dr. Vikram Sethi (Ortho)</option>
+                {dynamicDoctors.map((doc) => (
+                  <option key={doc.id} value={doc.name}>
+                    {doc.name} ({doc.dept})
+                  </option>
+                ))}
               </select>
             </div>
             <div>

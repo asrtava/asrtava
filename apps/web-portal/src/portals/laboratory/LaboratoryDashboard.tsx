@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Activity,
   CheckCircle2,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { diagnosticsApi, notificationsApi } from '../../services/api';
 import { AdvancedLISHub } from './AdvancedLISHub';
 
@@ -48,6 +49,7 @@ interface LabOrder {
 export const LaboratoryDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { labOrders, updateLabOrderResults } = useHospital();
   const [activeTab, setActiveTab] = useState<'advanced-hub' | 'pending' | 'verified'>('advanced-hub');
 
   useEffect(() => {
@@ -62,89 +64,24 @@ export const LaboratoryDashboard: React.FC = () => {
   };
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [orders, setOrders] = useState<LabOrder[]>([
-    {
-      id: 'l1',
-      orderId: 'LAB-2026-0811',
-      patient: 'Rahul Verma',
-      uhid: 'APEX-2026-00084',
-      test: 'Lipid Profile Comprehensive',
+  // Map dynamic lab orders from HospitalContext
+  const orders: LabOrder[] = useMemo(() => {
+    return labOrders.map((lo) => ({
+      id: lo.id,
+      orderId: lo.orderNumber,
+      patient: lo.patientName,
+      uhid: lo.uhid,
+      test: lo.tests.join(', ') || 'Clinical Pathology Test',
       department: 'Biochemistry',
-      specimen: 'Serum / Blood (Vacutainer Gold)',
-      doctor: 'Dr. Rajesh Sharma',
-      collectedAt: '09:40 AM',
-      status: 'Ready for Entry',
-      results: [
-        { parameter: 'Total Cholesterol', value: '242', unit: 'mg/dL', reference: '< 200', flag: 'High' },
-        { parameter: 'HDL Cholesterol', value: '38', unit: 'mg/dL', reference: '> 40', flag: 'Low' },
-        { parameter: 'LDL Cholesterol', value: '162', unit: 'mg/dL', reference: '< 100', flag: 'High' },
-        { parameter: 'Triglycerides', value: '210', unit: 'mg/dL', reference: '< 150', flag: 'High' }
+      specimen: 'Serum / Blood Vacutainer',
+      doctor: lo.doctorName,
+      collectedAt: lo.orderedAt || '10:00 AM',
+      status: lo.status as any,
+      results: lo.results || [
+        { parameter: 'Diagnostic Assay', value: '7.4', unit: 'Index', reference: '3.5 - 8.0', flag: 'Normal' }
       ]
-    },
-    {
-      id: 'l2',
-      orderId: 'LAB-2026-0812',
-      patient: 'Sunita Sharma',
-      uhid: 'APEX-2026-00048',
-      test: 'Cardiac Troponin I (High Sensitivity)',
-      department: 'Biochemistry',
-      specimen: 'EDTA Whole Blood (Vacutainer Purple)',
-      doctor: 'Dr. Rajesh Sharma',
-      collectedAt: '10:05 AM',
-      status: 'Awaiting Sign-Off',
-      results: [
-        { parameter: 'Troponin-I (hs-cTnI)', value: '0.08', unit: 'ng/mL', reference: '< 0.04', flag: 'Critical' }
-      ]
-    },
-    {
-      id: 'l3',
-      orderId: 'LAB-2026-0813',
-      patient: 'Mohan Das',
-      uhid: 'APEX-2026-00086',
-      test: 'Complete Blood Count (CBC) + ESR',
-      department: 'Hematology',
-      specimen: 'EDTA Blood',
-      doctor: 'Dr. Ananya Roy',
-      collectedAt: '10:20 AM',
-      status: 'Sample Collected',
-      results: [
-        { parameter: 'Hemoglobin (Hb)', value: '13.8', unit: 'g/dL', reference: '13.0 - 17.0', flag: 'Normal' },
-        { parameter: 'Total WBC Count', value: '7,400', unit: '/mcL', reference: '4,000 - 11,000', flag: 'Normal' },
-        { parameter: 'Platelet Count', value: '2.4', unit: 'Lakhs/mcL', reference: '1.5 - 4.5', flag: 'Normal' }
-      ]
-    },
-    {
-      id: 'l4',
-      orderId: 'LAB-2026-0808',
-      patient: 'Vikram Malhotra',
-      uhid: 'APEX-2026-00078',
-      test: 'Glycated Hemoglobin (HbA1c)',
-      department: 'Biochemistry',
-      specimen: 'Fluoride / EDTA Blood',
-      doctor: 'Dr. Rajesh Sharma',
-      collectedAt: '08:30 AM',
-      status: 'Verified & Dispatched',
-      results: [
-        { parameter: 'HbA1c', value: '5.8', unit: '%', reference: '< 5.7', flag: 'Normal' },
-        { parameter: 'Estimated Average Glucose', value: '120', unit: 'mg/dL', reference: '< 117', flag: 'Normal' }
-      ]
-    }
-  ]);
-
-  // Live Laboratory Catalog & Worklist Fetch from PostgreSQL
-  useEffect(() => {
-    const fetchLiveLabWorklist = async () => {
-      try {
-        const res = await diagnosticsApi.getLabCatalog();
-        if (res.data?.data && res.data.data.length > 0) {
-          // Dynamic catalog loaded successfully
-        }
-      } catch (err) {
-        // Fallback to local queue on network boundary
-      }
-    };
-    fetchLiveLabWorklist();
-  }, []);
+    }));
+  }, [labOrders]);
 
   // Result Entry Modal State
   const [selectedOrder, setSelectedOrder] = useState<LabOrder | null>(null);
@@ -157,10 +94,8 @@ export const LaboratoryDashboard: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('Hemolyzed Specimen (Unsuitable for optical assay)');
   const [criticalAlertSent, setCriticalAlertSent] = useState<Record<string, boolean>>({});
 
-  const handleAccessionSample = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: 'Ready for Entry' } : o))
-    );
+  const handleAccessionSample = async (orderId: string) => {
+    await updateLabOrderResults(orderId, undefined, 'Ready for Entry');
     showToast({
       type: 'success',
       title: 'Specimen Accessioned into Laboratory',
@@ -170,13 +105,7 @@ export const LaboratoryDashboard: React.FC = () => {
 
   const handleConfirmRejection = () => {
     if (!orderToReject) return;
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === orderToReject.id
-          ? { ...o, status: 'Sample Rejected', rejectionReason }
-          : o
-      )
-    );
+    updateLabOrderResults(orderToReject.id, undefined, 'Sample Rejected' as any);
     setIsRejectModalOpen(false);
     showToast({
       type: 'warning',
@@ -221,10 +150,11 @@ export const LaboratoryDashboard: React.FC = () => {
       // Local fallback handled
     }
 
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === selectedOrder.id ? { ...o, status: 'Verified & Dispatched' } : o
-      )
+    await updateLabOrderResults(
+      selectedOrder.id,
+      selectedOrder.results,
+      'Verified & Dispatched',
+      'Dr. Pathologist'
     );
 
     setIsResultModalOpen(false);
@@ -275,8 +205,8 @@ export const LaboratoryDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Samples Collected Today</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{orders.length + 72}</div>
-          <span className="text-[11px] text-slate-400">Blood, Serum, Urine</span>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{orders.length}</div>
+          <span className="text-[11px] text-slate-400">Total pathology samples</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-amber-600 font-medium">Pending Result Entry</span>
@@ -294,8 +224,8 @@ export const LaboratoryDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Completed Reports</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{verifiedList.length + 51}</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Dispatched to EMR</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{verifiedList.length}</div>
+          <span className="text-[11px] text-emerald-600 font-medium">Dispatched to EMR & Patient</span>
         </div>
       </div>
 

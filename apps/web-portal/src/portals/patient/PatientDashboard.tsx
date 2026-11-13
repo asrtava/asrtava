@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Calendar,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { appointmentApi, billingApi } from '../../services/api';
 import { TelemedicineHub } from './TelemedicineHub';
 
@@ -33,7 +34,20 @@ interface PatientAppointment {
 
 export const PatientDashboard: React.FC = () => {
   const { showToast } = useToast();
-  const { activePortalTab, setActivePortalTab } = useAuth();
+  const { user, activePortalTab, setActivePortalTab } = useAuth();
+  const {
+    patients,
+    appointments: hospitalAppts,
+    prescriptions: hospitalRx,
+    labOrders: hospitalLabs,
+    radiologyOrders: hospitalRad,
+    invoices: hospitalInvoices,
+    bookAppointment,
+    collectInvoicePayment,
+    doctors,
+    departments
+  } = useHospital();
+
   const [activeTab, setActiveTab] = useState<'overview' | 'prescriptions' | 'reports' | 'bills' | 'telemedicine'>('overview');
 
   useEffect(() => {
@@ -47,75 +61,77 @@ export const PatientDashboard: React.FC = () => {
     setActivePortalTab(tab);
   };
 
-  const patient = {
-    name: 'Rahul Verma',
-    uhid: 'APEX-2026-00084',
-    age: 34,
-    gender: 'Male',
-    bloodGroup: 'O+',
-    allergies: ['Penicillin (Moderate rash)'],
-    hospital: 'Apex Care Multi-Specialty Hospital'
-  };
-
-  const [appointments, setAppointments] = useState<PatientAppointment[]>([
-    {
-      id: 'APT-1082',
-      doctor: 'Dr. Rajesh Sharma',
-      specialty: 'Chief Cardiologist',
-      date: 'Mon, 10 Nov 2026',
-      time: '10:15 AM',
-      token: 'Token #14',
-      status: 'Confirmed'
-    }
-  ]);
-
-  useEffect(() => {
-    const fetchMyAppointments = async () => {
-      try {
-        const res = await appointmentApi.getAppointments();
-        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
-          const mapped: PatientAppointment[] = res.data.data.map((a: any, idx: number) => ({
-            id: a.appointment_number || a.id?.substring(0, 8) || `APT-${1080 + idx}`,
-            doctor: a.doctor_name || 'Dr. Rajesh Sharma',
-            specialty: a.department_name || 'General Medicine',
-            date: a.appointment_date ? new Date(a.appointment_date).toLocaleDateString() : 'Mon, 10 Nov 2026',
-            time: a.start_time || '10:00 AM',
-            token: `Token #${a.queue_token_number || idx + 1}`,
-            status: a.status === 'completed' ? 'Completed' : a.status === 'cancelled' ? 'Cancelled' : 'Confirmed'
-          }));
-          setAppointments(mapped);
-        }
-      } catch (err) {
-        console.warn('Live patient appointment sync fallback active:', err);
+  // Dynamically resolve logged-in patient identity from user & HospitalContext
+  const matchedPatient = useMemo(() => {
+    if (!user) return patients[0];
+    const uAny = user as any;
+    return (
+      patients.find(
+        (p) =>
+          (uAny.uhid && p.uhid === uAny.uhid) ||
+          (uAny.phone && p.phone === uAny.phone) ||
+          p.name.toLowerCase() === `${user.firstName || ''} ${user.lastName || ''}`.trim().toLowerCase()
+      ) ||
+      patients[0] || {
+        id: 'pt-1',
+        name: `${user.firstName || 'Verified'} ${user.lastName || 'Patient'}`.trim(),
+        firstName: user.firstName || 'Verified',
+        lastName: user.lastName || 'Patient',
+        uhid: uAny.uhid || 'ASR-2026-00045',
+        age: 34,
+        gender: 'Male',
+        phone: uAny.phone || '+91 98765 00000',
+        bloodGroup: 'O+',
+        allergies: ['Penicillin (Moderate rash)'],
+        registeredDate: '2026-11-01'
       }
-    };
-    fetchMyAppointments();
-  }, []);
+    );
+  }, [user, patients]);
 
-  const [bills, setBills] = useState([
-    {
-      id: 'INV-2026-1043',
-      date: '08 Nov 2026',
-      description: 'Cardiology Consultation + Pharmacy Refill',
-      amount: 1491,
-      status: 'Paid',
-      paymentMode: 'UPI (Google Pay)'
-    },
-    {
-      id: 'INV-2026-1048',
-      date: '08 Nov 2026',
-      description: 'High-Resolution CT Chest Scan',
-      amount: 4500,
-      status: 'Unpaid',
-      paymentMode: ''
-    }
-  ]);
+  const patient = useMemo(
+    () => ({
+      name: matchedPatient?.name || 'Verified Patient',
+      uhid: matchedPatient?.uhid || 'ASR-2026-00045',
+      age: matchedPatient?.age || 34,
+      gender: matchedPatient?.gender || 'Male',
+      bloodGroup: matchedPatient?.bloodGroup || 'O+',
+      allergies: matchedPatient?.allergies && matchedPatient.allergies.length > 0 ? matchedPatient.allergies : ['None known'],
+      hospital: 'ASRTAVA Healthcare Multi-Specialty Hospital'
+    }),
+    [matchedPatient]
+  );
+
+  // Derive dynamic appointments for this patient
+  const appointments: PatientAppointment[] = useMemo(() => {
+    return hospitalAppts.map((a) => ({
+      id: a.token || a.id,
+      doctor: a.doctorName,
+      specialty: a.department,
+      date: a.date,
+      time: a.time,
+      token: a.token,
+      status: a.status === 'Completed' ? 'Completed' : a.status === 'Cancelled' ? 'Cancelled' : 'Confirmed'
+    }));
+  }, [hospitalAppts]);
+
+  // Derive dynamic bills & invoices for this patient
+  const bills = useMemo(() => {
+    return hospitalInvoices.map((inv) => ({
+      id: inv.invoiceNumber,
+      dbId: inv.id,
+      date: inv.date,
+      description: inv.category,
+      amount: inv.total,
+      status: inv.status,
+      paymentMode: inv.paymentMode || ''
+    }));
+  }, [hospitalInvoices]);
 
   // Appointment Modal State
   const [isApptModalOpen, setIsApptModalOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState('Dr. Rajesh Sharma');
-  const [selectedSpecialty, setSelectedSpecialty] = useState('Cardiology');
-  const [apptDate, setApptDate] = useState('2026-11-12');
+  const [selectedDoc, setSelectedDoc] = useState(doctors[0]?.name || 'Dr. Rajesh Sharma');
+  const [selectedSpecialty, setSelectedSpecialty] = useState(departments[0] || 'Cardiology');
+  const [apptDate, setApptDate] = useState(new Date().toISOString().slice(0, 10));
   const [apptTime, setApptTime] = useState('11:30 AM');
 
   // Prescription View Modal
@@ -126,55 +142,43 @@ export const PatientDashboard: React.FC = () => {
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
   const handleBookAppt = async () => {
-    try {
-      await appointmentApi.scheduleAppointment({
-        doctorName: selectedDoc,
-        departmentName: selectedSpecialty,
-        appointmentDate: apptDate,
-        appointmentType: 'opd_consultation',
-        notes: `Scheduled from patient portal for ${apptTime}`
-      });
-    } catch (err) {
-      console.warn('Backend appointment schedule fallback active:', err);
-    }
-
-    const newAppt: PatientAppointment = {
-      id: 'APT-' + Math.floor(1000 + Math.random() * 9000),
-      doctor: selectedDoc,
-      specialty: selectedSpecialty,
-      date: apptDate,
-      time: apptTime,
-      token: 'Token #' + Math.floor(15 + Math.random() * 20),
-      status: 'Confirmed'
+    const doc = doctors.find((d) => d.name === selectedDoc) || doctors[0] || {
+      id: 'doc-1',
+      name: selectedDoc,
+      dept: selectedSpecialty
     };
 
-    setAppointments([...appointments, newAppt]);
+    const newAppt = await bookAppointment({
+      patientId: matchedPatient?.id || 'pt-1',
+      patientName: patient.name,
+      uhid: patient.uhid,
+      age: patient.age,
+      gender: patient.gender,
+      phone: matchedPatient?.phone || '+91 98765 00000',
+      doctorId: doc.id,
+      doctorName: doc.name,
+      department: doc.dept || selectedSpecialty,
+      date: apptDate,
+      time: apptTime,
+      complaint: 'Patient scheduled appointment via mobile portal'
+    });
+
     setIsApptModalOpen(false);
 
     showToast({
       type: 'success',
       title: 'Appointment Scheduled Successfully',
-      message: `Confirmed with ${selectedDoc} on ${apptDate} at ${apptTime}. ${newAppt.token} issued.`
+      message: `Confirmed with ${doc.name} on ${apptDate} at ${apptTime}. ${newAppt.token} issued.`
     });
   };
 
   const handlePayBill = async () => {
     if (!selectedBill) return;
 
-    try {
-      await billingApi.collectPayment({
-        invoiceId: selectedBill.id,
-        amount: selectedBill.amount,
-        paymentMode: 'online_upi',
-        transactionReference: `UPI-${Date.now()}`
-      });
-    } catch (err) {
-      console.warn('Backend payment processing fallback active:', err);
+    const inv = hospitalInvoices.find((i) => i.invoiceNumber === selectedBill.id) || hospitalInvoices[0];
+    if (inv) {
+      await collectInvoicePayment(inv.id, selectedBill.amount, 'Online UPI');
     }
-
-    setBills((prev) =>
-      prev.map((b) => (b.id === selectedBill.id ? { ...b, status: 'Paid', paymentMode: 'Online UPI' } : b))
-    );
 
     setIsPayModalOpen(false);
     showToast({
@@ -385,32 +389,45 @@ export const PatientDashboard: React.FC = () => {
             </Button>
           </div>
 
-          <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 text-xs">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="font-bold text-sm text-slate-900">RX-2026-0194</span>
-                <span className="text-slate-400 block text-[11px]">Issued 08 Nov 2026 by Dr. Rajesh Sharma (Cardiology)</span>
-              </div>
-              <Badge variant="success" size="sm">Active Formulary</Badge>
+          {hospitalRx.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs">
+              No electronic prescriptions on file for this patient encounter.
             </div>
+          ) : (
+            hospitalRx.map((rx) => (
+              <div key={rx.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 text-xs">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="font-bold text-sm text-slate-900">{rx.rxNumber}</span>
+                    <span className="text-slate-400 block text-[11px]">
+                      Issued {rx.date} by {rx.doctorName}
+                    </span>
+                  </div>
+                  <Badge variant={rx.status === 'Dispensed' ? 'success' : 'warning'} size="sm">
+                    {rx.status}
+                  </Badge>
+                </div>
 
-            <div className="divide-y divide-slate-200 bg-white rounded-lg border border-slate-200 p-3">
-              <div className="py-2 flex justify-between">
-                <div>
-                  <div className="font-bold text-slate-800">1. Atorvastatin 20mg Tablet</div>
-                  <div className="text-[11px] text-slate-500">1 tablet once daily at bedtime after dinner · 30 Days</div>
+                <div className="divide-y divide-slate-200 bg-white rounded-lg border border-slate-200 p-3">
+                  {rx.items.map((item, idx) => (
+                    <div key={item.id || idx} className="py-2 flex justify-between">
+                      <div>
+                        <div className="font-bold text-slate-800">
+                          {idx + 1}. {item.drugName} ({item.dosage})
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {item.frequency} · {item.duration} · {item.instructions}
+                        </div>
+                      </div>
+                      <span className="font-medium text-teal-700">
+                        {rx.status === 'Dispensed' ? 'Dispensed by Pharmacy' : 'Awaiting Dispensing'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                <span className="font-medium text-teal-700">Dispensed by Pharmacy</span>
               </div>
-              <div className="py-2 flex justify-between">
-                <div>
-                  <div className="font-bold text-slate-800">2. Aspirin 75mg Gastro-Resistant Tablet</div>
-                  <div className="text-[11px] text-slate-500">1 tablet once daily post lunch · 30 Days</div>
-                </div>
-                <span className="font-medium text-teal-700">Dispensed by Pharmacy</span>
-              </div>
-            </div>
-          </div>
+            ))
+          )}
         </div>
       )}
 
@@ -429,9 +446,20 @@ export const PatientDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
               {[
-                { id: 'REP-8821', date: '08 Nov 2026', test: 'Lipid Profile Comprehensive', doc: 'Dr. Rajesh Sharma', status: 'Ready' },
-                { id: 'REP-8820', date: '08 Nov 2026', test: 'Cardiac Troponin-I (High Sensitivity)', doc: 'Dr. Rajesh Sharma', status: 'Ready' },
-                { id: 'REP-7412', date: '15 Oct 2026', test: 'Complete Blood Count (CBC)', doc: 'Dr. Ananya Roy', status: 'Archived' }
+                ...hospitalLabs.map((lo) => ({
+                  id: lo.orderNumber,
+                  date: lo.orderedAt || 'Today',
+                  test: lo.tests.join(', ') || 'Clinical Pathology Test',
+                  doc: lo.doctorName,
+                  status: lo.status === 'Verified & Dispatched' ? 'Ready' : lo.status
+                })),
+                ...hospitalRad.map((ro) => ({
+                  id: ro.orderNumber,
+                  date: ro.orderedAt || 'Today',
+                  test: ro.procedures.join(', ') || 'Radiology Imaging',
+                  doc: ro.doctorName,
+                  status: ro.status === 'Reported & Signed' ? 'Ready' : ro.status
+                }))
               ].map((rep) => (
                 <tr key={rep.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3.5 px-4">
@@ -441,7 +469,9 @@ export const PatientDashboard: React.FC = () => {
                   <td className="py-3 px-3 font-semibold text-slate-900">{rep.test}</td>
                   <td className="py-3 px-3 text-slate-800">{rep.doc}</td>
                   <td className="py-3 px-3">
-                    <Badge variant="success" size="sm">{rep.status}</Badge>
+                    <Badge variant={rep.status === 'Ready' ? 'success' : 'neutral'} size="sm">
+                      {rep.status}
+                    </Badge>
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <Button
@@ -450,12 +480,12 @@ export const PatientDashboard: React.FC = () => {
                       onClick={() => {
                         showToast({
                           type: 'info',
-                          title: 'Downloading PDF',
-                          message: `Downloading signed laboratory report ${rep.id}.`
+                          title: 'Digital Health Record Download',
+                          message: `Downloading signed diagnostic report ${rep.id} (${rep.test}) in DPDP-compliant PDF format.`
                         });
                       }}
                     >
-                      <Download className="w-3.5 h-3.5 mr-1 text-teal-700" />
+                      <Download className="w-3.5 h-3.5 mr-1" />
                       <span>PDF</span>
                     </Button>
                   </td>

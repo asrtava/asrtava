@@ -205,7 +205,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
       {/* Enterprise Top Navigation Bar */}
-      <header className="h-16 shrink-0 bg-navy-900 text-white flex items-center justify-between px-4 md:px-6 border-b border-navy-800 shadow-md z-40 sticky top-0">
+      <header className="h-16 shrink-0 bg-navy-900 text-white flex items-center justify-between px-4 md:px-6 border-b border-navy-800 shadow-md z-50 relative top-0">
         {/* Left: Mobile Toggle + Brand Logo + Tenant Badge */}
         <div className="flex items-center space-x-3 md:space-x-5">
           <button
@@ -247,8 +247,30 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <span className="font-semibold text-white">{portalLabels[activePortal]?.title}</span>
         </div>
 
-        {/* Right: Quick Search + Multi-Role Switcher + Notifications + User Avatar */}
-        <div className="flex items-center space-x-2.5 md:space-x-3.5">
+        {/* Right: Quick Search + Multi-Role Switcher + Home + My Profile + Notifications + User Avatar */}
+        <div className="flex items-center space-x-2 md:space-x-2.5">
+          {/* Quick Home Navigation */}
+          <button
+            type="button"
+            onClick={() => setCurrentAuthView('public-home')}
+            className="flex items-center space-x-1.5 bg-navy-800 hover:bg-navy-700 text-slate-200 hover:text-white text-xs py-1.5 px-2.5 rounded-lg border border-navy-700 transition cursor-pointer"
+            title="Back to Public Homepage"
+          >
+            <Home className="w-3.5 h-3.5 text-brand-400" />
+            <span className="hidden md:inline font-medium">Home</span>
+          </button>
+
+          {/* Direct My Profile Button */}
+          <button
+            type="button"
+            onClick={() => setProfileModalOpen(true)}
+            className="flex items-center space-x-1.5 bg-navy-800 hover:bg-navy-700 text-slate-200 hover:text-white text-xs py-1.5 px-2.5 rounded-lg border border-navy-700 transition cursor-pointer"
+            title="My Profile & System Credentials"
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline font-medium">My Profile</span>
+          </button>
+
           {/* Quick Search Shortcut */}
           <button
             onClick={() => setSearchModalOpen(true)}
@@ -411,7 +433,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       {/* Global Quick Search Modal */}
       {searchModalOpen && (
-        <div className="fixed inset-0 z-50 bg-navy-950/70 backdrop-blur-xs flex items-start justify-center pt-20 p-4">
+        <div className="fixed inset-0 z-[70] bg-navy-950/70 backdrop-blur-xs flex items-start justify-center pt-20 p-4">
           <div className="w-full max-w-xl bg-white rounded-2xl shadow-modal border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="p-4 border-b border-slate-200 flex items-center space-x-3">
               <Search className="w-5 h-5 text-brand-600" />

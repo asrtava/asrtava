@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Pill,
   Package,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { pharmacyApi } from '../../services/api';
 import { AdvancedPharmacyHub } from './AdvancedPharmacyHub';
 
@@ -59,6 +60,14 @@ interface StockBatch {
 export const PharmacyDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const {
+    prescriptions: hospitalPrescriptions,
+    inventory: hospitalInventory,
+    dispensePrescription,
+    createInvoice,
+    collectInvoicePayment
+  } = useHospital();
+
   const [activeTab, setActiveTab] = useState<'queue' | 'inventory' | 'advanced'>('queue');
 
   useEffect(() => {
@@ -73,80 +82,42 @@ export const PharmacyDashboard: React.FC = () => {
   };
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [prescriptions, setPrescriptions] = useState<PendingRx[]>([
-    {
-      id: 'p1',
-      rxId: 'RX-2026-0194',
-      patient: 'Rahul Verma',
-      uhid: 'APEX-2026-00084',
-      doctor: 'Dr. Rajesh Sharma',
-      time: '12 mins ago',
-      status: 'Pending',
-      items: [
-        { drug: 'Atorvastatin 20mg', form: 'Tablet', qty: 30, batch: 'BAT-2026-09A', expiry: '12/2027', unitPrice: 7.5, stock: 450 },
-        { drug: 'Metoprolol 50mg', form: 'Tablet', qty: 30, batch: 'BAT-2026-03C', expiry: '08/2026', unitPrice: 6.0, stock: 120 }
-      ]
-    },
-    {
-      id: 'p2',
-      rxId: 'RX-2026-0195',
-      patient: 'Kavita Patel',
-      uhid: 'APEX-2026-00087',
-      doctor: 'Dr. Vikram Sethi',
-      time: '25 mins ago',
-      status: 'Pending',
-      items: [
-        { drug: 'Amoxicillin + Clavulanic 625mg', form: 'Tablet', qty: 10, batch: 'BAT-2026-11B', expiry: '04/2027', unitPrice: 18.5, stock: 300 },
-        { drug: 'Paracetamol 650mg', form: 'Tablet', qty: 15, batch: 'BAT-2026-01D', expiry: '10/2026', unitPrice: 2.2, stock: 850 }
-      ]
-    },
-    {
-      id: 'p3',
-      rxId: 'RX-2026-0190',
-      patient: 'Mohammed Ali',
-      uhid: 'APEX-2026-00104',
-      doctor: 'Dr. Rajesh Sharma',
-      time: '1 hour ago',
-      status: 'Dispensed',
-      items: [
-        { drug: 'Amlodipine 5mg', form: 'Tablet', qty: 30, batch: 'BAT-2026-05E', expiry: '02/2028', unitPrice: 3.5, stock: 600 }
-      ]
-    }
-  ]);
+  // Map dynamic electronic prescriptions from HospitalContext
+  const prescriptions: PendingRx[] = useMemo(() => {
+    return hospitalPrescriptions.map((rx) => ({
+      id: rx.id,
+      rxId: rx.rxNumber,
+      patient: rx.patientName,
+      uhid: rx.uhid,
+      doctor: rx.doctorName,
+      time: rx.time || 'Today',
+      status: rx.status,
+      items: rx.items.map((it, idx) => ({
+        drug: it.drugName,
+        form: 'Tablet',
+        qty: it.qty || 30,
+        batch: `BAT-2026-${String(idx + 1).padStart(2, '0')}A`,
+        expiry: '12/2027',
+        unitPrice: it.unitPrice || 7.5,
+        stock: 450
+      }))
+    }));
+  }, [hospitalPrescriptions]);
 
-  const [inventory, setInventory] = useState<StockBatch[]>([
-    { id: 'b1', name: 'Atorvastatin 20mg', category: 'Cardiology', batch: 'BAT-2026-09A', exp: '2027-12-31', stock: 450, cost: 4.2, mrp: 7.5, status: 'Healthy' },
-    { id: 'b2', name: 'Aspirin 75mg Gastro-Resistant', category: 'Cardiology', batch: 'BAT-2026-03C', exp: '2026-08-31', stock: 120, cost: 1.1, mrp: 2.0, status: 'Expiring Soon' },
-    { id: 'b3', name: 'Ceftriaxone 1g Injection', category: 'Antibiotic', batch: 'BAT-2026-07K', exp: '2027-04-30', stock: 18, cost: 45.0, mrp: 85.0, status: 'Low Stock' },
-    { id: 'b4', name: 'Pantoprazole 40mg', category: 'Gastroenterology', batch: 'BAT-2026-05F', exp: '2028-01-31', stock: 900, cost: 3.0, mrp: 6.0, status: 'Healthy' },
-    { id: 'b5', name: 'Paracetamol 650mg', category: 'Analgesic', batch: 'BAT-2026-01D', exp: '2026-10-31', stock: 850, cost: 1.2, mrp: 2.2, status: 'Healthy' }
-  ]);
-
-  // Live Inventory Fetch from PostgreSQL
-  useEffect(() => {
-    const fetchPharmacyStock = async () => {
-      try {
-        const res = await pharmacyApi.getMedicines();
-        if (res.data?.data && res.data.data.length > 0) {
-          const liveStock: StockBatch[] = res.data.data.map((m: any, idx: number) => ({
-            id: m.id,
-            name: `${m.name} ${m.strength || ''}`,
-            category: m.therapeutic_class || 'General',
-            batch: m.batch_number || `BAT-2026-${idx + 10}A`,
-            exp: m.expiry_date || '2027-12-31',
-            stock: Number(m.quantity_on_hand || m.total_stock || 100),
-            cost: Number(m.unit_cost || 5.0),
-            mrp: Number(m.unit_price || 10.0),
-            status: Number(m.quantity_on_hand || m.total_stock || 100) < 20 ? 'Low Stock' : 'Healthy',
-          }));
-          setInventory(liveStock);
-        }
-      } catch (err) {
-        // Fallback to local inventory
-      }
-    };
-    fetchPharmacyStock();
-  }, []);
+  // Map inventory from HospitalContext
+  const inventory: StockBatch[] = useMemo(() => {
+    return hospitalInventory.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      batch: item.batch || 'BAT-2026-01',
+      exp: item.expiry || '2027-12-31',
+      stock: item.stock,
+      cost: item.unitPrice * 0.6,
+      mrp: item.unitPrice,
+      status: item.status
+    }));
+  }, [hospitalInventory]);
 
   // Dispense Modal State
   const [selectedRx, setSelectedRx] = useState<PendingRx | null>(null);
@@ -208,6 +179,10 @@ export const PharmacyDashboard: React.FC = () => {
   const handleConfirmDispense = async () => {
     if (!selectedRx) return;
 
+    const subtotal = selectedRx.items.reduce((acc, it) => acc + (it.qty * it.unitPrice), 0);
+    const tax = subtotal * 0.05;
+    const total = subtotal + tax;
+
     try {
       await pharmacyApi.dispense({
         prescriptionId: selectedRx.id,
@@ -217,43 +192,52 @@ export const PharmacyDashboard: React.FC = () => {
           batchNumber: it.batch,
         }))
       });
-    } catch (err) {
-      // Local fallback handled
-    }
+    } catch (err) {}
 
-    setPrescriptions((prev) =>
-      prev.map((r) => (r.id === selectedRx.id ? { ...r, status: 'Dispensed' } : r))
-    );
+    await dispensePrescription(selectedRx.id, total, 'Counter');
 
     setIsDispenseModalOpen(false);
     showToast({
       type: 'success',
       title: 'Medication Dispensed & Invoiced',
-      message: `Prescription ${selectedRx.rxId} dispensed for ${selectedRx.patient}. Stock deducted via FEFO.`
+      message: `Prescription ${selectedRx.rxId} dispensed for ${selectedRx.patient}. Stock deducted via FEFO and invoice recorded in Finance.`
     });
   };
 
   const handleCompletePosSale = async () => {
     const unitPrice = 2.5;
-    const total = (posQty * unitPrice).toFixed(2);
+    const total = posQty * unitPrice;
 
     try {
-      await pharmacyApi.dispense({
-        isOtcSale: true,
-        customerName: posCustomerName,
-        drugName: posSelectedDrug,
-        quantity: posQty,
-        paymentMethod: posPaymentMethod.toLowerCase(),
+      await pharmacyApi.posSale({
+        patientName: posCustomerName,
+        items: [{ drug: posSelectedDrug, quantity: posQty, unitPrice }],
+        paymentMethod: posPaymentMethod,
+        total: total.toFixed(2),
       });
-    } catch (err) {
-      // Local fallback handled
-    }
+    } catch (err) {}
+
+    const inv = await createInvoice({
+      patientId: 'pt-pos-walkin',
+      patientName: posCustomerName || 'Walk-in Customer',
+      uhid: 'UHID-POS-WALKIN',
+      category: 'Pharmacy Counter POS Sale',
+      items: [
+        {
+          description: `${posSelectedDrug} (${posQty} units)`,
+          quantity: posQty,
+          unitRate: unitPrice,
+          amount: total
+        }
+      ]
+    });
+    const receipt = await collectInvoicePayment(inv.id, total, posPaymentMethod);
 
     setIsPosModalOpen(false);
     showToast({
       type: 'success',
-      title: 'OTC Sale Completed',
-      message: `Billed ₹ ${total} to ${posCustomerName} via ${posPaymentMethod}. Stock deducted.`
+      title: 'POS Counter Sale Completed',
+      message: `Receipt ${receipt} generated for ${posCustomerName}. ₹${total.toFixed(2)} received via ${posPaymentMethod}.`
     });
   };
 
@@ -296,8 +280,10 @@ export const PharmacyDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Dispensed Today</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">68</div>
-          <span className="text-[11px] text-emerald-600 font-medium">Total sales: ₹ 41,200</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{dispensedList.length}</div>
+          <span className="text-[11px] text-emerald-600 font-medium">
+            Total sales: ₹ {dispensedList.reduce((acc, rx) => acc + rx.items.reduce((s, it) => s + (it.qty * it.unitPrice * 1.05), 0), 0).toFixed(0)}
+          </span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-amber-600 font-medium">Near Expiry Batches (&lt;60d)</span>
@@ -308,7 +294,7 @@ export const PharmacyDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-teal-600 font-medium">Total Active Catalog SKUs</span>
-          <div className="text-2xl font-bold text-teal-600 mt-1">{inventory.length + 420}</div>
+          <div className="text-2xl font-bold text-teal-600 mt-1">{inventory.length}</div>
           <span className="text-[11px] text-slate-400">Barcode mapped</span>
         </div>
       </div>

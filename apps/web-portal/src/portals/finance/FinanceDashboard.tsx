@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CreditCard,
   DollarSign,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { billingApi } from '../../services/api';
 import { RevenueCycleAccountingHub } from './RevenueCycleAccountingHub';
 
@@ -40,6 +41,7 @@ interface Invoice {
 export const FinanceDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { invoices: hospitalInvoices, createInvoice, collectInvoicePayment } = useHospital();
   const [activeTab, setActiveTab] = useState<'invoices' | 'insurance' | 'rcm'>('invoices');
 
   useEffect(() => {
@@ -54,64 +56,23 @@ export const FinanceDashboard: React.FC = () => {
   };
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [invoices, setInvoices] = useState<Invoice[]>([
-    {
-      id: 'i1',
-      invId: 'INV-2026-1042',
-      patient: 'Ramesh Patel',
-      uhid: 'APEX-2026-00045',
-      type: 'IPD Comprehensive',
-      subtotal: 42500,
-      tax: 2125,
-      total: 44625,
-      paid: 20000,
-      balance: 24625,
-      status: 'Partially Paid',
-      date: '08 Nov 2026'
-    },
-    {
-      id: 'i2',
-      invId: 'INV-2026-1043',
-      patient: 'Rahul Verma',
-      uhid: 'APEX-2026-00084',
-      type: 'OPD + Pharmacy',
-      subtotal: 1420,
-      tax: 71,
-      total: 1491,
-      paid: 1491,
-      balance: 0,
-      status: 'Paid',
-      date: '08 Nov 2026'
-    },
-    {
-      id: 'i3',
-      invId: 'INV-2026-1044',
-      patient: 'Sunita Sharma',
-      uhid: 'APEX-2026-00048',
-      type: 'ICU + Lab + Meds',
-      subtotal: 68000,
-      tax: 3400,
-      total: 71400,
-      paid: 0,
-      balance: 71400,
-      status: 'Insurance Pending',
-      date: '07 Nov 2026'
-    },
-    {
-      id: 'i4',
-      invId: 'INV-2026-1045',
-      patient: 'Pooja Hegde',
-      uhid: 'APEX-2026-00092',
-      type: 'OPD Consultation',
-      subtotal: 800,
-      tax: 0,
-      total: 800,
-      paid: 0,
-      balance: 800,
-      status: 'Unpaid',
-      date: '08 Nov 2026'
-    }
-  ]);
+  // Map dynamic invoices from HospitalContext
+  const invoices: Invoice[] = useMemo(() => {
+    return hospitalInvoices.map((inv) => ({
+      id: inv.id,
+      invId: inv.invoiceNumber,
+      patient: inv.patientName,
+      uhid: inv.uhid,
+      type: inv.category,
+      subtotal: inv.subtotal,
+      tax: inv.tax,
+      total: inv.total,
+      paid: inv.paid,
+      balance: inv.balance,
+      status: inv.status,
+      date: inv.date
+    }));
+  }, [hospitalInvoices]);
 
   // Payment Settlement Modal State
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -147,11 +108,6 @@ export const FinanceDashboard: React.FC = () => {
   const [tpaEstCost, setTpaEstCost] = useState(65000);
   const [tpaDiagnosis, setTpaDiagnosis] = useState('Coronary Angiography & Medical Stabilization');
 
-  // Live Invoices Fetch from PostgreSQL
-  useEffect(() => {
-    // Invoices dynamic hydration
-  }, []);
-
   const handleOpenPayment = (inv: Invoice) => {
     setSelectedInvoice(inv);
     setPaymentAmount(inv.balance);
@@ -173,23 +129,12 @@ export const FinanceDashboard: React.FC = () => {
       // Graceful local handling
     }
 
-    const remaining = selectedInvoice.balance - paymentAmount;
-    const newPaid = selectedInvoice.paid + paymentAmount;
-    const newStatus = remaining <= 0 ? 'Paid' : 'Partially Paid';
-
-    setInvoices((prev) =>
-      prev.map((i) =>
-        i.id === selectedInvoice.id
-          ? { ...i, paid: newPaid, balance: Math.max(0, remaining), status: newStatus }
-          : i
-      )
-    );
-
+    const receipt = await collectInvoicePayment(selectedInvoice.id, paymentAmount, paymentMode);
     setIsPaymentModalOpen(false);
     showToast({
       type: 'success',
       title: 'Payment Collected & Cleared',
-      message: `₹ ${paymentAmount.toFixed(2)} received via ${paymentMode} for ${selectedInvoice.invId}. Tax receipt generated.`
+      message: `₹ ${paymentAmount.toFixed(2)} received via ${paymentMode} for ${selectedInvoice.invId}. Tax receipt ${receipt} generated.`
     });
   };
 
@@ -197,46 +142,26 @@ export const FinanceDashboard: React.FC = () => {
     const tax = Math.round(newInvAmount * 0.18);
     const total = newInvAmount + tax;
 
-    let invoiceId = 'i-' + Date.now();
-    let invNum = 'INV-2026-' + Math.floor(1050 + Math.random() * 50);
-
-    try {
-      const res = await billingApi.createInvoice({
-        patientId: newInvUhid,
-        items: [{ description: newInvType, amount: newInvAmount, quantity: 1 }],
-        taxAmount: tax,
-        totalAmount: total,
-      });
-      if (res.data?.data?.invoice_number) {
-        invNum = res.data.data.invoice_number;
-        invoiceId = res.data.data.id;
-      }
-    } catch (err) {
-      // Graceful local handling
-    }
-
-    const newInv: Invoice = {
-      id: invoiceId,
-      invId: invNum,
-      patient: newInvPatient,
+    const newInv = await createInvoice({
+      patientId: 'pt-' + Date.now(),
+      patientName: newInvPatient,
       uhid: newInvUhid,
-      type: newInvType,
-      subtotal: newInvAmount,
-      tax: tax,
-      total: total,
-      paid: 0,
-      balance: total,
-      status: 'Unpaid',
-      date: '09 Nov 2026'
-    };
+      category: newInvType,
+      items: [
+        {
+          description: newInvType,
+          quantity: 1,
+          unitRate: newInvAmount,
+          amount: newInvAmount
+        }
+      ]
+    });
 
-    setInvoices([newInv, ...invoices]);
     setIsNewInvoiceOpen(false);
-
     showToast({
       type: 'success',
       title: 'Invoice Generated',
-      message: `${newInv.invId} created for ${newInvPatient}. Total: ₹ ${total.toFixed(2)}.`
+      message: `${newInv.invoiceNumber} created for ${newInvPatient}. Total: ₹ ${total.toFixed(2)}.`
     });
   };
 
@@ -256,14 +181,6 @@ export const FinanceDashboard: React.FC = () => {
         supervisorAuth: supervisorPin,
       });
     } catch (err) {}
-
-    setInvoices((prev) =>
-      prev.map((i) =>
-        i.id === refundInvoice.id
-          ? { ...i, paid: i.paid - refundAmount, balance: i.balance + refundAmount, status: 'Partially Paid' }
-          : i
-      )
-    );
 
     setIsRefundModalOpen(false);
     showToast({
@@ -327,9 +244,11 @@ export const FinanceDashboard: React.FC = () => {
       {/* Finance KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Today's Collections</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">₹ 2,68,500</div>
-          <span className="text-[11px] text-emerald-600 font-medium">UPI: 65% · Card: 25% · Cash: 10%</span>
+          <span className="text-xs text-slate-500 font-medium">Total Paid Collections</span>
+          <div className="text-2xl font-bold text-slate-900 mt-1">
+            ₹ {invoices.reduce((sum, inv) => sum + inv.paid, 0).toLocaleString()}
+          </div>
+          <span className="text-[11px] text-emerald-600 font-medium">Across {invoices.filter((i) => i.paid > 0).length} cleared transactions</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-amber-600 font-medium">Pending Receivables</span>
@@ -342,14 +261,18 @@ export const FinanceDashboard: React.FC = () => {
           <span className="text-[11px] text-amber-600">Across {invoices.filter((i) => i.balance > 0).length} open bills</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-teal-600 font-medium">Insurance / TPA Claims</span>
-          <div className="text-2xl font-bold text-teal-600 mt-1">₹ 4,12,000</div>
-          <span className="text-[11px] text-teal-600">8 claims under pre-auth</span>
+          <span className="text-xs text-teal-600 font-medium">Insurance Pending</span>
+          <div className="text-2xl font-bold text-teal-600 mt-1">
+            ₹ {invoices.filter((i) => i.status === 'Insurance Pending').reduce((sum, inv) => sum + inv.balance, 0).toLocaleString()}
+          </div>
+          <span className="text-[11px] text-teal-600">{invoices.filter((i) => i.status === 'Insurance Pending').length} claims under pre-auth</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-emerald-600 font-medium">GST Tax Settled</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ 14,820</div>
-          <span className="text-[11px] text-emerald-600">5% / 12% split logged</span>
+          <span className="text-xs text-emerald-600 font-medium">Total Invoiced Amount</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
+            ₹ {invoices.reduce((sum, inv) => sum + inv.total, 0).toLocaleString()}
+          </div>
+          <span className="text-[11px] text-emerald-600">Net revenue billing generated</span>
         </div>
       </div>
 

@@ -84,9 +84,9 @@ export const AdminDepartmentsSection: React.FC = () => {
       hod: formHod.trim() || 'HOD Pending Assignment',
       departmentType: formType,
       description: formDesc.trim(),
-      doctorsCount: 1,
+      doctorsCount: 0,
       opdQueue: 0,
-      ipdOccupancy: '0/15 Beds',
+      ipdOccupancy: '0 Beds',
       revenueToday: 0,
       isActive: true
     };

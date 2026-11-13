@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   UserCheck,
   Users,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { hospitalAdminApi } from '../../services/api';
 import { AdvancedHRMSHub } from './AdvancedHRMSHub';
 
@@ -40,6 +41,7 @@ interface LeaveRequest {
 export const HRDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { staff: hospitalStaff } = useHospital();
   const [activeTab, setActiveTab] = useState<'directory' | 'leaves' | 'roster' | 'advanced_hrms'>('advanced_hrms');
 
   useEffect(() => {
@@ -73,28 +75,22 @@ export const HRDashboard: React.FC = () => {
     { id: 'STF-006', name: 'Dr. Vikram Sethi', role: 'Senior Orthopedic Surgeon', dept: 'Orthopedics', shift: 'Morning (08:00 - 16:00)', status: 'On Duty', licenseNo: 'MCI-2002-1204' }
   ]);
 
+  // Sync with HospitalContext staff if available
   useEffect(() => {
-    const fetchStaff = async () => {
-      try {
-        const res = await hospitalAdminApi.getStaff();
-        if (res.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
-          const mapped: StaffMember[] = res.data.data.map((s: any, idx: number) => ({
-            id: s.employee_code || s.id?.substring(0, 8) || `STF-00${idx + 1}`,
-            name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Staff Member',
-            role: s.designation || s.user_type || 'Staff Nurse',
-            dept: s.department_name || 'General',
-            shift: 'Morning (08:00 - 16:00)',
-            status: s.employment_status === 'inactive' ? 'Off Duty' : 'On Duty',
-            licenseNo: s.license_no || `MCI-REG-${idx + 1000}`
-          }));
-          setStaff(mapped);
-        }
-      } catch (err) {
-        console.warn('Live staff sync fallback active:', err);
-      }
-    };
-    fetchStaff();
-  }, []);
+    if (hospitalStaff.length > 0) {
+      setStaff(
+        hospitalStaff.map((s, idx) => ({
+          id: s.id || `STF-00${idx + 1}`,
+          name: s.name,
+          role: s.role,
+          dept: s.department,
+          shift: s.shift || 'Morning (08:00 - 16:00)',
+          status: s.status,
+          licenseNo: s.licenseNumber || `MCI-REG-${idx + 1000}`
+        }))
+      );
+    }
+  }, [hospitalStaff]);
 
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
     { id: 'lr-1', staffName: 'Nurse Anjali Verma', dept: 'ICU', leaveType: 'Casual Leave', duration: '12 Nov - 14 Nov (3 Days)', reason: 'Family engagement out of state.', status: 'Pending' },
@@ -225,13 +221,15 @@ export const HRDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Total Hospital Staff</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{staff.length + 142}</div>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{staff.length}</div>
           <span className="text-[11px] text-slate-400">Clinical & Administrative</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Currently On Duty</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{staff.filter((s) => s.status === 'On Duty').length + 48}</div>
-          <span className="text-[11px] text-emerald-600">Active across 8 departments</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">
+            {staff.filter((s) => s.status === 'On Duty').length}
+          </div>
+          <span className="text-[11px] text-emerald-600">Active across duty shifts</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-amber-600 font-medium">Pending Leave Requests</span>

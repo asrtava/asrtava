@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { appointmentApi, clinicalApi, diagnosticsApi, inpatientApi, patientApi } from '../../services/api';
 
 export interface PrescriptionItem {
@@ -97,6 +98,13 @@ export interface DiagnosticOrderItem {
 export const DoctorDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { user, activePortalTab, setActivePortalTab } = useAuth();
+  const {
+    addPrescription: hospitalAddPrescription,
+    orderLabTests: hospitalOrderLabTests,
+    orderRadiology: hospitalOrderRadiology,
+    admitPatientToBed: hospitalAdmitPatientToBed,
+    updateAppointmentStatus: hospitalUpdateAppointmentStatus
+  } = useHospital();
 
   // Mode / Tab State
   const [workbenchMode, setWorkbenchMode] = useState<'opd' | 'emr' | 'prescriptions' | 'diagnostics' | 'ipd-rounds'>('opd');
@@ -364,6 +372,7 @@ export const DoctorDashboard: React.FC = () => {
     try {
       if (activePatient.appointmentId) {
         await appointmentApi.updateStatus(activePatient.appointmentId, 'completed');
+        await hospitalUpdateAppointmentStatus(activePatient.appointmentId, 'Completed');
       }
       await clinicalApi.createConsultation({
         patientId: activePatient.id,
@@ -372,6 +381,24 @@ export const DoctorDashboard: React.FC = () => {
         diagnosis,
         prescriptions: activePatient.prescriptions,
       });
+
+      if (activePatient.prescriptions.length > 0) {
+        await hospitalAddPrescription({
+          patientId: activePatient.id,
+          patientName: activePatient.name,
+          uhid: activePatient.uhid,
+          doctorId: user?.id || 'doc-1',
+          doctorName: user ? `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Dr. Rajesh Sharma',
+          items: activePatient.prescriptions.map((rx) => ({
+            id: rx.id,
+            drugName: rx.drugName,
+            dosage: rx.dosage,
+            frequency: rx.frequency,
+            duration: rx.duration,
+            instructions: rx.instructions
+          }))
+        });
+      }
     } catch (err) {
       // Graceful local handling
     }
@@ -466,6 +493,15 @@ export const DoctorDashboard: React.FC = () => {
         tests: selectedTests,
         priority: testPriority.toLowerCase(),
       });
+      await hospitalOrderLabTests({
+        patientId: activePatient.id,
+        patientName: activePatient.name,
+        uhid: activePatient.uhid,
+        doctorId: user?.id || 'doc-1',
+        doctorName: user ? `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Dr. Rajesh Sharma',
+        tests: selectedTests,
+        priority: testPriority
+      });
     } catch (err) {
       // Local fallback
     }
@@ -507,6 +543,15 @@ export const DoctorDashboard: React.FC = () => {
         patientId: activePatient.id,
         procedures: selectedRadProcedures,
         priority: testPriority.toLowerCase(),
+      });
+      await hospitalOrderRadiology({
+        patientId: activePatient.id,
+        patientName: activePatient.name,
+        uhid: activePatient.uhid,
+        doctorId: user?.id || 'doc-1',
+        doctorName: user ? `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Dr. Rajesh Sharma',
+        procedures: selectedRadProcedures,
+        priority: testPriority
       });
     } catch (err) {
       // Local fallback
@@ -587,6 +632,18 @@ export const DoctorDashboard: React.FC = () => {
     setSelectedIpdPatientId(newInpatient.id);
     setActiveIpdRoundNote(newInpatient.roundNote);
     setIsAdmitModalOpen(false);
+
+    hospitalAdmitPatientToBed({
+      patientId: activePatient.id,
+      patientName: activePatient.name,
+      uhid: activePatient.uhid,
+      age: activePatient.age,
+      gender: activePatient.gender,
+      bedId: admitBedNumber,
+      wardName: admitWard,
+      diagnosis: admitDiagnosis || activePatient.diagnosis || 'Clinical Observation',
+      attendingDoctor: user ? `Dr. ${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Dr. Rajesh Sharma'
+    }).catch(() => {});
 
     showToast({
       type: 'success',

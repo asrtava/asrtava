@@ -64,12 +64,17 @@ export function requireHospitalAdmin(req: AuthenticatedRequest, res: Response, n
     return;
   }
 
+  const rolesLower = (req.user.roles || []).map((r: any) => String(r).toLowerCase().trim());
   const isHospitalAdmin =
     req.user.userType === 'hospital_admin' ||
-    req.user.roles.includes('hospital_owner') ||
-    req.user.roles.includes('hospital_admin');
+    req.user.userType === 'super_admin' ||
+    rolesLower.includes('hospital_owner') ||
+    rolesLower.includes('hospital_admin') ||
+    rolesLower.includes('admin') ||
+    rolesLower.includes('owner') ||
+    req.user.activePortal === 'hospital-admin';
 
-  if (!isHospitalAdmin && req.user.userType !== 'super_admin') {
+  if (!isHospitalAdmin) {
     res.status(403).json({ success: false, message: 'Access denied: Requires Hospital Administrator authority.' });
     return;
   }

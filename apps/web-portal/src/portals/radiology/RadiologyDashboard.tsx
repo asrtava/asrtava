@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Layers,
   FileText,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { diagnosticsApi, notificationsApi } from '../../services/api';
 import { AdvancedRISHub } from './AdvancedRISHub';
 
@@ -46,6 +47,7 @@ interface RadiologyStudy {
 export const RadiologyDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { radiologyOrders, updateRadiologyReport } = useHospital();
   const [activeTab, setActiveTab] = useState<'worklist' | 'reported' | 'advanced-hub'>('worklist');
 
   useEffect(() => {
@@ -60,101 +62,32 @@ export const RadiologyDashboard: React.FC = () => {
   };
   const [modalityFilter, setModalityFilter] = useState('All');
 
-  const [studies, setStudies] = useState<RadiologyStudy[]>([
-    {
-      id: 'r1',
-      orderId: 'RAD-2026-0312',
-      patient: 'Vikram Joshi',
-      uhid: 'APEX-2026-00051',
+  // Derive dynamic radiology studies from HospitalContext
+  const studies: RadiologyStudy[] = useMemo(() => {
+    return radiologyOrders.map((ro) => ({
+      id: ro.id,
+      orderId: ro.orderNumber,
+      patient: ro.patientName,
+      uhid: ro.uhid,
       age: 42,
       gender: 'M',
-      modality: 'CT',
-      procedure: 'HRCT Chest (High Resolution)',
-      doctor: 'Dr. Vikram Sethi',
-      time: '10:30 AM',
-      pacsStudyId: 'STUDY-CT-99120',
-      status: 'Study Ready',
-      findings: 'Axial thin-section CT reveals clear bilateral lung parenchyma without evidence of focal consolidation, ground-glass opacities, or pleural effusion. Heart size is within normal limits. Tracheobronchial tree is patent.',
-      impression: 'Normal HRCT study of the thorax. No acute pulmonary parenchymal abnormality.'
-    },
-    {
-      id: 'r2',
-      orderId: 'RAD-2026-0313',
-      patient: 'Kavita Patel',
-      uhid: 'APEX-2026-00087',
-      age: 41,
-      gender: 'F',
-      modality: 'X-Ray',
-      procedure: 'X-Ray Knee AP & Lateral Views (Right)',
-      doctor: 'Dr. Vikram Sethi',
-      time: '11:15 AM',
-      pacsStudyId: 'STUDY-XR-44019',
-      status: 'Study Ready',
-      findings: 'Mild medial joint compartment narrowing with subchondral sclerosis. No acute fracture, dislocation, or joint effusion visualized.',
-      impression: 'Early Grade 2 medial compartment osteoarthritis of the right knee.'
-    },
-    {
-      id: 'r3',
-      orderId: 'RAD-2026-0314',
-      patient: 'Priya Iyer',
-      uhid: 'APEX-2026-00085',
-      age: 29,
-      gender: 'F',
-      modality: 'Ultrasound',
-      procedure: 'USG Whole Abdomen & Pelvis',
-      doctor: 'Dr. Ananya Roy',
-      time: '11:45 AM',
-      pacsStudyId: 'STUDY-US-21088',
-      status: 'Scheduled'
-    },
-    {
-      id: 'r4',
-      orderId: 'RAD-2026-0309',
-      patient: 'Ramesh Verma',
-      uhid: 'APEX-2026-00084',
-      age: 45,
-      gender: 'M',
-      modality: 'CT',
-      procedure: 'CT Coronary Angiography',
-      doctor: 'Dr. Rajesh Sharma',
-      time: '09:00 AM',
-      pacsStudyId: 'STUDY-CT-99105',
-      status: 'Reported & Signed',
-      findings: 'LAD demonstrates 40-50% eccentric soft plaque in proximal segment. LCx and RCA are patent with normal caliber. Calcium score: 82.',
-      impression: 'Mild-to-moderate CAD with single-vessel proximal LAD non-obstructive plaque.'
-    }
-  ]);
-
-  // Live Radiology Worklist Fetch from PostgreSQL & DICOM PACS Bridge
-  useEffect(() => {
-    const fetchLiveRadiologyStudies = async () => {
-      try {
-        const res = await diagnosticsApi.getRadiologyOrders();
-        if (res.data?.data && res.data.data.length > 0) {
-          const liveStudies: RadiologyStudy[] = res.data.data.map((r: any, idx: number) => ({
-            id: r.id,
-            orderId: r.order_number || `RAD-2026-${idx + 310}`,
-            patient: r.patient_name || 'Patient On File',
-            uhid: r.uhid || 'APEX-2026-00001',
-            age: r.patient_age || 40,
-            gender: r.gender === 'Female' ? 'F' : 'M',
-            modality: r.modality || 'CT',
-            procedure: r.procedure_name || 'Diagnostic Imaging Study',
-            doctor: r.referring_doctor || 'Attending Physician',
-            time: r.scheduled_time || '10:00 AM',
-            pacsStudyId: r.pacs_study_uid || `STUDY-${r.modality || 'CT'}-${idx + 99100}`,
-            status: r.status === 'reported' ? 'Reported & Signed' : r.status === 'ready' ? 'Study Ready' : 'Scheduled',
-            findings: r.findings,
-            impression: r.impression,
-          }));
-          setStudies(liveStudies);
-        }
-      } catch (err) {
-        // Fallback to local studies on network boundary
-      }
-    };
-    fetchLiveRadiologyStudies();
-  }, []);
+      modality: (ro.procedures.some((p) => p.includes('CT'))
+        ? 'CT'
+        : ro.procedures.some((p) => p.includes('MRI'))
+        ? 'MRI'
+        : ro.procedures.some((p) => p.includes('USG') || p.includes('Ultrasound'))
+        ? 'Ultrasound'
+        : 'X-Ray') as any,
+      procedure: ro.procedures.join(', ') || 'Diagnostic Imaging Study',
+      doctor: ro.doctorName,
+      time: ro.orderedAt || '10:00 AM',
+      pacsStudyId: ro.pacsStudyId || `STUDY-${ro.id.slice(0, 6)}`,
+      status: ro.status,
+      findings: ro.findings,
+      impression: ro.impression,
+      isCriticalAlert: ro.isCriticalAlert
+    }));
+  }, [radiologyOrders]);
 
   // DICOM Viewer & Reporting Modal State
   const [selectedStudy, setSelectedStudy] = useState<RadiologyStudy | null>(null);
@@ -180,13 +113,6 @@ export const RadiologyDashboard: React.FC = () => {
 
   const handleAssignTechnician = () => {
     if (!studyToAssign) return;
-    setStudies((prev) =>
-      prev.map((s) =>
-        s.id === studyToAssign.id
-          ? { ...s, status: 'Study Ready', technician: assignedTechnician }
-          : s
-      )
-    );
     setIsAssignModalOpen(false);
     showToast({
       type: 'success',
@@ -218,18 +144,12 @@ export const RadiologyDashboard: React.FC = () => {
       // Local graceful fallback handled
     }
 
-    setStudies((prev) =>
-      prev.map((s) =>
-        s.id === selectedStudy.id
-          ? {
-              ...s,
-              status: 'Reported & Signed',
-              findings: reportFindings,
-              impression: reportImpression,
-              isCriticalAlert: isCriticalFindingChecked
-            }
-          : s
-      )
+    await updateRadiologyReport(
+      selectedStudy.id,
+      reportFindings,
+      reportImpression,
+      'Dr. Radiologist',
+      isCriticalFindingChecked
     );
 
     setIsViewerModalOpen(false);
@@ -288,8 +208,8 @@ export const RadiologyDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Scans Scheduled Today</span>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{studies.length + 34}</div>
-          <span className="text-[11px] text-slate-400">CT, MRI, X-Ray, USG</span>
+          <div className="text-2xl font-bold text-slate-900 mt-1">{studies.length}</div>
+          <span className="text-[11px] text-slate-400">Total Imaging Orders</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-amber-600 font-medium">Pending Image Capture</span>
@@ -307,7 +227,7 @@ export const RadiologyDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Signed Diagnostic Reports</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">{reportedItems.length + 22}</div>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{reportedItems.length}</div>
           <span className="text-[11px] text-emerald-600 font-medium">Published to PACS</span>
         </div>
       </div>

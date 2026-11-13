@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../../database';
-import { authMiddleware, AuthenticatedRequest } from '../../middleware/auth.middleware';
+import { authMiddleware, AuthenticatedRequest, requireHospitalAdmin } from '../../middleware/auth.middleware';
 import { tenantMiddleware } from '../../middleware/tenant.middleware';
 import { requirePermission } from '../../middleware/permission.middleware';
 import { validateBody } from '../../middleware/validate.middleware';
@@ -509,7 +509,7 @@ hospitalRouter.put('/staff/:id/roles', requirePermission('manage', 'all'), async
 // ============================================================
 // 11. Comprehensive Hospital Admin Real-Time Database Metrics
 // ============================================================
-hospitalRouter.get('/admin-metrics', requirePermission('view', 'all'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+hospitalRouter.get('/admin-metrics', requireHospitalAdmin, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const hospitalId = req.hospitalId;
 

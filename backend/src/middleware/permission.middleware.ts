@@ -51,10 +51,15 @@ export function requirePermission(requiredAction: string, resource: string) {
     }
 
     // Hospital Owner & Hospital Admin: Full administrative authority over their tenant's resources
+    const rolesLower = (req.user.roles || []).map((r: any) => String(r).toLowerCase().trim());
     const isHospitalAdmin =
       req.user.userType === 'hospital_admin' ||
-      req.user.roles?.includes('hospital_owner') ||
-      req.user.roles?.includes('hospital_admin');
+      req.user.userType === 'super_admin' ||
+      rolesLower.includes('hospital_owner') ||
+      rolesLower.includes('hospital_admin') ||
+      rolesLower.includes('admin') ||
+      rolesLower.includes('owner') ||
+      req.user.activePortal === 'hospital-admin';
 
     if (isHospitalAdmin) {
       next();

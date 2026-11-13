@@ -26,112 +26,22 @@ export const AdvancedQualityHub: React.FC = () => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'incidents' | 'capa' | 'hai' | 'audits' | 'complaints' | 'accreditation'>('incidents');
 
-  // Incidents State
-  const [incidents, setIncidents] = useState([
-    {
-      id: 'INC-2026-00001',
-      category: 'PATIENT_FALL',
-      severity: 'SERIOUS_ADVERSE',
-      date: 'Today, 04:15 AM',
-      location: 'Ward 2 (Room 204)',
-      patient: 'Rahul Verma (UHID: APEX-00084)',
-      description: 'Inpatient slipped during unassisted ambulation; call bell wire was unclipped.',
-      status: 'UNDER_INVESTIGATION'
-    },
-    {
-      id: 'INC-2026-00002',
-      category: 'MEDICATION_ERROR',
-      severity: 'NEAR_MISS',
-      date: 'Yesterday, 11:30 PM',
-      location: 'ICU Clean Prep Area',
-      patient: 'Sita Devi (UHID: APEX-00091)',
-      description: 'Syringe filled with 40U Insulin Glargine intercepted during nurse double-check (order 14U).',
-      status: 'RCA_IN_PROGRESS'
-    },
-    {
-      id: 'INC-2026-00003',
-      category: 'EQUIPMENT_FAILURE',
-      severity: 'MINOR_ADVERSE',
-      date: '08 Nov 2026',
-      location: 'OT Room 3',
-      patient: 'Sunil Kumar (UHID: APEX-00072)',
-      description: 'Electrosurgical cautery unit pedal intermittently unresponsive; replaced with backup unit.',
-      status: 'CAPA_PENDING'
-    }
-  ]);
+  // Incidents State - Starting Dynamic from Zero
+  const [incidents, setIncidents] = useState<any[]>([]);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('PATIENT_FALL');
   const [newSeverity, setNewSeverity] = useState('SERIOUS_ADVERSE');
   const [newLocation, setNewLocation] = useState('General Ward');
   const [newDescription, setNewDescription] = useState('');
 
-  // CAPA State
-  const [capas, setCapas] = useState([
-    {
-      id: 'CAPA-2026-00001',
-      title: 'Mandatory Bedside Call-Bell & Rail Positioning Audit on Turnover',
-      actionType: 'CORRECTIVE',
-      assignedTo: 'Nurse Manager Sharma',
-      targetDate: '20 Nov 2026',
-      verificationCriteria: '100% compliance over 14 consecutive days of random nighttime audits.',
-      status: 'PENDING_VERIFICATION'
-    },
-    {
-      id: 'CAPA-2026-00002',
-      title: 'High-Alert Insulin Dedicated Color-Coded Dispensing Tray',
-      actionType: 'PREVENTIVE',
-      assignedTo: 'Chief Pharmacist Varma',
-      targetDate: '18 Nov 2026',
-      verificationCriteria: 'Zero concentration mixing in central pharmacy storage bins.',
-      status: 'VERIFIED_CLOSED'
-    }
-  ]);
+  // CAPA State - Starting Dynamic from Zero
+  const [capas, setCapas] = useState<any[]>([]);
 
-  // HAI Surveillance State
-  const [haiRecords, setHaiRecords] = useState([
-    {
-      id: 'HAI-01',
-      type: 'CLABSI',
-      patient: 'Rahul Verma (ICU Bed 04)',
-      detectedDate: '10 Nov 2026',
-      deviceDays: 14,
-      ratePer1000: '71.43',
-      organism: 'Klebsiella pneumoniae (ESBL+)',
-      outcome: 'Targeted Colistin Regimen'
-    },
-    {
-      id: 'HAI-02',
-      type: 'CAUTI',
-      patient: 'Abdul Rahman (Ward 3)',
-      detectedDate: '07 Nov 2026',
-      deviceDays: 20,
-      ratePer1000: '50.00',
-      organism: 'Pseudomonas aeruginosa',
-      outcome: 'Catheter Removed, Resolved'
-    }
-  ]);
+  // HAI Surveillance State - Starting Dynamic from Zero
+  const [haiRecords, setHaiRecords] = useState<any[]>([]);
 
-  // Complaints State
-  const [complaints, setComplaints] = useState([
-    {
-      id: 'COMPL-2026-00001',
-      category: 'WAIT_TIME',
-      priority: 'MEDIUM',
-      patient: 'Rahul Verma',
-      description: 'Waited 55 minutes beyond scheduled slot in Cardiology OPD.',
-      status: 'RESOLVED',
-      resolution: 'Apologized for emergency cath lab delay; issued priority pass for review.'
-    },
-    {
-      id: 'COMPL-2026-00002',
-      category: 'BILLING_DISPUTE',
-      priority: 'HIGH',
-      patient: 'Meenakshi Sundaram',
-      description: 'Disputed pharmacy consumable line item on final IPD discharge invoice.',
-      status: 'INVESTIGATING',
-      resolution: 'Finance reviewing nursing dispensing logs.'
-    }
-  ]);
+  // Complaints State - Starting Dynamic from Zero
+  const [complaints, setComplaints] = useState<any[]>([]);
 
   const handleReportIncident = () => {
     if (!newDescription.trim()) {
@@ -324,6 +234,13 @@ export const AdvancedQualityHub: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                  {incidents.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        Zero safety incidents recorded. System in clean state.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -340,8 +257,8 @@ export const AdvancedQualityHub: React.FC = () => {
                 <h3 className="font-bold text-slate-900 text-sm">Corrective & Preventive Action (CAPA) Tracker</h3>
                 <p className="text-xs text-slate-500">Every action requires formal verification by a designated Quality Auditor before closure.</p>
               </div>
-              <Badge variant="warning" className="font-semibold text-xs">
-                1 Pending Verification
+              <Badge variant={capas.filter(c => c.status === 'PENDING_VERIFICATION').length > 0 ? 'warning' : 'success'} className="font-semibold text-xs">
+                {capas.filter(c => c.status === 'PENDING_VERIFICATION').length} Pending Verification
               </Badge>
             </div>
 
@@ -439,6 +356,13 @@ export const AdvancedQualityHub: React.FC = () => {
                     <td className="p-3 text-slate-600 italic">{r.outcome}</td>
                   </tr>
                 ))}
+                {haiRecords.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-400">
+                      Zero healthcare-associated infections detected. IPC protocols 100% active.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -550,6 +474,13 @@ export const AdvancedQualityHub: React.FC = () => {
                   <td className="p-3 text-slate-600 italic max-w-xs">{c.resolution}</td>
                 </tr>
               ))}
+              {complaints.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    Zero grievances or complaints recorded. Patient satisfaction optimal.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

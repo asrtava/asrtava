@@ -244,6 +244,7 @@ export const pharmacyApi = {
   createMedicine: (data: any) => apiClient.post('/pharmacy/medicines', data),
   receiveBatch: (data: any) => apiClient.post('/pharmacy/batches', data),
   dispense: (data: any) => apiClient.post('/pharmacy/dispense', data),
+  posSale: (data: any) => apiClient.post('/pharmacy/pos', data),
 };
 
 // ============================================================

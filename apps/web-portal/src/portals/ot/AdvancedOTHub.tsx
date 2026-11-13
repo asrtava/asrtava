@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Badge, useToast, Modal } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 
 interface TheatreRoom {
   id: string;
@@ -63,6 +64,7 @@ interface SurgicalCount {
 export const AdvancedOTHub: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { otSurgeries, scheduleSurgery, updateSurgeryStatus } = useHospital();
   const [activeTab, setActiveTab] = useState<'theatres' | 'schedules' | 'who_checklist' | 'anaesthesia' | 'counts' | 'pacu'>('theatres');
 
   useEffect(() => {
@@ -160,6 +162,12 @@ export const AdvancedOTHub: React.FC = () => {
     },
   ]);
 
+  useEffect(() => {
+    if (otSurgeries.length > 0) {
+      setSchedules(otSurgeries);
+    }
+  }, [otSurgeries]);
+
   // 3. WHO Surgical Safety Checklist State
   const [whoPhase, setWhoPhase] = useState<'SIGN_IN' | 'TIME_OUT' | 'SIGN_OUT'>('TIME_OUT');
   const [signInDone, setSignInDone] = useState(true);
@@ -238,7 +246,7 @@ export const AdvancedOTHub: React.FC = () => {
             </div>
             <div className="px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700 text-xs">
               <span className="text-slate-400">Surgeries Today: </span>
-              <span className="font-mono font-bold text-emerald-300">14 Procedures</span>
+              <span className="font-mono font-bold text-emerald-300">{schedules.length} Procedures</span>
             </div>
           </div>
         </div>

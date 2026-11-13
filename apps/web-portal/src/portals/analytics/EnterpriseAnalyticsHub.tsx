@@ -24,6 +24,7 @@ import {
   Building2
 } from 'lucide-react';
 import { Badge, Button, Input, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface DepartmentMetrics {
   code: string;
@@ -59,6 +60,7 @@ interface PredictiveAlert {
 
 export const EnterpriseAnalyticsHub: React.FC = () => {
   const { showToast } = useToast();
+  const { appointments, beds, invoices, inventory, staff } = useHospital();
   const [activeTab, setActiveTab] = useState<
     'executive' | 'predictive' | 'departments' | 'doctors' | 'alerts' | 'schedules'
   >('executive');
@@ -78,56 +80,83 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
   const [noShowFirstVisit, setNoShowFirstVisit] = useState<boolean>(true);
   const [noShowResult, setNoShowResult] = useState<{ prob: number; isHigh: boolean } | null>(null);
 
-  // Departmental Data
-  const [departments] = useState<DepartmentMetrics[]>([
-    { code: 'CARDIO', name: 'Cardiology & Cath Lab', type: 'Clinical', opdVisits: 480, ipdAdmissions: 94, revenue: 3840000, occupancyPercent: 88.5, avgWaitMin: 18 },
-    { code: 'ORTHO', name: 'Orthopedics & Joint Replacement', type: 'Surgical', opdVisits: 395, ipdAdmissions: 78, revenue: 2950000, occupancyPercent: 82.0, avgWaitMin: 22 },
-    { code: 'NEURO', name: 'Neurology & Neuro Surgery', type: 'Clinical', opdVisits: 290, ipdAdmissions: 62, revenue: 3410000, occupancyPercent: 91.2, avgWaitMin: 15 },
-    { code: 'GEN_MED', name: 'General Medicine & Diabetology', type: 'Clinical', opdVisits: 620, ipdAdmissions: 110, revenue: 1650000, occupancyPercent: 85.0, avgWaitMin: 25 },
-    { code: 'EMERGENCY', name: 'Emergency & Trauma Services', type: 'Emergency', opdVisits: 840, ipdAdmissions: 145, revenue: 2280000, occupancyPercent: 94.0, avgWaitMin: 4 }
-  ]);
-
-  // Doctor Productivity Data
-  const [doctors] = useState<DoctorProductivity[]>([
-    { id: 'DOC-01', name: 'Dr. Rajesh Sharma', specialty: 'Interventional Cardiology', encounters: 245, revenue: 1960000, avgDurationMin: 16, satisfactionRating: 4.9 },
-    { id: 'DOC-02', name: 'Dr. Vikram Sethi', specialty: 'Orthopedic Surgery', encounters: 198, revenue: 1780000, avgDurationMin: 14, satisfactionRating: 4.8 },
-    { id: 'DOC-03', name: 'Dr. Ananya Roy', specialty: 'General Internal Medicine', encounters: 320, revenue: 960000, avgDurationMin: 12, satisfactionRating: 4.7 },
-    { id: 'DOC-04', name: 'Dr. Sameer Khan', specialty: 'Emergency Medicine', encounters: 410, revenue: 1230000, avgDurationMin: 10, satisfactionRating: 4.9 }
-  ]);
-
-  // Predictive Alerts
-  const [alerts, setAlerts] = useState<PredictiveAlert[]>([
-    {
-      id: 'ALT-PRED-101',
-      type: 'BED_SURGE',
-      title: 'Inpatient Bed Surge Alert (24-Hour Horizon)',
-      severity: 'CRITICAL',
-      score: 94.0,
-      details: 'Predicted census: 94/100 operational beds (94%). Shortage anticipated in Step-down HDU. Recommend expediting 6 morning discharges.',
-      timestamp: 'Today, 08:30 AM',
-      status: 'PENDING'
-    },
-    {
-      id: 'ALT-PRED-102',
-      type: 'STOCKOUT_RISK',
-      title: 'Critical Antibiotic Stockout Forecast',
-      severity: 'HIGH',
-      score: 88.0,
-      details: 'Inj Meropenem 1g stock (120 vials) will deplete within 2.8 days at current ICU velocity. Auto-requisition REQ-STAT-49 generated.',
-      timestamp: 'Today, 07:15 AM',
-      status: 'PENDING'
-    },
-    {
-      id: 'ALT-PRED-103',
-      type: 'READMISSION_RISK',
-      title: 'Patient LACE+ High 30-Day Readmission Risk',
-      severity: 'HIGH',
-      score: 13.0,
-      details: 'Patient UHID-88491 (Heart Failure) scored LACE 13 (Risk > 32%). Transition of care nurse protocol dispatched.',
-      timestamp: 'Yesterday, 04:45 PM',
-      status: 'ACKNOWLEDGED'
+  // Dynamic Departmental Metrics derived from live hospital context
+  const departments: DepartmentMetrics[] = React.useMemo(() => {
+    const deptNames = Array.from(new Set(appointments.map(a => a.department).filter(Boolean)));
+    if (deptNames.length === 0) {
+      return [];
     }
-  ]);
+    return deptNames.map((dName, idx) => {
+      const deptAppts = appointments.filter(a => a.department === dName);
+      const deptBeds = beds.filter(b => (b.wardName || '').toLowerCase().includes(dName.toLowerCase()));
+      const occupied = deptBeds.filter(b => b.status === 'Occupied').length;
+      return {
+        code: dName.slice(0, 5).toUpperCase(),
+        name: dName,
+        type: 'Clinical',
+        opdVisits: deptAppts.length,
+        ipdAdmissions: occupied,
+        revenue: deptAppts.length * 600,
+        occupancyPercent: deptBeds.length > 0 ? Math.round((occupied / deptBeds.length) * 100) : 0,
+        avgWaitMin: 15
+      };
+    });
+  }, [appointments, beds]);
+
+  // Dynamic Doctor Productivity derived from live hospital staff and appointments
+  const doctors: DoctorProductivity[] = React.useMemo(() => {
+    const docStaff = staff.filter(s => s.role.toLowerCase().includes('doc') || s.role.toLowerCase().includes('physician') || s.role.toLowerCase().includes('specialist'));
+    if (docStaff.length === 0) {
+      return [];
+    }
+    return docStaff.map((doc, idx) => {
+      const encounters = appointments.filter(a => a.doctorName.toLowerCase().includes(doc.name.toLowerCase())).length;
+      return {
+        id: doc.id || `DOC-0${idx + 1}`,
+        name: doc.name,
+        specialty: doc.department || 'Clinical Practice',
+        encounters,
+        revenue: encounters * 600,
+        avgDurationMin: 15,
+        satisfactionRating: 5.0
+      };
+    });
+  }, [staff, appointments]);
+
+  // Dynamic Predictive Alerts derived from live bed & inventory buffers
+  const [alerts, setAlerts] = useState<PredictiveAlert[]>([]);
+
+  // Keep alerts synced with real capacity
+  React.useEffect(() => {
+    const newAlerts: PredictiveAlert[] = [];
+    const occupied = beds.filter(b => b.status === 'Occupied').length;
+    if (beds.length > 0 && (occupied / beds.length) >= 0.85) {
+      newAlerts.push({
+        id: `ALT-SURGE-${Date.now()}`,
+        type: 'BED_SURGE',
+        title: 'High Inpatient Bed Occupancy Alert',
+        severity: 'CRITICAL',
+        score: Math.round((occupied / beds.length) * 100),
+        details: `Census is at ${occupied}/${beds.length} beds (${Math.round((occupied / beds.length) * 100)}%). Recommend reviewing discharge candidates.`,
+        timestamp: 'Just now',
+        status: 'PENDING'
+      });
+    }
+    const lowStock = inventory.filter(i => (i.stock || 0) <= 50);
+    if (lowStock.length > 0) {
+      newAlerts.push({
+        id: `ALT-STOCK-${Date.now()}`,
+        type: 'STOCKOUT_RISK',
+        title: `Low Buffer Inventory Stockout (${lowStock.length} SKUs)`,
+        severity: 'HIGH',
+        score: lowStock.length * 10,
+        details: `${lowStock.map(i => i.name).slice(0, 3).join(', ')} below minimum threshold of 50 units. Auto-requisition recommended.`,
+        timestamp: 'Just now',
+        status: 'PENDING'
+      });
+    }
+    setAlerts(newAlerts);
+  }, [beds, inventory]);
 
   // Handle LACE Calculation
   const runLaceCalculation = () => {
@@ -278,11 +307,13 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
             <BedDouble className="w-3.5 h-3.5 text-indigo-500" />
           </div>
           <div className="mt-2">
-            <span className="text-xl font-bold text-slate-900 font-mono">84.6%</span>
+            <span className="text-xl font-bold text-slate-900 font-mono">
+              {beds.length > 0 ? `${Math.round((beds.filter(b => b.status === 'Occupied').length / beds.length) * 100)}%` : '0%'}
+            </span>
           </div>
           <div className="mt-2 text-[10px] text-emerald-600 font-semibold flex items-center">
             <CheckCircle className="w-3 h-3 mr-0.5" />
-            <span>Optimal (80-85% Target)</span>
+            <span>{beds.filter(b => b.status === 'Occupied').length} / {beds.length} Inpatients</span>
           </div>
         </div>
 
@@ -654,6 +685,13 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {departments.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    No department encounters recorded yet. OPD and IPD metrics will appear automatically as consultations are logged.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -692,6 +730,13 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {doctors.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                    No doctor encounters logged yet. Physician productivity ranking will populate from completed appointments.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -739,6 +784,13 @@ export const EnterpriseAnalyticsHub: React.FC = () => {
               </div>
             </div>
           ))}
+          {alerts.length === 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-xs shadow-sm">
+              <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
+              <div className="font-semibold text-slate-700">All Operations Nominal</div>
+              <p className="mt-1">Zero predictive bottlenecks detected. Inpatient bed buffer and pharmacy stock velocity are within safe limits.</p>
+            </div>
+          )}
         </div>
       )}
 

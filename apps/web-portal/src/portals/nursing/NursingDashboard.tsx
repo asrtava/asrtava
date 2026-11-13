@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BedDouble,
   Activity,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 import { inpatientApi, nursingApi } from '../../services/api';
 import { AdvancedNursingHub } from './AdvancedNursingHub';
 import { AdvancedWardHub } from './AdvancedWardHub';
@@ -85,7 +86,14 @@ interface ShiftHandoverRecord {
 export const NursingDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
-  const [selectedWard, setSelectedWard] = useState('ICU-A');
+  const { beds: hospitalBeds, dischargePatientFromBed, updateBedVitals } = useHospital();
+
+  const availableWards = useMemo(() => {
+    const set = new Set(hospitalBeds.map((b) => b.wardName));
+    return set.size > 0 ? Array.from(set) : ['ICU-A', 'ICU-B', 'GEN-M', 'GEN-F'];
+  }, [hospitalBeds]);
+
+  const [selectedWard, setSelectedWard] = useState(availableWards[0] || 'ICU-A');
   const [activeTab, setActiveTab] = useState<'advanced-hub' | 'ward-operations' | 'beds' | 'mar' | 'care-plans' | 'handover'>('beds');
 
   useEffect(() => {
@@ -98,6 +106,29 @@ export const NursingDashboard: React.FC = () => {
     setActiveTab(tab);
     setActivePortalTab(tab);
   };
+
+  // Map dynamic beds from HospitalContext
+  const beds: InpatientBed[] = useMemo(() => {
+    return hospitalBeds.map((b) => ({
+      bedNumber: b.bedNumber,
+      ward: b.wardName,
+      status: b.status === 'Occupied' ? 'Occupied' : b.status === 'Cleaning' ? 'Cleaning' : 'Available',
+      patient: b.patient
+        ? {
+            name: b.patient.name,
+            ipdNumber: b.patient.admissionNumber,
+            uhid: b.patient.uhid,
+            age: b.patient.age,
+            gender: b.patient.gender,
+            diagnosis: b.patient.diagnosis,
+            attendingDoctor: b.patient.attendingDoctor,
+            admittedDate: b.patient.admittedDate,
+            vitals: b.patient.vitals,
+            allergies: b.patient.allergies || 'None documented'
+          }
+        : undefined
+    }));
+  }, [hospitalBeds]);
 
   // Care Plans State
   const [carePlans, setCarePlans] = useState<CarePlan[]>([
@@ -166,118 +197,6 @@ export const NursingDashboard: React.FC = () => {
   const [outputUrine, setOutputUrine] = useState('650');
   const [outputDrain, setOutputDrain] = useState('50');
   const [outputVomitus, setOutputVomitus] = useState('0');
-
-  const [beds, setBeds] = useState<InpatientBed[]>([
-    {
-      bedNumber: 'ICU-01',
-      ward: 'ICU-A',
-      status: 'Occupied',
-      patient: {
-        name: 'Ramesh Patel',
-        ipdNumber: 'IPD-2026-0045',
-        uhid: 'APEX-2026-00045',
-        age: 58,
-        gender: 'Male',
-        diagnosis: 'Acute Coronary Syndrome / Post Angioplasty',
-        attendingDoctor: 'Dr. Rajesh Sharma',
-        admittedDate: '06 Nov 2026',
-        vitals: { bp: '138 / 88 mmHg', hr: '84 bpm', temp: '98.6 °F', spo2: '97%', sugar: '142 mg/dL' },
-        allergies: 'None known'
-      }
-    },
-    {
-      bedNumber: 'ICU-02',
-      ward: 'ICU-A',
-      status: 'Occupied',
-      patient: {
-        name: 'Sunita Sharma',
-        ipdNumber: 'IPD-2026-0048',
-        uhid: 'APEX-2026-00048',
-        age: 64,
-        gender: 'Female',
-        diagnosis: 'Congestive Heart Failure, Fluid Overload',
-        attendingDoctor: 'Dr. Rajesh Sharma',
-        admittedDate: '07 Nov 2026',
-        vitals: { bp: '154 / 96 mmHg', hr: '104 bpm', temp: '99.2 °F', spo2: '93%', sugar: '168 mg/dL', alert: true },
-        allergies: 'Penicillin (Moderate Urticaria)'
-      }
-    },
-    {
-      bedNumber: 'ICU-03',
-      ward: 'ICU-A',
-      status: 'Occupied',
-      patient: {
-        name: 'Vikram Joshi',
-        ipdNumber: 'IPD-2026-0051',
-        uhid: 'APEX-2026-00051',
-        age: 42,
-        gender: 'Male',
-        diagnosis: 'Post-CABG Day 2, Extubated',
-        attendingDoctor: 'Dr. Vikram Sethi',
-        admittedDate: '05 Nov 2026',
-        vitals: { bp: '122 / 78 mmHg', hr: '76 bpm', temp: '98.4 °F', spo2: '99%', sugar: '112 mg/dL' },
-        allergies: 'Sulfa Drugs'
-      }
-    },
-    {
-      bedNumber: 'ICU-04',
-      ward: 'ICU-A',
-      status: 'Available'
-    },
-    {
-      bedNumber: 'ICU-05',
-      ward: 'ICU-A',
-      status: 'Cleaning'
-    },
-    {
-      bedNumber: 'ICU-06',
-      ward: 'ICU-A',
-      status: 'Occupied',
-      patient: {
-        name: 'Meena Saxena',
-        ipdNumber: 'IPD-2026-0054',
-        uhid: 'APEX-2026-00054',
-        age: 71,
-        gender: 'Female',
-        diagnosis: 'Pneumonia with Hypoxemia',
-        attendingDoctor: 'Dr. Ananya Roy',
-        admittedDate: '07 Nov 2026',
-        vitals: { bp: '110 / 70 mmHg', hr: '88 bpm', temp: '100.4 °F', spo2: '94%', sugar: '126 mg/dL', alert: true },
-        allergies: 'None'
-      }
-    }
-  ]);
-
-  // Live Inpatient Bed Occupancy Fetch from PostgreSQL
-  useEffect(() => {
-    const fetchLiveBeds = async () => {
-      try {
-        const res = await inpatientApi.getBeds();
-        if (res.data?.data && res.data.data.length > 0) {
-          const liveBeds: InpatientBed[] = res.data.data.map((b: any) => ({
-            bedNumber: b.bed_number,
-            ward: b.ward_name || selectedWard,
-            status: b.status === 'occupied' ? 'Occupied' : b.status === 'sanitation' || b.status === 'cleaning' ? 'Cleaning' : 'Available',
-            patient: b.current_patient_name ? {
-              name: b.current_patient_name,
-              ipdNumber: b.admission_number || 'IPD-2026-0001',
-              uhid: b.uhid || 'APEX-2026-00001',
-              age: b.patient_age || 45,
-              gender: b.patient_gender || 'Male',
-              diagnosis: b.provisional_diagnosis || 'Inpatient Medical Care',
-              attendingDoctor: b.doctor_name || 'Dr. Rajesh Sharma',
-              admittedDate: b.admitted_date || 'Today',
-              vitals: { bp: '124 / 82 mmHg', hr: '76 bpm', temp: '98.6 °F', spo2: '98%', sugar: '115 mg/dL' }
-            } : undefined
-          }));
-          setBeds(liveBeds);
-        }
-      } catch (err) {
-        // Fallback to initial beds on network failure
-      }
-    };
-    fetchLiveBeds();
-  }, [selectedWard]);
 
   const [medicationsDue, setMedicationsDue] = useState<MedicationDue[]>([
     { id: 'm1', bedNumber: 'ICU-01', patientName: 'Ramesh Patel', drug: 'Aspirin 75mg', dosage: '1 Tab Enteric-Coated', route: 'Oral', dueTime: '12:00 PM', status: 'Due' },
@@ -355,26 +274,14 @@ export const NursingDashboard: React.FC = () => {
       // Local graceful fallback
     }
 
-    setBeds((prev) =>
-      prev.map((b) =>
-        b.bedNumber === selectedBed.bedNumber && b.patient
-          ? {
-              ...b,
-              patient: {
-                ...b.patient,
-                vitals: {
-                  bp: newBp,
-                  hr: `${heartRate} bpm`,
-                  temp: `${tempF} °F`,
-                  spo2: `${spo2Percent}%`,
-                  sugar: `${bloodSugar} mg/dL`,
-                  alert: isAlert
-                }
-              }
-            }
-          : b
-      )
-    );
+    updateBedVitals(selectedBed.bedNumber, {
+      bp: newBp,
+      hr: `${heartRate} bpm`,
+      temp: `${tempF} °F`,
+      spo2: `${spo2Percent}%`,
+      sugar: `${bloodSugar} mg/dL`,
+      alert: isAlert
+    });
 
     setIsVitalsModalOpen(false);
     showToast({
@@ -519,10 +426,11 @@ export const NursingDashboard: React.FC = () => {
             onChange={(e) => setSelectedWard(e.target.value)}
             className="bg-white border border-slate-200 text-xs font-semibold px-3 py-2 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-sm"
           >
-            <option value="ICU-A">Ward: ICU-A (Cardio-Thoracic)</option>
-            <option value="ICU-B">Ward: ICU-B (Medical / Neuro)</option>
-            <option value="GEN-M">Ward: General Male (Floor 3)</option>
-            <option value="GEN-F">Ward: General Female (Floor 4)</option>
+            {availableWards.map((w) => (
+              <option key={w} value={w}>
+                Ward: {w}
+              </option>
+            ))}
           </select>
         </div>
       </div>
