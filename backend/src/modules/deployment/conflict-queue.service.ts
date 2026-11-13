@@ -298,8 +298,15 @@ export class ClinicalConflictQueueService {
     }
 
     // 2. Validate essential fields exist based on entity type
-    if (existing.entityType === 'consultation' && !mergedPayload.diagnosis && !mergedPayload.notes && !mergedPayload.soapNote) {
-      throw new Error('CLINICAL_VALIDATION_ERROR: Reconciled consultation must contain clinical notes or diagnosis.');
+    if (
+      existing.entityType === 'consultation' &&
+      !mergedPayload.diagnosis &&
+      !mergedPayload.primaryDiagnosis &&
+      !mergedPayload.notes &&
+      !mergedPayload.soapNote &&
+      !mergedPayload.treatmentPlan
+    ) {
+      throw new Error('CLINICAL_VALIDATION_ERROR: Reconciled consultation must contain clinical notes, diagnosis, or treatment plan.');
     }
 
     if (existing.entityType === 'emar' && (!mergedPayload.medicationName && !mergedPayload.drugName)) {
