@@ -110,3 +110,4 @@ export function resolveApplicationExperience(): AsrtavaApplication {
   // Default to Public Website
   return 'public';
 }
+

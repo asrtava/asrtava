@@ -29,6 +29,7 @@ import { SuperAdminLogin } from './auth/SuperAdminLogin';
 import { RoleLoginView } from './auth/RoleLoginView';
 import { HospitalRegistration } from './auth/HospitalRegistration';
 import { OnboardingWizard } from './auth/OnboardingWizard';
+import { HospitalOnboardingWorkspace } from './portals/onboarding/HospitalOnboardingWorkspace';
 import { resolveApplicationExperience } from './utils/appResolver';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
@@ -73,6 +74,15 @@ const MainPortalView: React.FC = () => {
           }
         }} />
       </div>
+    );
+  }
+
+  // Authenticated user viewing Hospital Onboarding Workspace
+  if (user && (currentAuthView === '/onboarding' || currentAuthView === '/hospital-onboarding')) {
+    return (
+      <HospitalOnboardingWorkspace
+        onExit={() => setCurrentAuthView(null)}
+      />
     );
   }
 
@@ -172,12 +182,10 @@ const MainPortalView: React.FC = () => {
       );
     }
 
-    if (currentAuthView === '/onboarding') {
+    if (currentAuthView === '/onboarding' || currentAuthView === '/hospital-onboarding') {
       return (
-        <OnboardingWizard
-          resumptionToken={resumptionToken || 'onb_demo_token_123'}
-          onComplete={() => setCurrentAuthView('/login/hospital-admin')}
-          onExit={() => setCurrentAuthView('/login/hospital-admin')}
+        <HospitalOnboardingWorkspace
+          onExit={() => setCurrentAuthView('/')}
         />
       );
     }

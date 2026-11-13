@@ -288,11 +288,11 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
               Perpetual Licensing
             </button>
             <button
-              onClick={() => onNavigate('/register-hospital')}
+              onClick={() => onNavigate('/onboarding')}
               className="hover:text-teal-400 transition cursor-pointer flex items-center space-x-1"
             >
               <FileCheck2 className="w-3.5 h-3.5 text-teal-400" />
-              <span>Customer Onboarding</span>
+              <span>Hospital Onboarding</span>
             </button>
             <button
               onClick={() => onNavigate('/login/coordination')}

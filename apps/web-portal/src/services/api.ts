@@ -347,3 +347,48 @@ export const saasApi = {
   approveJitAccess: (requestId: string) => apiClient.post(`/saas/tenant/jit-access/${requestId}/approve`),
   requestDataExport: (data?: { format?: string; scope?: string }) => apiClient.post('/saas/tenant/data-export', data),
 };
+
+// ============================================================
+// Enterprise Customer Onboarding & Implementation Management
+// ============================================================
+export const onboardingApi = {
+  getDashboard: () => apiClient.get('/onboarding/dashboard'),
+  registerCustomer: (data: any) => apiClient.post('/onboarding/customers', data),
+  createProject: (data: any) => apiClient.post('/onboarding/projects', data),
+  transitionStage: (id: string, targetStage: string, notes?: string) =>
+    apiClient.post(`/onboarding/projects/${id}/stage`, { targetStage, notes }),
+  recordAssessment: (id: string, assessmentData: any) =>
+    apiClient.post(`/onboarding/projects/${id}/assessment`, assessmentData),
+  addRequirement: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/requirements`, data),
+  dryRunMigration: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/migration/dry-run`, data),
+  approveMigration: (jobId: string) =>
+    apiClient.post(`/onboarding/migration/${jobId}/approve`),
+  executeMigration: (jobId: string) =>
+    apiClient.post(`/onboarding/migration/${jobId}/execute`),
+  bulkOnboardStaff: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/staff/bulk`, data),
+  createTrainingProgram: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/training/programs`, data),
+  recordAttendance: (programId: string, data: any) =>
+    apiClient.post(`/onboarding/training/${programId}/attendance`, data),
+  createUatTestCase: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/uat/test-cases`, data),
+  recordUatResult: (testCaseId: string, data: any) =>
+    apiClient.post(`/onboarding/uat/${testCaseId}/result`, data),
+  getReadiness: (id: string) =>
+    apiClient.get(`/onboarding/projects/${id}/readiness`),
+  verifyChecklistItem: (id: string, checkItemCode: string, notes?: string) =>
+    apiClient.post(`/onboarding/projects/${id}/checklist/verify`, { checkItemCode, notes }),
+  executeGoLive: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/go-live`, data),
+  createHypercareTicket: (id: string, data: any) =>
+    apiClient.post(`/onboarding/projects/${id}/hypercare/tickets`, data),
+  resolveHypercareTicket: (ticketId: string, resolutionSummary: string) =>
+    apiClient.post(`/onboarding/hypercare/${ticketId}/resolve`, { resolutionSummary }),
+  handoverToSupport: (id: string) =>
+    apiClient.post(`/onboarding/projects/${id}/handover`),
+  getHospitalProgress: () =>
+    apiClient.get('/onboarding/my-hospital/progress'),
+};

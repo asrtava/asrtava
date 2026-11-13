@@ -249,3 +249,4 @@ export const CoordinationLogin: React.FC<{ onSwitchPortal?: (path: string) => vo
     </div>
   );
 };
+

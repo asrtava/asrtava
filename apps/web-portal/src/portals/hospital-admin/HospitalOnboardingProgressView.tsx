@@ -97,6 +97,20 @@ export const HospitalOnboardingProgressView: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = '/onboarding';
+              }
+            }}
+          >
+            <Sparkles className="w-4 h-4 mr-1.5" />
+            <span>Open Onboarding Workspace</span>
+          </Button>
+
           <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20 text-white border-white/20" onClick={() => setIsHypercareModalOpen(true)}>
             <Headphones className="w-4 h-4 mr-1.5" />
             <span>Submit Hypercare Ticket</span>
