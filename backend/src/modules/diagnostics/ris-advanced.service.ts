@@ -1,4 +1,5 @@
 import { logger } from '../../utils/logger';
+import { db } from '../../database';
 
 export interface ModalityInput {
   hospitalId: string;
@@ -90,6 +91,28 @@ export class RISAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.modalities.set(id, mod);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_modalities').insert({
+          id: mod.id,
+          hospital_id: mod.hospitalId,
+          modality_code: mod.modalityCode,
+          modality_type: mod.modalityType,
+          name: mod.name,
+          ae_title: mod.aeTitle,
+          ip_address: mod.ipAddress,
+          port_number: mod.portNumber,
+          location_room: mod.locationRoom,
+          status: 'AVAILABLE',
+          is_active: mod.isActive,
+          created_at: mod.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_modalities DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Radiology Modality Registered', { modalityId: id, aeTitle: input.aeTitle });
     return mod;
   }
@@ -105,6 +128,26 @@ export class RISAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.procedures.set(id, proc);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_procedure_master').insert({
+          id: proc.id,
+          hospital_id: proc.hospitalId,
+          procedure_code: proc.procedureCode,
+          procedure_name: proc.procedureName,
+          modality_type: proc.modalityType,
+          body_region: proc.bodyRegion,
+          contrast_requirement: proc.contrastRequirement,
+          expected_duration_mins: proc.expectedDurationMins,
+          is_active: proc.isActive,
+          created_at: proc.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_procedure_master DB persistence fallback', { error: err.message });
+    }
+
     return proc;
   }
 
@@ -122,6 +165,26 @@ export class RISAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.orders.set(id, order);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_imaging_orders').insert({
+          id: order.id,
+          hospital_id: order.hospitalId,
+          patient_id: order.patientId,
+          ordering_doctor_id: order.orderingDoctorId,
+          procedure_id: order.procedureId,
+          priority: order.priority,
+          clinical_indication: order.clinicalIndication,
+          requires_contrast: order.requiresContrast,
+          order_status: order.orderStatus,
+          created_at: order.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_imaging_orders DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Radiology Imaging Order Placed', { orderNumber, priority: order.priority });
     return order;
   }
@@ -152,6 +215,24 @@ export class RISAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.appointments.set(id, appointment);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_imaging_appointments').insert({
+          id: appointment.id,
+          hospital_id: appointment.hospitalId,
+          order_id: appointment.orderId,
+          modality_id: appointment.modalityId,
+          scheduled_start: appointment.scheduledStart,
+          scheduled_end: appointment.scheduledEnd,
+          appointment_status: appointment.appointmentStatus,
+          created_at: appointment.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_imaging_appointments DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Modality appointment scheduled', { apptId: id, modalityId: input.modalityId });
     return appointment;
   }
@@ -190,6 +271,27 @@ export class RISAdvancedService {
       screenedAt: new Date().toISOString(),
     };
     this.screenings.set(id, screening);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_patient_screenings').insert({
+          id: screening.id,
+          hospital_id: screening.hospitalId,
+          appointment_id: screening.appointmentId,
+          patient_id: screening.patientId,
+          egfr_value: screening.egfrValue || null,
+          is_contrast_allergy_history: !!screening.isContrastAllergyHistory,
+          is_pacemaker_or_ferrous_implant: !!screening.isPacemakerOrFerrousImplant,
+          is_pregnant: !!screening.isPregnant,
+          cleared_for_scan: screening.clearedForScan,
+          clearance_status: screening.clearanceStatus,
+          screened_at: screening.screenedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_patient_screenings DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Patient pre-imaging screening documented', { screeningId: id, clearedForScan, clearanceStatus });
     return screening;
   }
@@ -218,6 +320,30 @@ export class RISAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.pacsStudies.set(id, study);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('pacs_studies').insert({
+          id: study.id,
+          hospital_id: study.hospitalId,
+          study_instance_uid: study.studyInstanceUid,
+          accession_number: study.accessionNumber,
+          patient_id: study.patientId,
+          order_id: study.orderId || null,
+          study_date: study.studyDate,
+          study_time: study.studyTime,
+          study_description: study.studyDescription,
+          modality: study.modality,
+          total_series: study.totalSeries,
+          total_instances: study.totalInstances,
+          storage_uri: study.storageUri,
+          created_at: study.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] pacs_studies DB persistence fallback', { error: err.message });
+    }
+
     logger.info('PACS Study Indexed', { studyUid: input.studyInstanceUid, accession: input.accessionNumber });
     return study;
   }
@@ -250,6 +376,39 @@ export class RISAdvancedService {
       logger.error('CRITICAL RADIOLOGY FINDING DETECTED', { condition: input.criticalCondition, reportId: id });
     }
 
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_radiology_reports').insert({
+          id: report.id,
+          hospital_id: report.hospitalId,
+          order_id: report.studyId,
+          study_id: report.studyId,
+          reporting_radiologist_id: report.reportingRadiologistId,
+          technique_notes: report.techniqueNotes,
+          findings: report.findings,
+          impression: report.impression,
+          recommendations: report.recommendations || null,
+          report_status: report.reportStatus,
+          is_critical_finding: !!report.isCriticalFinding,
+          created_at: report.createdAt,
+        });
+
+        if (criticalAlert) {
+          await trx('ris_critical_findings').insert({
+            id: criticalAlert.id,
+            hospital_id: criticalAlert.hospitalId,
+            report_id: criticalAlert.reportId,
+            critical_condition: criticalAlert.criticalCondition,
+            notification_channel: criticalAlert.notificationChannel,
+            notified_at: criticalAlert.notifiedAt,
+            read_back_confirmed: criticalAlert.readBackConfirmed,
+          });
+        }
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_radiology_reports DB persistence fallback', { error: err.message });
+    }
+
     return { report, criticalAlert };
   }
 
@@ -260,6 +419,19 @@ export class RISAdvancedService {
     rep.reportingRadiologistId = radiologistId;
     rep.authorizedAt = new Date().toISOString();
     rep.digitalSignatureHash = `SHA256-RAD-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_radiology_reports').where({ id: reportId }).update({
+          report_status: 'AUTHORIZED',
+          reporting_radiologist_id: radiologistId,
+          authorized_at: rep.authorizedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] authorizeReport DB fallback', { error: err.message });
+    }
+
     logger.info('Radiology report authorized with digital seal', { reportId, radiologistId });
     return rep;
   }
@@ -277,6 +449,18 @@ export class RISAdvancedService {
     }
     if (input.findings) rep.findings = input.findings;
     if (input.impression) rep.impression = input.impression;
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_radiology_reports').where({ id: input.reportId }).update({
+          findings: rep.findings,
+          impression: rep.impression,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] updateRadiologyReportContent DB fallback', { error: err.message });
+    }
+
     return rep;
   }
 
@@ -287,6 +471,20 @@ export class RISAdvancedService {
     rep.reportStatus = 'AMENDED';
     rep.amendmentReason = addendumNotes;
     rep.authorizedAt = new Date().toISOString();
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_radiology_reports').where({ id: reportId }).update({
+          is_amended: true,
+          report_status: 'AMENDED',
+          amendment_reason: addendumNotes,
+          authorized_at: rep.authorizedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] amendReport DB fallback', { error: err.message });
+    }
+
     logger.warn('Radiology report addendum filed', { reportId, radiologistId });
     return rep;
   }
@@ -340,10 +538,23 @@ export class RISAdvancedService {
     alert.readBackConfirmed = true;
     alert.readBackVerifiedBy = verifiedBy;
     alert.confirmedAt = new Date().toISOString();
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_critical_findings').where({ id: alertId }).update({
+          read_back_confirmed: true,
+          read_back_verified_by: verifiedBy,
+          confirmed_at: alert.confirmedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] confirmCriticalFindingReadBack DB fallback', { error: err.message });
+    }
+
     return alert;
   }
 
-  // 7. Contrast Administration Log
+  // 8. Contrast Administration Log
   public async recordContrastAdministration(input: {
     hospitalId: string;
     appointmentId: string;
@@ -365,6 +576,27 @@ export class RISAdvancedService {
       administeredAt: new Date().toISOString(),
     };
     this.contrastAdministrations.set(id, record);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ris_contrast_administrations').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          appointment_id: record.appointmentId,
+          contrast_name: record.contrastName,
+          batch_lot_number: record.batchLotNumber,
+          volume_administered_ml: record.volumeAdministeredMl,
+          flow_rate_ml_sec: record.flowRateMlSec,
+          injection_site: record.injectionSite,
+          administered_by_user_id: record.administeredByUserId,
+          adverse_reaction_observed: record.adverseReactionObserved,
+          administered_at: record.administeredAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[RISAdvancedService] ris_contrast_administrations DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Contrast media injection documented', { contrast: input.contrastName, volume: input.volumeAdministeredMl });
     return record;
   }

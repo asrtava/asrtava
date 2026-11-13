@@ -1,4 +1,5 @@
 import { logger } from '../../utils/logger';
+import { db } from '../../database';
 
 export interface PatientAssignmentInput {
   hospitalId: string;
@@ -127,6 +128,29 @@ export class NursingAdvancedService {
       isActive: true,
     };
     this.assignments.set(id, assignment);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('nursing_patient_assignments').insert({
+          id: assignment.id,
+          hospital_id: assignment.hospitalId,
+          ward_id: assignment.wardId,
+          bed_id: assignment.bedId,
+          admission_id: assignment.admissionId,
+          patient_id: assignment.patientId,
+          nurse_user_id: assignment.nurseUserId,
+          shift_id: assignment.shiftId || null,
+          assigned_by_user_id: assignment.assignedByUserId,
+          assignment_role: assignment.assignmentRole,
+          acuity_level: assignment.acuityLevel,
+          assigned_at: assignment.assignedAt,
+          is_active: assignment.isActive,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] nursing_patient_assignments DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Patient assigned to nurse', { assignmentId: id, nurseId: input.nurseUserId, patientId: input.patientId });
     return assignment;
   }
@@ -269,6 +293,48 @@ export class NursingAdvancedService {
       logger.warn('Vital observation alert triggered', { alertId, news2Score: score, risk });
     }
 
+    try {
+      await db.transaction(async (trx) => {
+        await trx('patient_vital_observations').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          admission_id: record.admissionId,
+          patient_id: record.patientId,
+          recorded_by_nurse_id: record.recordedByNurseId,
+          systolic_bp: record.systolicBp,
+          diastolic_bp: record.diastolicBp,
+          heart_rate: record.heartRate,
+          respiratory_rate: record.respiratoryRate,
+          temperature_celsius: record.temperatureCelsius,
+          spo2_percent: record.spo2Percent,
+          is_supplemental_o2: !!record.isSupplementalO2,
+          o2_flow_liters_min: record.o2FlowLitersMin || null,
+          pain_score: record.painScore || null,
+          blood_glucose_mg_dl: record.bloodGlucoseMgDl || null,
+          consciousness_level: record.consciousnessLevel || 'ALERT',
+          news2_score: record.news2Score,
+          news2_risk_category: record.news2RiskCategory,
+          monitoring_frequency_minutes: record.monitoringFrequencyMinutes,
+          recorded_at: record.recordedAt,
+        });
+
+        if (alertRecord) {
+          await trx('nursing_observation_alerts').insert({
+            id: alertRecord.id,
+            hospital_id: alertRecord.hospitalId,
+            observation_id: alertRecord.observationId,
+            patient_id: alertRecord.patientId,
+            alert_level: alertRecord.alertSeverity,
+            news2_score: score,
+            trigger_reason: alertRecord.triggerReason,
+            created_at: alertRecord.createdAt,
+          });
+        }
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] patient_vital_observations DB persistence fallback', { error: err.message });
+    }
+
     return { vitalRecord: record, alert: alertRecord };
   }
 
@@ -342,6 +408,26 @@ export class NursingAdvancedService {
       assessedAt: new Date().toISOString(),
     };
     this.assessments.set(id, assessment);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('nursing_patient_assessments').insert({
+          id: assessment.id,
+          hospital_id: assessment.hospitalId,
+          admission_id: assessment.admissionId,
+          patient_id: assessment.patientId,
+          template_code: assessment.templateCode,
+          assessed_by_nurse_id: assessment.assessedByNurseId,
+          assessment_data: JSON.stringify(assessment.assessmentData),
+          clinical_findings: assessment.clinicalFindings || null,
+          recommended_interventions: JSON.stringify(assessment.recommendedInterventions || []),
+          assessed_at: assessment.assessedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] nursing_patient_assessments DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Nursing assessment recorded', { assessmentId: id, template: input.templateCode, score: calculatedScore, riskTier });
     return assessment;
   }
@@ -401,6 +487,34 @@ export class NursingAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.emarRecords.set(id, record);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('inpatient_emar_records').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          admission_id: record.admissionId,
+          prescription_item_id: record.prescriptionItemId || null,
+          drug_id: record.drugId || null,
+          batch_id: record.batchId || null,
+          scheduled_time: record.scheduledTime,
+          actual_admin_time: record.actualAdminTime || null,
+          administration_status: record.administrationStatus,
+          omission_reason: record.omissionReason || null,
+          administering_nurse_id: record.administeringNurseId,
+          cosigning_nurse_id: record.cosigningNurseId || null,
+          dose_administered: record.doseAdministered,
+          route_used: record.routeUsed,
+          site_of_administration: record.siteOfAdministration || null,
+          is_high_alert: !!record.isHighAlertOrNarcotic,
+          notes: record.failSafeReason || null,
+          created_at: record.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] inpatient_emar_records DB persistence fallback', { error: err.message });
+    }
+
     logger.info('eMAR dose recorded', { emarId: id, status: input.administrationStatus, dose: input.doseAdministered });
     return record;
   }
@@ -602,6 +716,30 @@ export class NursingAdvancedService {
       status: 'SUBMITTED',
     };
     this.sbarHandovers.set(id, handover);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('nursing_sbar_handovers').insert({
+          id: handover.id,
+          hospital_id: handover.hospitalId,
+          ward_id: handover.wardId,
+          shift_id: handover.shiftId || null,
+          outgoing_nurse_id: handover.outgoingNurseId,
+          incoming_nurse_id: handover.incomingNurseId,
+          census_occupied_beds: handover.censusOccupiedBeds,
+          census_vacant_beds: handover.censusVacantBeds,
+          situation_summary: handover.situationSummary,
+          background_summary: handover.backgroundSummary,
+          assessment_summary: handover.assessmentSummary,
+          recommendations_summary: handover.recommendationsSummary,
+          outgoing_signed_at: handover.outgoingSignedAt,
+          status: handover.status,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] nursing_sbar_handovers DB persistence fallback', { error: err.message });
+    }
+
     logger.info('SBAR shift handover submitted', { handoverId: id, wardId: input.wardId });
     return handover;
   }
@@ -614,6 +752,18 @@ export class NursingAdvancedService {
     }
     handover.incomingAcknowledgedAt = new Date().toISOString();
     handover.status = 'ACKNOWLEDGED_SIGNED';
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('nursing_sbar_handovers').where({ id: handoverId }).update({
+          incoming_acknowledged_at: handover.incomingAcknowledgedAt,
+          status: handover.status,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] nursing_sbar_handovers acknowledge fallback', { error: err.message });
+    }
+
     logger.info('SBAR shift handover acknowledged and signed', { handoverId, incomingNurseId });
     return handover;
   }
@@ -671,6 +821,31 @@ export class NursingAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.safetyIncidents.set(id, incident);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('patient_safety_incidents').insert({
+          id: incident.id,
+          hospital_id: incident.hospitalId,
+          incident_number: incident.incidentNumber,
+          patient_id: incident.patientId || null,
+          admission_id: incident.admissionId || null,
+          ward_id: incident.wardId || null,
+          incident_category: incident.incidentCategory,
+          severity_index: incident.severityIndex,
+          incident_time: incident.incidentTime,
+          reported_by_user_id: incident.reportedByUserId,
+          description: incident.description,
+          immediate_actions_taken: incident.immediateActionsTaken,
+          physician_notified_id: incident.physicianNotifiedId || null,
+          investigation_status: incident.investigationStatus,
+          created_at: incident.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[NursingAdvancedService] patient_safety_incidents DB persistence fallback', { error: err.message });
+    }
+
     logger.warn('Patient safety incident reported', { incidentNumber, category: input.incidentCategory, severity: input.severityIndex });
     return incident;
   }

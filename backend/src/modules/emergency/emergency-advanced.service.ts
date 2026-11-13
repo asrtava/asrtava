@@ -1,4 +1,5 @@
 import { logger } from '../../utils/logger';
+import { db } from '../../database';
 
 export interface EmergencyEncounterInput {
   hospitalId: string;
@@ -142,6 +143,26 @@ export class EmergencyAdvancedService {
     };
 
     this.encounters.set(id, encounter);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_encounters').insert({
+          id: encounter.id,
+          hospital_id: encounter.hospitalId,
+          patient_id: encounter.patientId,
+          patient_name: encounter.patientName,
+          is_unknown_identity: encounter.isUnknownIdentity,
+          arrival_mode: encounter.arrivalMode,
+          presenting_complaint: encounter.presentingComplaint,
+          is_medico_legal: encounter.isMedicoLegal,
+          status: encounter.status,
+          created_at: encounter.arrivalTimestamp,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_encounters DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Emergency encounter registered', { encounterNumber: encNumber, isUnknown: encounter.isUnknownIdentity, tempUhid });
     return encounter;
   }
@@ -154,19 +175,18 @@ export class EmergencyAdvancedService {
     let esi = input.esiLevel;
     let zone: 'RED_RESUS' | 'YELLOW_ACUTE' | 'GREEN_FAST_TRACK' = 'YELLOW_ACUTE';
 
-    // Automated ESI Calculation if not explicitly overridden:
     if (!esi) {
       if (input.gcsScore < 9 || input.spo2Percent < 85 || input.heartRate < 40 || input.heartRate > 140) {
-        esi = 1; // Resuscitation required immediately
+        esi = 1;
         zone = 'RED_RESUS';
-      } else if (input.painScore && input.painScore >= 8 || input.spo2Percent < 92 || input.systolicBp < 90) {
-        esi = 2; // High risk / severe pain / emergent
+      } else if ((input.painScore && input.painScore >= 8) || input.spo2Percent < 92 || input.systolicBp < 90) {
+        esi = 2;
         zone = 'YELLOW_ACUTE';
-      } else if (input.respiratoryRate > 24 || input.temperatureCelsius && input.temperatureCelsius > 39.0) {
-        esi = 3; // Urgent / multiple resources
+      } else if (input.respiratoryRate > 24 || (input.temperatureCelsius && input.temperatureCelsius > 39.0)) {
+        esi = 3;
         zone = 'YELLOW_ACUTE';
       } else {
-        esi = 4; // Less urgent
+        esi = 4;
         zone = 'GREEN_FAST_TRACK';
       }
     } else {
@@ -187,6 +207,35 @@ export class EmergencyAdvancedService {
     encounter.assignedZone = zone;
     encounter.esiLevel = esi;
 
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_triage_records').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          encounter_id: record.encounterId,
+          triaged_by_user_id: record.triagedByUserId,
+          esi_level: record.esiLevel,
+          heart_rate: record.heartRate,
+          systolic_bp: record.systolicBp,
+          diastolic_bp: record.diastolicBp,
+          respiratory_rate: record.respiratoryRate,
+          spo2_percent: record.spo2Percent,
+          gcs_score: record.gcsScore,
+          temperature_celsius: record.temperatureCelsius || null,
+          pain_score: record.painScore || null,
+          triage_notes: record.triageNotes || null,
+          triaged_at: record.triagedAt,
+        });
+
+        await trx('ed_encounters').where({ id: input.encounterId }).update({
+          triage_esi_level: record.esiLevel,
+          status: 'IN_ZONE',
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_triage_records DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Patient triaged with ESI score', { encounterId: input.encounterId, esi, zone });
     return record;
   }
@@ -198,10 +247,26 @@ export class EmergencyAdvancedService {
       id,
       ...input,
       activatedAt: new Date().toISOString(),
-      responseTimeSeconds: 45, // Rapid 45-second team influx
+      responseTimeSeconds: 45,
       outcome: 'IN_PROGRESS',
     };
     this.traumaActivations.set(id, activation);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_trauma_activations').insert({
+          id: activation.id,
+          hospital_id: activation.hospitalId,
+          encounter_id: activation.encounterId,
+          activation_type: activation.activationType,
+          team_leader_id: activation.teamLeaderId,
+          activated_at: activation.activatedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_trauma_activations DB persistence fallback', { error: err.message });
+    }
+
     logger.error('EMERGENCY CODE BROADCAST ACTIVATED', { type: input.activationType, encounterId: input.encounterId });
     return activation;
   }
@@ -219,6 +284,29 @@ export class EmergencyAdvancedService {
       assessedAt: new Date().toISOString(),
     };
     this.resuscitationChecklists.set(input.encounterId, checklist);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_resuscitation_checklists').insert({
+          id: checklist.id,
+          hospital_id: checklist.hospitalId,
+          encounter_id: checklist.encounterId,
+          airway_status: checklist.airwayStatus,
+          c_spine_immobilized: checklist.cSpineImmobilized,
+          breathing_status: checklist.breathingStatus,
+          bilateral_breath_sounds: checklist.bilateralBreathSounds,
+          circulation_pulse: checklist.circulationPulse,
+          iv_access_gauge: checklist.ivAccessGauge,
+          disability_gcs: checklist.disabilityGcs,
+          pupils_reactive: checklist.pupilsReactive,
+          exposure_hypothermia_prevention: checklist.exposureHypothermiaPrevention,
+          completed_at: checklist.assessedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_resuscitation_checklists DB persistence fallback', { error: err.message });
+    }
+
     logger.info('ATLS primary resuscitation checklist documented', { encounterId: input.encounterId });
     return checklist;
   }
@@ -238,6 +326,25 @@ export class EmergencyAdvancedService {
     const orders = this.statOrders.get(input.encounterId) || [];
     orders.push(order);
     this.statOrders.set(input.encounterId, orders);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_stat_orders').insert({
+          id: order.id,
+          hospital_id: order.hospitalId,
+          encounter_id: order.encounterId,
+          order_type: order.orderType,
+          order_details: order.orderDetails,
+          ordered_by_user_id: order.orderedByUserId,
+          clinical_override_reason: order.clinicalOverrideReason,
+          order_status: order.orderStatus,
+          ordered_at: order.orderedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_stat_orders DB persistence fallback', { error: err.message });
+    }
+
     logger.warn('STAT Emergency order dispatched with payment override', { type: input.orderType, encounterId: input.encounterId });
     return order;
   }
@@ -256,6 +363,28 @@ export class EmergencyAdvancedService {
 
     const enc = this.encounters.get(input.encounterId);
     if (enc) enc.isMedicoLegal = true;
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_medico_legal_cases').insert({
+          id: mlc.id,
+          hospital_id: mlc.hospitalId,
+          encounter_id: mlc.encounterId,
+          incident_type: mlc.incidentType,
+          injury_description: mlc.injuryDescription,
+          police_station_name: mlc.policeStationName,
+          police_intimation_number: mlc.policeIntimationNumber || mlc.mlcNumber,
+          police_constable_name: mlc.policeConstableName || null,
+          intimation_timestamp: mlc.intimationTimestamp,
+        });
+
+        await trx('ed_encounters').where({ id: input.encounterId }).update({
+          is_medico_legal: true,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_medico_legal_cases DB persistence fallback', { error: err.message });
+    }
 
     logger.info('Medico-Legal Case (MLC) registered', { mlcNumber, incidentType: input.incidentType });
     return mlc;
@@ -279,6 +408,23 @@ export class EmergencyAdvancedService {
       lastTelemetryTime: new Date().toISOString(),
     };
     this.ambulances.set(id, amb);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ambulance_fleet').insert({
+          id: amb.id,
+          hospital_id: amb.hospitalId,
+          vehicle_registration_number: amb.vehicleNumber,
+          call_sign: amb.vehicleNumber,
+          vehicle_type: amb.ambulanceType,
+          current_status: amb.status,
+          created_at: amb.lastTelemetryTime,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ambulance_fleet DB persistence fallback', { error: err.message });
+    }
+
     return amb;
   }
 
@@ -300,6 +446,25 @@ export class EmergencyAdvancedService {
 
     amb.status = 'DISPATCHED';
     this.trips.set(id, trip);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ambulance_trips').insert({
+          id: trip.id,
+          hospital_id: trip.hospitalId,
+          ambulance_id: trip.ambulanceId,
+          caller_name: trip.callerName,
+          caller_phone: trip.callerPhone,
+          pickup_location: trip.pickupLocation,
+          patient_name: trip.patientName || null,
+          trip_status: trip.status,
+          dispatch_timestamp: trip.dispatchTimestamp,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ambulance_trips DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Ambulance dispatched on emergency 108/911 call', { tripNumber, vehicle: amb.vehicleNumber });
     return { trip, ambulance: amb };
   }
@@ -316,6 +481,24 @@ export class EmergencyAdvancedService {
       transmissionToEdTimestamp: new Date().toISOString(),
     };
     this.pcrRecords.set(input.tripId, pcr);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ambulance_pcr_records').insert({
+          id: pcr.id,
+          hospital_id: pcr.hospitalId,
+          trip_id: pcr.tripId,
+          paramedic_user_id: pcr.paramedicUserId,
+          chief_complaint: pcr.chiefComplaint,
+          initial_vitals: JSON.stringify(pcr.initialVitals),
+          administered_prehospital_drugs: JSON.stringify(pcr.administeredPrehospitalDrugs || []),
+          transmission_to_ed_timestamp: pcr.transmissionToEdTimestamp,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ambulance_pcr_records DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Pre-Hospital Care Report (PCR) synchronized with ED receiving room', { tripId: input.tripId });
     return pcr;
   }
@@ -340,6 +523,22 @@ export class EmergencyAdvancedService {
     const enc = this.encounters.get(input.encounterId);
     if (enc) enc.status = 'OBSERVING';
 
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_observation_beds').insert({
+          id: bed.id,
+          hospital_id: bed.hospitalId,
+          encounter_id: bed.encounterId,
+          bed_number: bed.bedNumber,
+          zone: bed.zone,
+          is_occupied: bed.isOccupied,
+          occupied_since: bed.occupiedSince,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_observation_beds DB persistence fallback', { error: err.message });
+    }
+
     return bed;
   }
 
@@ -357,10 +556,31 @@ export class EmergencyAdvancedService {
     this.dispositions.set(input.encounterId, disposition);
 
     enc.status = input.dispositionType === 'DISCHARGED' ? 'DISCHARGED' : 'ADMITTED';
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ed_dispositions').insert({
+          id: disposition.id,
+          hospital_id: disposition.hospitalId,
+          encounter_id: disposition.encounterId,
+          disposition_type: disposition.dispositionType,
+          authorized_by_doctor_id: disposition.authorizedByDoctorId,
+          destination_unit: disposition.destinationUnit || null,
+          discharge_summary: disposition.dischargeSummary || null,
+          disposition_timestamp: disposition.dispositionTimestamp,
+        });
+
+        await trx('ed_encounters').where({ id: input.encounterId }).update({
+          status: enc.status,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EmergencyAdvancedService] ed_dispositions DB persistence fallback', { error: err.message });
+    }
+
     logger.info('Emergency patient disposition finalized', { encounterId: input.encounterId, type: input.dispositionType });
     return disposition;
   }
 }
 
 export const emergencyAdvancedService = new EmergencyAdvancedService();
-

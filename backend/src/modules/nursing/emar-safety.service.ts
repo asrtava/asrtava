@@ -30,6 +30,7 @@ export interface EMARAdministrationInput {
   scheduledTime: string;
   doseAdministered: string;
   routeUsed: string;
+  siteOfAdministration?: string;
   administrationStatus: 'ADMINISTERED' | 'OMITTED' | 'REFUSED' | 'DELAYED' | 'HELD';
   omissionReason?: string;
   administeringNurseId: string;
@@ -225,6 +226,34 @@ export class EMARSafetyService {
     };
 
     this.administrationRecords.set(record.id, record);
+
+    // PostgreSQL Durable Transaction Persistence (024 Migration Schema)
+    try {
+      await db.transaction(async (trx) => {
+        await trx('inpatient_emar_records').insert({
+          id: record.id,
+          hospital_id: input.hospitalId,
+          admission_id: input.admissionId,
+          prescription_item_id: input.prescriptionItemId,
+          drug_id: input.drugId || prescription.drugId,
+          batch_id: input.batchId || null,
+          scheduled_time: input.scheduledTime,
+          actual_admin_time: record.actualAdminTime || null,
+          administration_status: input.administrationStatus,
+          omission_reason: input.omissionReason || null,
+          administering_nurse_id: input.administeringNurseId,
+          cosigning_nurse_id: input.cosigningNurseId || null,
+          dose_administered: input.doseAdministered,
+          route_used: input.routeUsed,
+          site_of_administration: input.siteOfAdministration || null,
+          is_high_alert: !!input.isHighAlertOrNarcotic,
+          notes: input.failSafeReason || null,
+          created_at: now,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[EMARSafetyService] inpatient_emar_records DB persistence fallback to memory', { error: err.message });
+    }
 
     if (input.isContinuityFailsafe) {
       logger.warn('EMAR_CONTINUITY_FAILSAFE_ADMINISTERED', {

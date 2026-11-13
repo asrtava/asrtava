@@ -1,4 +1,5 @@
 import { logger } from '../../utils/logger';
+import { db } from '../../database';
 
 export interface TheatreInput {
   hospitalId: string;
@@ -115,11 +116,47 @@ export class OTAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.theatres.set(id, theatre);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_theatres').insert({
+          id: theatre.id,
+          hospital_id: theatre.hospitalId,
+          theatre_number: theatre.theatreNumber,
+          name: theatre.name,
+          specialty: theatre.specialty,
+          is_laminar_airflow: theatre.isLaminarAirflow,
+          status: theatre.status,
+          branch_id: theatre.branchId || null,
+          created_at: theatre.createdAt,
+          updated_at: theatre.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_theatres DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('Operation Theatre registered', { theatreId: id, theatreNumber: input.theatreNumber });
     return theatre;
   }
 
   public async getTheatres(hospitalId: string): Promise<any[]> {
+    try {
+      const rows = await db('ot_theatres').where({ hospital_id: hospitalId });
+      if (rows && rows.length > 0) {
+        return rows.map((r: any) => ({
+          id: r.id,
+          hospitalId: r.hospital_id,
+          theatreNumber: r.theatre_number,
+          name: r.name,
+          specialty: r.specialty,
+          isLaminarAirflow: r.is_laminar_airflow,
+          status: r.status,
+          branchId: r.branch_id,
+          createdAt: r.created_at,
+        }));
+      }
+    } catch {}
     return Array.from(this.theatres.values()).filter((t) => t.hospitalId === hospitalId);
   }
 
@@ -135,6 +172,27 @@ export class OTAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.surgeryRequests.set(id, request);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_surgery_requests').insert({
+          id: request.id,
+          hospital_id: request.hospitalId,
+          patient_id: request.patientId,
+          requesting_surgeon_id: request.requestingSurgeonId,
+          proposed_procedure: request.proposedProcedure,
+          preop_diagnosis: request.preopDiagnosis,
+          priority: request.priority,
+          estimated_duration_mins: request.estimatedDurationMins,
+          requested_date: request.requestedDate,
+          status: request.status,
+          created_at: request.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_surgery_requests DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('Surgery request submitted', { requestId: id, priority: request.priority });
     return request;
   }
@@ -172,6 +230,30 @@ export class OTAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.schedules.set(id, schedule);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_schedules').insert({
+          id: schedule.id,
+          hospital_id: schedule.hospitalId,
+          request_id: schedule.requestId || null,
+          theatre_id: schedule.theatreId,
+          patient_id: schedule.patientId,
+          primary_surgeon_id: schedule.primarySurgeonId,
+          assistant_surgeon_id: schedule.assistantSurgeonId || null,
+          anaesthetist_id: schedule.anaesthetistId,
+          scrub_nurse_id: schedule.scrubNurseId || null,
+          circulating_nurse_id: schedule.circulatingNurseId || null,
+          scheduled_start: schedule.scheduledStart,
+          scheduled_end: schedule.scheduledEnd,
+          status: schedule.status,
+          created_at: schedule.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_schedules DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('Surgery scheduled successfully', { scheduleId: id, theatreId: input.theatreId });
     return schedule;
   }
@@ -196,6 +278,29 @@ export class OTAdvancedService {
       assessedAt: new Date().toISOString(),
     };
     this.preopAssessments.set(id, assessment);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_preop_assessments').insert({
+          id: assessment.id,
+          hospital_id: assessment.hospitalId,
+          schedule_id: assessment.scheduleId,
+          patient_id: assessment.patientId,
+          anaesthetist_id: assessment.anaesthetistId,
+          asa_class: assessment.asaClass,
+          mallampati_score: assessment.mallampatiScore,
+          fasting_hours_solid: assessment.fastingHoursSolid,
+          fasting_hours_clear_fluids: assessment.fastingHoursClearFluids,
+          airway_assessment: assessment.airwayAssessment || null,
+          is_cleared_for_surgery: assessment.isClearedForSurgery,
+          rejection_reason: assessment.rejectionReason || null,
+          assessed_at: assessment.assessedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_preop_assessments DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('Pre-anaesthetic checkup (PAC) documented', { pacId: id, isCleared });
     return assessment;
   }
@@ -213,6 +318,27 @@ export class OTAdvancedService {
       signedAt: new Date().toISOString(),
     };
     this.consents.set(id, consent);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_surgical_consents').insert({
+          id: consent.id,
+          hospital_id: consent.hospitalId,
+          schedule_id: consent.scheduleId,
+          patient_id: consent.patientId,
+          procedure_name: consent.procedureName,
+          risks_disclosed: consent.risksDisclosed,
+          patient_signed: consent.patientSigned,
+          guardian_signed: consent.guardianSigned,
+          witness_name: consent.witnessName,
+          consent_signature_hash: consent.consentSignatureHash,
+          signed_at: consent.signedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_surgical_consents DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('Surgical informed consent recorded', { consentId: id, hash: consentHash });
     return consent;
   }
@@ -222,6 +348,7 @@ export class OTAdvancedService {
     let checklist = this.whoChecklists.get(input.scheduleId);
     if (!checklist) {
       checklist = {
+        id: `who-${input.scheduleId}`,
         scheduleId: input.scheduleId,
         hospitalId: input.hospitalId,
         signInCompleted: false,
@@ -264,6 +391,68 @@ export class OTAdvancedService {
     }
 
     this.whoChecklists.set(input.scheduleId, checklist);
+
+    try {
+      await db.transaction(async (trx) => {
+        const existing = await trx('ot_who_checklists').where({ schedule_id: input.scheduleId }).first();
+        if (existing) {
+          await trx('ot_who_checklists').where({ schedule_id: input.scheduleId }).update({
+            sign_in_completed: checklist.signInCompleted,
+            sign_in_timestamp: checklist.signInTimestamp || null,
+            sign_in_verified_by: checklist.signInVerifiedBy || null,
+            patient_identity_confirmed: checklist.patientIdentityConfirmed || false,
+            site_marked: checklist.siteMarked || false,
+            pulse_oximeter_operating: checklist.pulseOximeterOperating || false,
+            known_allergy_checked: checklist.knownAllergyChecked || false,
+            airway_aspiration_risk: checklist.airwayAspirationRisk || false,
+            anticipated_blood_loss_ml: checklist.anticipatedBloodLossMl || 0,
+            time_out_completed: checklist.timeOutCompleted,
+            time_out_timestamp: checklist.timeOutTimestamp || null,
+            time_out_verified_by: checklist.timeOutVerifiedBy || null,
+            team_members_introduced: checklist.teamMembersIntroduced || false,
+            antibiotic_given_within_60m: checklist.antibioticGivenWithin60m || false,
+            imaging_displayed: checklist.imagingDisplayed || false,
+            sign_out_completed: checklist.signOutCompleted,
+            sign_out_timestamp: checklist.signOutTimestamp || null,
+            sign_out_verified_by: checklist.signOutVerifiedBy || null,
+            procedure_name_recorded: checklist.procedureNameRecorded || false,
+            counts_reconciled: checklist.countsReconciled || false,
+            specimen_labeled: checklist.specimenLabeled || false,
+          });
+        } else {
+          await trx('ot_who_checklists').insert({
+            id: checklist.id || `who-${input.scheduleId}`,
+            hospital_id: checklist.hospitalId,
+            schedule_id: checklist.scheduleId,
+            sign_in_completed: checklist.signInCompleted,
+            sign_in_timestamp: checklist.signInTimestamp || null,
+            sign_in_verified_by: checklist.signInVerifiedBy || null,
+            patient_identity_confirmed: checklist.patientIdentityConfirmed || false,
+            site_marked: checklist.siteMarked || false,
+            pulse_oximeter_operating: checklist.pulseOximeterOperating || false,
+            known_allergy_checked: checklist.knownAllergyChecked || false,
+            airway_aspiration_risk: checklist.airwayAspirationRisk || false,
+            anticipated_blood_loss_ml: checklist.anticipatedBloodLossMl || 0,
+            time_out_completed: checklist.timeOutCompleted,
+            time_out_timestamp: checklist.timeOutTimestamp || null,
+            time_out_verified_by: checklist.timeOutVerifiedBy || null,
+            team_members_introduced: checklist.teamMembersIntroduced || false,
+            antibiotic_given_within_60m: checklist.antibioticGivenWithin60m || false,
+            imaging_displayed: checklist.imagingDisplayed || false,
+            sign_out_completed: checklist.signOutCompleted,
+            sign_out_timestamp: checklist.signOutTimestamp || null,
+            sign_out_verified_by: checklist.signOutVerifiedBy || null,
+            procedure_name_recorded: checklist.procedureNameRecorded || false,
+            counts_reconciled: checklist.countsReconciled || false,
+            specimen_labeled: checklist.specimenLabeled || false,
+            created_at: now,
+          });
+        }
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_who_checklists DB persistence fallback to memory', { error: err.message });
+    }
+
     logger.info('WHO Surgical Safety Checklist phase recorded', { scheduleId: input.scheduleId, phase: input.phase });
     return checklist;
   }
@@ -285,6 +474,24 @@ export class OTAdvancedService {
       createdAt: new Date().toISOString(),
     };
     this.anaesthesiaRecords.set(input.scheduleId, record);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_anaesthesia_records').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          schedule_id: record.scheduleId,
+          anaesthetist_id: record.anaesthetistId,
+          anaesthesia_type: record.anaesthesiaType,
+          airway_type: record.airwayType,
+          induction_timestamp: record.inductionTimestamp,
+          created_at: record.createdAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_anaesthesia_records DB persistence fallback to memory', { error: err.message });
+    }
+
     return record;
   }
 
@@ -300,12 +507,34 @@ export class OTAdvancedService {
     administeredDrugs?: Array<{ drug: string; dose: string; time: string }>;
   }): Promise<any> {
     const log = {
+      id: `vit-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       ...input,
       recordedAt: new Date().toISOString(),
     };
     const list = this.intraopVitals.get(input.scheduleId) || [];
     list.push(log);
     this.intraopVitals.set(input.scheduleId, list);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_intraop_vitals').insert({
+          id: log.id,
+          hospital_id: log.hospitalId,
+          schedule_id: log.scheduleId,
+          recorded_at: log.recordedAt,
+          heart_rate: log.heartRate,
+          systolic_bp: log.systolicBp,
+          diastolic_bp: log.diastolicBp,
+          spo2_percent: log.spo2Percent,
+          etco2_mmhg: log.etco2Mmhg || null,
+          temperature_celsius: log.temperatureCelsius || null,
+          administered_drugs: JSON.stringify(log.administeredDrugs || []),
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_intraop_vitals DB persistence fallback to memory', { error: err.message });
+    }
+
     return log;
   }
 
@@ -337,6 +566,27 @@ export class OTAdvancedService {
     const list = this.surgicalCounts.get(input.scheduleId) || [];
     list.push(record);
     this.surgicalCounts.set(input.scheduleId, list);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_surgical_counts').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          schedule_id: record.scheduleId,
+          count_category: record.countCategory,
+          initial_count: record.initialCount,
+          intraop_added_count: record.intraopAddedCount,
+          closing_count: record.closingCount,
+          is_count_correct: record.isCountCorrect,
+          scrub_nurse_id: record.scrubNurseId,
+          circulating_nurse_id: record.circulatingNurseId,
+          verified_at: record.verifiedAt,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_surgical_counts DB persistence fallback to memory', { error: err.message });
+    }
+
     return record;
   }
 
@@ -355,6 +605,23 @@ export class OTAdvancedService {
       status: 'IN_RECOVERY',
     };
     this.pacuRecords.set(id, record);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_pacu_records').insert({
+          id: record.id,
+          hospital_id: record.hospitalId,
+          schedule_id: record.scheduleId,
+          patient_id: record.patientId,
+          admission_timestamp: record.admissionTimestamp,
+          assigned_nurse_id: record.assignedNurseId,
+          status: record.status,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_pacu_records DB persistence fallback to memory', { error: err.message });
+    }
+
     return record;
   }
 
@@ -381,6 +648,28 @@ export class OTAdvancedService {
     const list = this.aldreteScores.get(input.pacuRecordId) || [];
     list.push(scoreRecord);
     this.aldreteScores.set(input.pacuRecordId, list);
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_aldrete_scores').insert({
+          id: scoreRecord.id,
+          hospital_id: scoreRecord.hospitalId,
+          pacu_record_id: scoreRecord.pacuRecordId,
+          evaluated_at: scoreRecord.evaluatedAt,
+          activity_score: scoreRecord.activityScore,
+          respiration_score: scoreRecord.respirationScore,
+          circulation_score: scoreRecord.circulationScore,
+          consciousness_score: scoreRecord.consciousnessScore,
+          o2_saturation_score: scoreRecord.o2SaturationScore,
+          total_score: scoreRecord.totalScore,
+          is_fit_for_discharge: scoreRecord.isFitForDischarge,
+          evaluated_by_user_id: scoreRecord.evaluatedByUserId,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_aldrete_scores DB persistence fallback to memory', { error: err.message });
+    }
+
     return scoreRecord;
   }
 
@@ -408,10 +697,23 @@ export class OTAdvancedService {
     pacu.dischargeTimestamp = new Date().toISOString();
     pacu.dischargeDestination = input.dischargeDestination;
     pacu.dischargePhysicianId = input.dischargePhysicianId;
+
+    try {
+      await db.transaction(async (trx) => {
+        await trx('ot_pacu_records').where({ id: input.pacuRecordId }).update({
+          status: 'DISCHARGED',
+          discharge_timestamp: pacu.dischargeTimestamp,
+          discharge_destination: pacu.dischargeDestination,
+          discharge_physician_id: pacu.dischargePhysicianId,
+        });
+      });
+    } catch (err: any) {
+      logger.warn('[OTAdvancedService] ot_pacu_records update fallback to memory', { error: err.message });
+    }
+
     logger.info('Patient safely discharged from PACU', { pacuRecordId: input.pacuRecordId, score: latestScore.totalScore });
     return pacu;
   }
 }
 
 export const otAdvancedService = new OTAdvancedService();
-

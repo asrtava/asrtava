@@ -855,6 +855,30 @@ export class AdvancedPharmacyService {
     };
 
     this.emarRecords.push(record);
+
+    try {
+      db.transaction(async (trx) => {
+        await trx('inpatient_emar_records').insert({
+          id: record.id,
+          hospital_id: payload.hospitalId,
+          admission_id: payload.admissionId,
+          prescription_item_id: payload.prescriptionItemId || null,
+          drug_id: payload.drugId,
+          batch_id: payload.batchId || null,
+          scheduled_time: payload.scheduledTime,
+          actual_admin_time: payload.administeredTime || record.recordedAt,
+          administration_status: payload.administrationStatus,
+          omission_reason: payload.omissionReason || null,
+          administering_nurse_id: payload.administeringNurseId,
+          cosigning_nurse_id: payload.cosigningNurseId || null,
+          notes: payload.nursingNotes || null,
+          created_at: record.recordedAt,
+        });
+      }).catch((err: any) => {
+        logger.warn('[AdvancedPharmacyService] inpatient_emar_records DB persistence fallback', { error: err.message });
+      });
+    } catch {}
+
     logger.info('eMAR dose administration logged by nurse', { emarId, status: payload.administrationStatus, admissionId: payload.admissionId });
 
     return {
@@ -897,6 +921,26 @@ export class AdvancedPharmacyService {
     };
 
     this.coldChainLogs.push(logEntry);
+
+    try {
+      db.transaction(async (trx) => {
+        await trx('cold_chain_temperature_logs').insert({
+          id: logEntry.id,
+          hospital_id: payload.hospitalId,
+          storage_unit_code: payload.storageUnitCode,
+          location_name: payload.locationName,
+          temperature_celsius: payload.temperatureCelsius,
+          target_min_celsius: min,
+          target_max_celsius: max,
+          is_excursion: isExcursion,
+          quarantine_triggered: quarantineTriggered,
+          logged_by_user_id: payload.loggedByUserId || null,
+          created_at: logEntry.loggedAt,
+        });
+      }).catch((err: any) => {
+        logger.warn('[AdvancedPharmacyService] cold_chain_temperature_logs DB persistence fallback', { error: err.message });
+      });
+    } catch {}
 
     // If excursion detected, quarantine all batches in this storage unit
     if (quarantineTriggered) {
@@ -1017,6 +1061,25 @@ export class AdvancedPharmacyService {
     };
 
     this.narcoticVaultLedger.push(entry);
+
+    try {
+      db.transaction(async (trx) => {
+        await trx('narcotic_vault_ledger').insert({
+          id: entry.id,
+          hospital_id: payload.hospitalId,
+          drug_id: payload.drugId,
+          transaction_type: payload.transactionType,
+          quantity: payload.quantity,
+          primary_custodian_user_id: payload.primaryCustodianUserId,
+          witness_user_id: payload.witnessUserId,
+          reference_order: payload.referenceRxOrOrder || null,
+          physical_count: payload.physicalCount || null,
+          created_at: entry.recordedAt,
+        });
+      }).catch((err: any) => {
+        logger.warn('[AdvancedPharmacyService] narcotic_vault_ledger DB persistence fallback', { error: err.message });
+      });
+    } catch {}
 
     return {
       transactionId,

@@ -45,6 +45,7 @@ import { AdminSettingsSection } from './AdminSettingsSection';
 import { AdminAuditLogsSection } from './AdminAuditLogsSection';
 import { HospitalOnboardingProgressView } from './HospitalOnboardingProgressView';
 import { InteroperabilityManagementHub } from './InteroperabilityManagementHub';
+import { ClinicalConflictQueueView } from './ClinicalConflictQueueView';
 import { AdvancedQualityHub } from '../quality/AdvancedQualityHub';
 import { EnterpriseAnalyticsHub } from '../analytics/EnterpriseAnalyticsHub';
 
@@ -617,6 +618,7 @@ export const HospitalAdminDashboard: React.FC = () => {
           {[
             { id: 'onboarding', label: '🚀 Onboarding & Go-Live Readiness (14 Gates)' },
             { id: 'quality-accreditation', label: '🛡️ Quality & Accreditation (NABH / CAPA)' },
+            { id: 'conflict-queue', label: '⚖️ Clinical Conflicts (P0-05)' },
             { id: 'subscription', label: 'Subscription & Invoices' },
             { id: 'usage', label: 'Quota & Metering' },
             { id: 'jit-security', label: `JIT Access (${jitRequests.filter(r => r.status === 'Pending Approval').length} Pending)` },
@@ -644,6 +646,9 @@ export const HospitalAdminDashboard: React.FC = () => {
 
       {/* Quality & Accreditation Section */}
       {activeTab === 'quality-accreditation' && <AdvancedQualityHub />}
+
+      {/* Clinical Conflict Reconciliation Queue (P0-05) */}
+      {activeTab === 'conflict-queue' && <ClinicalConflictQueueView />}
 
       {/* 1. Overview Section */}
       {activeTab === 'overview' && (

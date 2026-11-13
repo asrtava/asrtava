@@ -266,7 +266,7 @@ test('ASRTAVA Multi-Deployment Architecture & Compatibility Suite', async (t) =>
   // --------------------------------------------------------------------------
   // TEST 8: Conflict Handling (Append-Only EMR & Deterministic LWW)
   // --------------------------------------------------------------------------
-  await t.test('8. Conflict Handling: Clinical records append amendments; admin records apply LWW', () => {
+  await t.test('8. Conflict Handling: Clinical records append amendments; admin records apply LWW', async () => {
     // A. Clinical record: Consultation amended at local edge
     HybridSyncService.enqueueOutbox({
       hospitalId: HOSP_HYBRID,
@@ -281,7 +281,7 @@ test('ASRTAVA Multi-Deployment Architecture & Compatibility Suite', async (t) =>
       }
     });
 
-    HybridSyncService.flushPendingSync();
+    await HybridSyncService.flushPendingSync();
 
     const cloudConsult = HybridSyncService.getCloudRecord(HOSP_HYBRID, 'consultation', 'enc-5001');
     assert.strictEqual(cloudConsult._version, 2);
@@ -299,7 +299,7 @@ test('ASRTAVA Multi-Deployment Architecture & Compatibility Suite', async (t) =>
       version: 3,
       payload: { bedNumber: 'ICU-04', status: 'CLEANING' }
     });
-    HybridSyncService.flushPendingSync();
+    await HybridSyncService.flushPendingSync();
 
     const cloudBed = HybridSyncService.getCloudRecord(HOSP_HYBRID, 'bed_allocation', 'bed-401');
     assert.strictEqual(cloudBed._version, 3);
@@ -369,13 +369,13 @@ test('ASRTAVA Multi-Deployment Architecture & Compatibility Suite', async (t) =>
   // --------------------------------------------------------------------------
   // TEST 12: Idempotent Sync Ingestion (Duplicate Transmission Defense)
   // --------------------------------------------------------------------------
-  await t.test('12. Idempotency Defense: Replaying identical sync payload is safely ignored', () => {
+  await t.test('12. Idempotency Defense: Replaying identical sync payload is safely ignored', async () => {
     const queue = HybridSyncService.getOutboxQueue(HOSP_HYBRID);
     const firstSyncedItem = queue[0];
     assert.ok(firstSyncedItem);
 
     // Replay on cloud
-    const replayResult = HybridSyncService.ingestOnCloud(firstSyncedItem);
+    const replayResult = await HybridSyncService.ingestOnCloud(firstSyncedItem);
     assert.strictEqual(replayResult.success, true);
     assert.strictEqual(replayResult.isDuplicate, true, 'Replay must be flagged as duplicate without error');
   });

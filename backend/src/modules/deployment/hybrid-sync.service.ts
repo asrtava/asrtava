@@ -1,11 +1,13 @@
 import crypto from 'crypto';
 import { logger } from '../../utils/logger';
 import { deploymentConfig } from '../../config/deployment.config';
+import { ClinicalConflictQueueService } from './conflict-queue.service';
 
 // ============================================================================
 // ASRTAVA HYBRID DEPLOYMENT DATA SYNCHRONIZATION ENGINE
 // Implements Edge-to-Cloud Sync, Outbox Pattern, Offline Resilience,
-// Deterministic Conflict Resolution (LWW + Append-Only EMR), and DPDP PII Masking
+// P0-05 Manual Clinical Conflict Reconciliation Queue (Replaces naive LWW for clinical data),
+// and DPDP PII Masking
 // ============================================================================
 
 export type SyncEntityType =
@@ -15,6 +17,9 @@ export type SyncEntityType =
   | 'prescription_dispense'
   | 'billing_invoice'
   | 'emergency_triage'
+  | 'emar'
+  | 'surgical_record'
+  | 'vital_signs'
   | 'audit_log';
 
 export interface SyncOutboxEntry {
@@ -44,6 +49,7 @@ export class HybridSyncService {
     this.cloudReplicatedStore.clear();
     this.processedIdempotencyKeys.clear();
     this.isNetworkOnline = true;
+    ClinicalConflictQueueService.clearState();
   }
 
   public static setNetworkStatus(online: boolean): void {
@@ -113,6 +119,7 @@ export class HybridSyncService {
     processed: number;
     synced: number;
     failed: number;
+    conflictsQueued: number;
     offlineBlocked: boolean;
   }> {
     if (!this.isNetworkOnline) {
@@ -120,6 +127,7 @@ export class HybridSyncService {
         processed: 0,
         synced: 0,
         failed: 0,
+        conflictsQueued: 0,
         offlineBlocked: true
       };
     }
@@ -127,14 +135,20 @@ export class HybridSyncService {
     const pending = this.outboxQueue.filter((e) => e.status === 'pending' || e.status === 'failed');
     let synced = 0;
     let failed = 0;
+    let conflictsQueued = 0;
 
     for (const item of pending) {
       try {
-        const result = this.ingestOnCloud(item);
+        const result = await this.ingestOnCloud(item);
         if (result.success) {
-          item.status = 'synced';
-          item.syncedAt = new Date().toISOString();
-          synced++;
+          if (result.conflictQueued) {
+            item.status = 'conflict_resolved';
+            conflictsQueued++;
+          } else {
+            item.status = 'synced';
+            item.syncedAt = new Date().toISOString();
+            synced++;
+          }
         } else {
           item.status = 'failed';
           item.retryCount++;
@@ -153,21 +167,29 @@ export class HybridSyncService {
       processed: pending.length,
       synced,
       failed,
+      conflictsQueued,
       offlineBlocked: false
     };
   }
 
   // --------------------------------------------------------------------------
-  // 3. CLOUD INGESTION & CONFLICT RESOLUTION
+  // 3. CLOUD INGESTION & CONFLICT RESOLUTION (P0-05)
   // --------------------------------------------------------------------------
 
   /**
-   * Ingests a synced record on Cloud with Conflict Resolution:
+   * Ingests a synced record on Cloud:
    * 1. Idempotency Guard (ignores duplicate transmissions)
-   * 2. Append-Only Rule for Clinical EMR records (never overwrites clinical history)
-   * 3. Deterministic Last-Write-Wins (LWW) with version vectors for administrative entities
+   * 2. P0-05: Manual Clinical Conflict Reconciliation Queue for conflicting clinical mutations.
+   *    Strictly replaces naive LWW for clinical data (consultations, patient records, eMAR, triage).
+   * 3. Deterministic Last-Write-Wins (LWW) with version vectors ONLY for administrative/billing entities.
    */
-  public static ingestOnCloud(item: SyncOutboxEntry): { success: boolean; error?: string; isDuplicate?: boolean } {
+  public static async ingestOnCloud(item: SyncOutboxEntry): Promise<{
+    success: boolean;
+    error?: string;
+    isDuplicate?: boolean;
+    conflictQueued?: boolean;
+    conflictId?: string;
+  }> {
     // 1. Idempotency Check
     if (this.processedIdempotencyKeys.has(item.idempotencyKey)) {
       return { success: true, isDuplicate: true };
@@ -176,7 +198,48 @@ export class HybridSyncService {
     const recordKey = `${item.hospitalId}:${item.entityType}:${item.entityId}`;
     const existing = this.cloudReplicatedStore.get(recordKey);
 
-    // 2. Conflict Handling for Clinical Encounters: Strictly Append-Only
+    const isClinicalEntity = [
+      'consultation',
+      'emergency_triage',
+      'patient',
+      'emar',
+      'surgical_record',
+      'vital_signs'
+    ].includes(item.entityType);
+
+    // 2. P0-05: CLINICAL CONFLICT RECONCILIATION GUARD
+    if (isClinicalEntity && existing && item.operation !== 'APPEND') {
+      // Check if there is a concurrent collision or version divergence
+      const hasDivergence =
+        existing._version !== item.version ||
+        JSON.stringify(existing) !== JSON.stringify(item.payload);
+
+      if (hasDivergence) {
+        // Clinical collision detected! DO NOT auto-overwrite with LWW.
+        logger.warn('[HybridSync] Concurrent clinical collision detected. Diverting to supervisor conflict queue.', {
+          recordKey,
+          incomingVersion: item.version,
+          existingVersion: existing._version
+        });
+
+        const conflictEntry = await ClinicalConflictQueueService.enqueueConflict({
+          hospitalId: item.hospitalId,
+          syncEntryId: item.id,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          localVersion: item.version,
+          cloudVersion: existing._version || 1,
+          localPayload: item.payload,
+          cloudPayload: existing,
+          conflictReason: `CONCURRENT_CLINICAL_MODIFICATION: Incoming version ${item.version} conflicts with existing cloud version ${existing._version || 1}. Automated overwrite strictly prohibited.`
+        });
+
+        this.processedIdempotencyKeys.add(item.idempotencyKey);
+        return { success: true, conflictQueued: true, conflictId: conflictEntry.id };
+      }
+    }
+
+    // 3. Append-only history for non-colliding clinical encounters
     if (item.entityType === 'consultation' || item.entityType === 'emergency_triage') {
       if (existing) {
         const history = existing._amendments || [existing];
@@ -201,7 +264,7 @@ export class HybridSyncService {
       return { success: true };
     }
 
-    // 3. Conflict Handling for Administrative / Operational Records: LWW by Version
+    // 4. Administrative / Operational Records: LWW by Version
     if (existing && existing._version >= item.version) {
       // Incoming version is older or duplicate; ignore without error
       this.processedIdempotencyKeys.add(item.idempotencyKey);
@@ -217,6 +280,23 @@ export class HybridSyncService {
 
     this.processedIdempotencyKeys.add(item.idempotencyKey);
     return { success: true };
+  }
+
+  /**
+   * Applies a supervisor-resolved conflict to the cloud store.
+   */
+  public static applyResolvedConflict(params: {
+    hospitalId: string;
+    entityType: SyncEntityType;
+    entityId: string;
+    resolvedPayload: Record<string, any>;
+  }): void {
+    const recordKey = `${params.hospitalId}:${params.entityType}:${params.entityId}`;
+    this.cloudReplicatedStore.set(recordKey, {
+      ...params.resolvedPayload,
+      _resolvedAt: new Date().toISOString()
+    });
+    logger.info('[HybridSync] Supervisor-resolved clinical payload applied to cloud store', { recordKey });
   }
 
   // --------------------------------------------------------------------------
@@ -258,4 +338,3 @@ export class HybridSyncService {
     return this.cloudReplicatedStore.get(`${hospitalId}:${entityType}:${entityId}`);
   }
 }
-
