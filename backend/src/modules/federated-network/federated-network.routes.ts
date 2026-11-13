@@ -1,12 +1,12 @@
 import { Router, Response } from 'express';
-import { AuthenticatedRequest, authenticateToken } from '../../middleware/auth.middleware';
+import { AuthenticatedRequest, authMiddleware } from '../../middleware/auth.middleware';
 import { requirePermission } from '../../middleware/permission.middleware';
 import { FederatedCoordinationService } from './federated-coordination.service';
 
 const router = Router();
 
 // Apply base authentication to all federated endpoints
-router.use(authenticateToken);
+router.use(authMiddleware);
 
 /**
  * GET /api/federated-network/participating-hospitals
