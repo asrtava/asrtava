@@ -55,29 +55,15 @@ export const HRDashboard: React.FC = () => {
     setActivePortalTab(tab);
   };
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Shift & Duty Roster State
-  const [rosters, setRosters] = useState([
-    { shift: 'Morning Shift (07:00 - 15:00)', lead: 'Dr. Rajesh Sharma', staffCount: 18, departments: 'OPD 1-4, ICU-A, Central Lab, Pharmacy Counter 1' },
-    { shift: 'Evening Shift (15:00 - 23:00)', lead: 'Dr. Ananya Roy', staffCount: 12, departments: 'Emergency Ward, ICU-A, Inpatient Pharmacy' },
-    { shift: 'Night Shift (23:00 - 07:00)', lead: 'Dr. Vikram Sethi (On-Call)', staffCount: 8, departments: 'Emergency Triage, ICU Night Coverage' }
-  ]);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [selectedStaffForShift, setSelectedStaffForShift] = useState<StaffMember | null>(null);
   const [newShiftValue, setNewShiftValue] = useState('Morning (08:00 - 16:00)');
 
-  const [staff, setStaff] = useState<StaffMember[]>([
-    { id: 'STF-001', name: 'Dr. Rajesh Sharma', role: 'Chief of Cardiology', dept: 'Cardiology', shift: 'Morning (08:00 - 16:00)', status: 'On Duty', licenseNo: 'MCI-1998-4412' },
-    { id: 'STF-002', name: 'Dr. Ananya Roy', role: 'Senior Consultant', dept: 'General Medicine', shift: 'Morning (08:00 - 16:00)', status: 'On Duty', licenseNo: 'MCI-2005-9921' },
-    { id: 'STF-003', name: 'Nurse Anjali Verma', role: 'Head Nurse', dept: 'ICU', shift: 'Night (20:00 - 08:00)', status: 'Off Duty', licenseNo: 'INC-2012-3312' },
-    { id: 'STF-004', name: 'Pharmacist Suresh Nair', role: 'Senior Pharmacist', dept: 'Pharmacy', shift: 'Evening (14:00 - 22:00)', status: 'On Duty', licenseNo: 'PCI-2010-8812' },
-    { id: 'STF-005', name: 'Rohan Mehra', role: 'Lead Receptionist', dept: 'Front Desk', shift: 'Morning (07:00 - 15:00)', status: 'On Duty', licenseNo: 'EMP-ADM-4410' },
-    { id: 'STF-006', name: 'Dr. Vikram Sethi', role: 'Senior Orthopedic Surgeon', dept: 'Orthopedics', shift: 'Morning (08:00 - 16:00)', status: 'On Duty', licenseNo: 'MCI-2002-1204' }
-  ]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
 
   // Sync with HospitalContext staff if available
   useEffect(() => {
-    if (hospitalStaff.length > 0) {
+    if (hospitalStaff && hospitalStaff.length > 0) {
       setStaff(
         hospitalStaff.map((s, idx) => ({
           id: s.id || `STF-00${idx + 1}`,
@@ -92,10 +78,24 @@ export const HRDashboard: React.FC = () => {
     }
   }, [hospitalStaff]);
 
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
-    { id: 'lr-1', staffName: 'Nurse Anjali Verma', dept: 'ICU', leaveType: 'Casual Leave', duration: '12 Nov - 14 Nov (3 Days)', reason: 'Family engagement out of state.', status: 'Pending' },
-    { id: 'lr-2', staffName: 'Dr. Ananya Roy', dept: 'General Medicine', leaveType: 'Medical Conference', duration: '20 Nov - 22 Nov (3 Days)', reason: 'Attending National Internal Medicine CME 2026.', status: 'Pending' }
-  ]);
+  // Dynamic Shift & Duty Roster calculation
+  const rosters = useMemo(() => {
+    const morningStaff = staff.filter(s => !s.shift || s.shift.toLowerCase().includes('morning') || s.shift.includes('08:00') || s.shift.includes('07:00'));
+    const eveningStaff = staff.filter(s => s.shift && (s.shift.toLowerCase().includes('evening') || s.shift.includes('14:00') || s.shift.includes('15:00')));
+    const nightStaff = staff.filter(s => s.shift && (s.shift.toLowerCase().includes('night') || s.shift.includes('20:00') || s.shift.includes('23:00')));
+
+    const morningLead = morningStaff.find(s => s.role.toLowerCase().includes('doctor') || s.role.toLowerCase().includes('chief'))?.name || (morningStaff[0]?.name || 'None Assigned');
+    const eveningLead = eveningStaff.find(s => s.role.toLowerCase().includes('doctor') || s.role.toLowerCase().includes('senior'))?.name || (eveningStaff[0]?.name || 'None Assigned');
+    const nightLead = nightStaff.find(s => s.role.toLowerCase().includes('doctor') || s.role.toLowerCase().includes('nurse'))?.name || (nightStaff[0]?.name || 'None Assigned');
+
+    return [
+      { shift: 'Morning Shift (07:00 - 15:00)', lead: morningLead, staffCount: morningStaff.length, departments: morningStaff.length > 0 ? 'OPD 1-4, Central Diagnostics, Pharmacy Counter 1' : 'No staff currently scheduled' },
+      { shift: 'Evening Shift (15:00 - 23:00)', lead: eveningLead, staffCount: eveningStaff.length, departments: eveningStaff.length > 0 ? 'Emergency Ward, Inpatient Pharmacy, Evening Clinics' : 'No staff currently scheduled' },
+      { shift: 'Night Shift (23:00 - 07:00)', lead: nightLead, staffCount: nightStaff.length, departments: nightStaff.length > 0 ? 'Emergency Triage, ICU Night Coverage' : 'No staff currently scheduled' }
+    ];
+  }, [staff]);
+
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
   // Onboard Modal State
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
@@ -240,7 +240,7 @@ export const HRDashboard: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-teal-600 font-medium">Medical Licenses Verified</span>
-          <div className="text-2xl font-bold text-teal-600 mt-1">100%</div>
+          <div className="text-2xl font-bold text-teal-600 mt-1">{staff.length > 0 ? '100%' : '0%'}</div>
           <span className="text-[11px] text-teal-600">MCI, INC, PCI verified</span>
         </div>
       </div>
@@ -317,39 +317,49 @@ export const HRDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {filteredStaff.map((emp) => (
-                <tr key={emp.id} className="hover:bg-slate-50/60 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-teal-800">{emp.id}</td>
-                  <td className="py-3 px-3 font-bold text-slate-900">{emp.name}</td>
-                  <td className="py-3 px-3 text-slate-800">{emp.role}</td>
-                  <td className="py-3 px-3">
-                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
-                      {emp.dept}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-600">{emp.shift}</td>
-                  <td className="py-3 px-3 font-mono text-[11px] text-slate-500">{emp.licenseNo}</td>
-                  <td className="py-3 px-3">
-                    <Badge variant={emp.status === 'On Duty' ? 'success' : 'neutral'} size="sm">
-                      {emp.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedStaffForShift(emp);
-                        setNewShiftValue(emp.shift);
-                        setIsShiftModalOpen(true);
-                      }}
-                    >
-                      <Clock className="w-3 h-3 mr-1 text-teal-700" />
-                      <span>Change Shift</span>
-                    </Button>
+              {filteredStaff.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-slate-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-40 text-teal-600" />
+                    <p className="font-semibold text-slate-700">No staff members found</p>
+                    <p className="text-xs text-slate-400 mt-1">Click &apos;Onboard Employee&apos; above to register doctors, nurses, and administrative personnel.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredStaff.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-slate-50/60 transition">
+                    <td className="py-3.5 px-4 font-mono font-bold text-teal-800">{emp.id}</td>
+                    <td className="py-3 px-3 font-bold text-slate-900">{emp.name}</td>
+                    <td className="py-3 px-3 text-slate-800">{emp.role}</td>
+                    <td className="py-3 px-3">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
+                        {emp.dept}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-600">{emp.shift}</td>
+                    <td className="py-3 px-3 font-mono text-[11px] text-slate-500">{emp.licenseNo}</td>
+                    <td className="py-3 px-3">
+                      <Badge variant={emp.status === 'On Duty' ? 'success' : 'neutral'} size="sm">
+                        {emp.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedStaffForShift(emp);
+                          setNewShiftValue(emp.shift);
+                          setIsShiftModalOpen(true);
+                        }}
+                      >
+                        <Clock className="w-3 h-3 mr-1 text-teal-700" />
+                        <span>Change Shift</span>
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -358,63 +368,73 @@ export const HRDashboard: React.FC = () => {
       {/* Leave Approvals Tab */}
       {activeTab === 'leaves' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {leaveRequests.map((req) => (
-              <div
-                key={req.id}
-                className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-slate-900 text-sm">{req.staffName}</span>
-                    <Badge
-                      variant={
-                        req.status === 'Approved'
-                          ? 'success'
-                          : req.status === 'Rejected'
-                          ? 'danger'
-                          : 'warning'
-                      }
-                      size="sm"
-                    >
-                      {req.status}
-                    </Badge>
+          {leaveRequests.length === 0 ? (
+            <div className="bg-white rounded-xl border border-slate-200 p-10 text-center shadow-sm">
+              <FileCheck className="w-10 h-10 mx-auto mb-2 text-teal-600 opacity-60" />
+              <h3 className="font-bold text-slate-800 text-sm">No Pending Leave Applications</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                All employee leave applications have been reviewed and approved. New leave requests will appear here for supervisor action.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {leaveRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-slate-900 text-sm">{req.staffName}</span>
+                      <Badge
+                        variant={
+                          req.status === 'Approved'
+                            ? 'success'
+                            : req.status === 'Rejected'
+                            ? 'danger'
+                            : 'warning'
+                        }
+                        size="sm"
+                      >
+                        {req.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Department: <span className="font-semibold text-slate-700">{req.dept}</span> · Type:{' '}
+                      <span className="font-semibold text-teal-700">{req.leaveType}</span>
+                    </div>
+                    <div className="mt-2 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-700">
+                      <div className="font-semibold text-[11px] text-slate-400 uppercase">Dates Requested</div>
+                      <div>{req.duration}</div>
+                      <div className="font-semibold text-[11px] text-slate-400 uppercase mt-2">Reason Stated</div>
+                      <div className="italic text-slate-600">{req.reason}</div>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    Department: <span className="font-semibold text-slate-700">{req.dept}</span> · Type:{' '}
-                    <span className="font-semibold text-teal-700">{req.leaveType}</span>
-                  </div>
-                  <div className="mt-2 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-700">
-                    <div className="font-semibold text-[11px] text-slate-400 uppercase">Dates Requested</div>
-                    <div>{req.duration}</div>
-                    <div className="font-semibold text-[11px] text-slate-400 uppercase mt-2">Reason Stated</div>
-                    <div className="italic text-slate-600">{req.reason}</div>
-                  </div>
-                </div>
 
-                {req.status === 'Pending' && (
-                  <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => handleRejectLeave(req.id, req.staffName)}
-                    >
-                      <X className="w-3.5 h-3.5 mr-1" />
-                      <span>Reject</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleApproveLeave(req.id, req.staffName)}
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" />
-                      <span>Approve Leave</span>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {req.status === 'Pending' && (
+                    <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleRejectLeave(req.id, req.staffName)}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1" />
+                        <span>Reject</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => handleApproveLeave(req.id, req.staffName)}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" />
+                        <span>Approve Leave</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

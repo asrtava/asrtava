@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Video,
   Mic,
@@ -27,9 +27,11 @@ import {
   Plus
 } from 'lucide-react';
 import { Badge, Button, Input, Modal, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 export const TelemedicineHub: React.FC = () => {
   const { showToast } = useToast();
+  const { staff = [] } = useHospital();
   const [activeTab, setActiveTab] = useState<
     'discovery' | 'waiting_room' | 'video_call' | 'doctor_emr' | 'rpm' | 'education'
   >('discovery');
@@ -38,58 +40,35 @@ export const TelemedicineHub: React.FC = () => {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
-  const [callDuration, setCallDuration] = useState(145); // seconds
+  const [callDuration, setCallDuration] = useState(0); // seconds
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'Dr. Rajesh Sharma', role: 'DOCTOR', time: '10:16 AM', text: 'Good morning Rahul, how are you feeling today?' },
-    { sender: 'Rahul Verma', role: 'PATIENT', time: '10:16 AM', text: 'Morning doctor, I have had mild chest tightness since yesterday.' }
-  ]);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
 
-  // Doctor Discovery State
+  // Doctor Discovery State - dynamically mapped from HospitalContext.staff
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingSlot, setBookingSlot] = useState('10:30 AM - 10:45 AM');
   const [bookingComplaint, setBookingComplaint] = useState('');
 
-  const doctors = [
-    {
-      id: 'doc-01',
-      name: 'Dr. Rajesh Sharma',
-      specialty: 'Cardiology',
-      qualification: 'MBBS, MD, DM (Cardiology) - AIIMS',
-      experience: '16 Years',
-      languages: ['English', 'Hindi'],
-      modes: ['VIDEO', 'AUDIO'],
-      fee: 800,
-      slots: ['10:30 AM - 10:45 AM', '11:00 AM - 11:15 AM', '02:30 PM - 02:45 PM'],
-      hospital: 'Apex Care Multi-Specialty Hospital'
-    },
-    {
-      id: 'doc-02',
-      name: 'Dr. Ananya Iyer',
-      specialty: 'Endocrinology',
-      qualification: 'MBBS, DNB (Endocrinology) - CMC Vellore',
-      experience: '12 Years',
-      languages: ['English', 'Tamil', 'Hindi'],
-      modes: ['VIDEO', 'AUDIO', 'CHAT'],
-      fee: 750,
-      slots: ['11:30 AM - 11:45 AM', '03:15 PM - 03:30 PM'],
-      hospital: 'Apex Care Multi-Specialty Hospital'
-    },
-    {
-      id: 'doc-03',
-      name: 'Dr. Vikramaditya Rathore',
-      specialty: 'Pulmonology',
-      qualification: 'MBBS, MD (Pulmonary Medicine)',
-      experience: '19 Years',
-      languages: ['English', 'Hindi'],
-      modes: ['VIDEO'],
-      fee: 900,
-      slots: ['12:00 PM - 12:15 PM', '04:00 PM - 04:15 PM'],
-      hospital: 'Apex Care Multi-Specialty Hospital'
+  const doctors = useMemo(() => {
+    const docStaff = staff.filter(s => s.role?.toLowerCase().includes('doc') || (s as any).designation?.toLowerCase().includes('dr') || s.name?.startsWith('Dr.'));
+    if (docStaff.length > 0) {
+      return docStaff.map((d) => ({
+        id: d.id,
+        name: d.name.startsWith('Dr.') ? d.name : `Dr. ${d.name}`,
+        specialty: d.department || 'General Medicine',
+        qualification: (d as any).qualification || 'MBBS, MD',
+        experience: (d as any).experience ? `${(d as any).experience} Years` : '10+ Years',
+        languages: ['English', 'Hindi'],
+        modes: ['VIDEO', 'AUDIO'],
+        fee: 800,
+        slots: ['10:30 AM - 10:45 AM', '11:00 AM - 11:15 AM', '02:30 PM - 02:45 PM'],
+        hospital: 'Apex Care Multi-Specialty Hospital'
+      }));
     }
-  ];
+    return [];
+  }, [staff]);
 
   // Waiting Room State
   const [waitingRoomStatus, setWaitingRoomStatus] = useState<'WAITING' | 'DOCTOR_READY' | 'CONNECTED'>('WAITING');
@@ -103,50 +82,16 @@ export const TelemedicineHub: React.FC = () => {
 
   // Doctor EMR Workspace State
   const [soapNotes, setSoapNotes] = useState({
-    subjective: '34-year-old male with mild exertional dyspnea and retrosternal heaviness.',
-    objective: 'Patient alert, respiratory rate 18/min. Self-reported SpO2 98%, Heart Rate 78 bpm.',
-    assessment: 'Atypical chest discomfort. Rule out unstable angina or musculoskeletal pain.',
-    plan: '1. Tab Sorbitrate 5mg SOS\n2. 12-Lead ECG and Serum Troponin-I STAT\n3. In-person Cardiology OPD review tomorrow.'
+    subjective: '',
+    objective: '',
+    assessment: '',
+    plan: ''
   });
   const [referralType, setReferralType] = useState('OPD_IN_PERSON');
   const [isSigned, setIsSigned] = useState(false);
 
   // RPM State
-  const [rpmReadings, setRpmReadings] = useState([
-    {
-      id: 'rpm-01',
-      date: 'Today, 08:30 AM',
-      metric: 'Blood Pressure',
-      value: '142 / 92',
-      unit: 'mmHg',
-      source: 'Omron HEM-7120 (Bluetooth)',
-      severity: 'WARNING',
-      reviewed: true,
-      comment: 'Mild elevation. Advised salt restriction.'
-    },
-    {
-      id: 'rpm-02',
-      date: 'Today, 08:32 AM',
-      metric: 'Heart Rate',
-      value: '78',
-      unit: 'bpm',
-      source: 'Verified Connected Device',
-      severity: 'NORMAL',
-      reviewed: true,
-      comment: 'Normal resting sinus rate.'
-    },
-    {
-      id: 'rpm-03',
-      date: 'Yesterday, 09:15 PM',
-      metric: 'Blood Glucose (Post-prandial)',
-      value: '210',
-      unit: 'mg/dL',
-      source: 'Accu-Chek Instant (Manual)',
-      severity: 'WARNING',
-      reviewed: false,
-      comment: 'Awaiting doctor review.'
-    }
-  ]);
+  const [rpmReadings, setRpmReadings] = useState<any[]>([]);
   const [newMetricType, setNewMetricType] = useState('BLOOD_PRESSURE');
   const [newValue, setNewValue] = useState('');
   const [newSecondary, setNewSecondary] = useState('');
@@ -398,65 +343,71 @@ export const TelemedicineHub: React.FC = () => {
 
           {/* Doctors Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {doctors
-              .filter(d => selectedSpecialty === 'All' || d.specialty === selectedSpecialty)
-              .map(doc => (
-                <div
-                  key={doc.id}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-lg">
-                          {doc.name.replace('Dr. ', '').charAt(0)}
+            {doctors.filter(d => selectedSpecialty === 'All' || d.specialty === selectedSpecialty).length === 0 ? (
+              <div className="col-span-full p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+                No clinicians found for the selected specialty. Clinicians added to the workforce with teleconsult privileges will appear here.
+              </div>
+            ) : (
+              doctors
+                .filter(d => selectedSpecialty === 'All' || d.specialty === selectedSpecialty)
+                .map(doc => (
+                  <div
+                    key={doc.id}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-lg">
+                            {doc.name.replace('Dr. ', '').charAt(0)}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
+                              {doc.name}
+                              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                            </h3>
+                            <p className="text-teal-700 font-semibold text-xs">{doc.specialty}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
-                            {doc.name}
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                          </h3>
-                          <p className="text-teal-700 font-semibold text-xs">{doc.specialty}</p>
-                        </div>
+                        <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold text-xs">
+                          ₹{doc.fee}
+                        </Badge>
                       </div>
-                      <Badge variant="success" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold text-xs">
-                        ₹{doc.fee}
-                      </Badge>
+
+                      <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                        <p><strong>Qualification:</strong> {doc.qualification}</p>
+                        <p><strong>Experience:</strong> {doc.experience}</p>
+                        <p><strong>Languages:</strong> {doc.languages.join(', ')}</p>
+                        <p><strong>Modes:</strong> {doc.modes.join(', ')}</p>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {doc.slots.map((slot: string) => (
+                          <span key={slot} className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[11px] font-medium">
+                            {slot}
+                          </span>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
-                      <p><strong>Qualification:</strong> {doc.qualification}</p>
-                      <p><strong>Experience:</strong> {doc.experience}</p>
-                      <p><strong>Languages:</strong> {doc.languages.join(', ')}</p>
-                      <p><strong>Modes:</strong> {doc.modes.join(', ')}</p>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {doc.slots.map(slot => (
-                        <span key={slot} className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[11px] font-medium">
-                          {slot}
-                        </span>
-                      ))}
+                    <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Teleconsult Ready
+                      </span>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedDoctor(doc);
+                          setIsBookingModalOpen(true);
+                        }}
+                        className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
+                      >
+                        Book Teleconsult
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Next Slot in 20m
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setSelectedDoctor(doc);
-                        setIsBookingModalOpen(true);
-                      }}
-                      className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
-                    >
-                      Book Teleconsult
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+            )}
           </div>
         </div>
       )}
@@ -700,22 +651,28 @@ export const TelemedicineHub: React.FC = () => {
 
             {/* Chat Body */}
             <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
-              {chatMessages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-xl max-w-[85%] ${
-                    msg.role === 'DOCTOR'
-                      ? 'bg-slate-100 text-slate-800 self-start mr-auto'
-                      : 'bg-teal-600 text-white self-end ml-auto'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4 font-bold text-[10px] mb-1 opacity-80">
-                    <span>{msg.sender}</span>
-                    <span>{msg.time}</span>
-                  </div>
-                  <p>{msg.text}</p>
+              {chatMessages.length === 0 ? (
+                <div className="text-center text-xs text-slate-400 py-16">
+                  End-to-end encrypted consultation channel ready. Type a message below to communicate.
                 </div>
-              ))}
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl max-w-[85%] ${
+                      msg.role === 'DOCTOR'
+                        ? 'bg-slate-100 text-slate-800 self-start mr-auto'
+                        : 'bg-teal-600 text-white self-end ml-auto'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-4 font-bold text-[10px] mb-1 opacity-80">
+                      <span>{msg.sender}</span>
+                      <span>{msg.time}</span>
+                    </div>
+                    <p>{msg.text}</p>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Chat Input */}
@@ -757,7 +714,9 @@ export const TelemedicineHub: React.FC = () => {
               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800">
                 EMR Teleconsultation Encounter Record
               </span>
-              <h2 className="text-xl font-bold text-slate-900 mt-2">Clinical Encounter: Rahul Verma (UHID: APEX-2026-00084)</h2>
+              <h2 className="text-xl font-bold text-slate-900 mt-2">
+                Clinical Encounter Documentation {selectedDoctor ? `— ${selectedDoctor.name}` : ''}
+              </h2>
               <p className="text-xs text-slate-500">Attending Doctor: Dr. Rajesh Sharma • Mode: WebRTC HD Video</p>
             </div>
 
@@ -980,41 +939,49 @@ export const TelemedicineHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {rpmReadings.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-3 font-medium text-slate-700">{r.date}</td>
-                      <td className="p-3 font-bold text-slate-900">{r.metric}</td>
-                      <td className="p-3 font-semibold text-slate-800">
-                        {r.value} <span className="text-[11px] font-normal text-slate-500">{r.unit}</span>
+                  {rpmReadings.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500 font-sans">
+                        No remote biometric readings recorded yet. Use the form above to log Blood Pressure, Glucose, or SpO2 telemetry.
                       </td>
-                      <td className="p-3 text-slate-600">{r.source}</td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                            r.severity === 'NORMAL'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : r.severity === 'WARNING'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {r.severity}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        {r.reviewed ? (
-                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Reviewed
-                          </span>
-                        ) : (
-                          <span className="text-amber-700 font-semibold flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" /> Pending Review
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-slate-600 italic">{r.comment}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    rpmReadings.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-3 font-medium text-slate-700">{r.date}</td>
+                        <td className="p-3 font-bold text-slate-900">{r.metric}</td>
+                        <td className="p-3 font-semibold text-slate-800">
+                          {r.value} <span className="text-[11px] font-normal text-slate-500">{r.unit}</span>
+                        </td>
+                        <td className="p-3 text-slate-600">{r.source}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                              r.severity === 'NORMAL'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : r.severity === 'WARNING'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {r.severity}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {r.reviewed ? (
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Reviewed
+                            </span>
+                          ) : (
+                            <span className="text-amber-700 font-semibold flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" /> Pending Review
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-600 italic">{r.comment}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

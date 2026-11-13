@@ -169,9 +169,11 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
             onClick={() => onNavigate('/')}
             className="flex items-center space-x-3 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center font-bold text-white shadow-lg shadow-teal-500/20 group-hover:scale-105 transition">
-              A
-            </div>
+            <img
+              src="/asrtava-logo.png"
+              alt="ASRTAVA Logo"
+              className="w-10 h-10 object-contain drop-shadow-md group-hover:scale-105 transition"
+            />
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold tracking-wider text-xl text-white">ASRTAVA</span>
@@ -180,7 +182,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 font-medium tracking-wide block">
-                Multi-Tenant Hospital Management System
+                Hospital Management System
               </span>
             </div>
           </div>

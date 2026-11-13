@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Package,
   Truck,
@@ -19,6 +19,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Button, Badge, Modal, Input, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface VendorItem {
   id: string;
@@ -107,202 +108,48 @@ export const AdvancedProcurementHub: React.FC = () => {
     'procurement' | 'receiving' | 'inventory' | 'movements' | 'reconciliation' | 'invoices' | 'assets' | 'maintenance'
   >('procurement');
 
+  const { inventory } = useHospital();
+
   // 1. Vendors State
-  const [vendors] = useState<VendorItem[]>([
-    {
-      id: 'v-1',
-      vendorCode: 'VEN-PHM-001',
-      name: 'Sun Pharma Logistics Ltd',
-      category: 'PHARMACEUTICAL',
-      gstin: '27AABCS1429B1Z4',
-      rating: 4.8,
-      paymentTerms: 'NET_30',
-      status: 'ACTIVE',
-    },
-    {
-      id: 'v-2',
-      vendorCode: 'VEN-SRG-002',
-      name: 'MedTech Surgical Devices India',
-      category: 'SURGICAL',
-      gstin: '27AABCM8821C1Z8',
-      rating: 4.6,
-      paymentTerms: 'NET_45',
-      status: 'ACTIVE',
-    },
-    {
-      id: 'v-3',
-      vendorCode: 'VEN-BIO-003',
-      name: 'GE Healthcare Diagnostics',
-      category: 'BIOMEDICAL_EQUIPMENT',
-      gstin: '29AABCG1234D1Z2',
-      rating: 4.9,
-      paymentTerms: 'NET_30',
-      status: 'ACTIVE',
-    },
-  ]);
+  const [vendors] = useState<VendorItem[]>([]);
 
   // 2. Requisitions State
-  const [requisitions, setRequisitions] = useState<RequisitionItem[]>([
-    {
-      id: 'pr-1',
-      reqNumber: 'REQ-2026-OT-088',
-      department: 'Operation Theatre',
-      purpose: 'Cardiac Surgery consumable restock (Surgical Sutures & Cannulas)',
-      itemsSummary: 'Surgical Prolene Sutures 3-0 (500 units), Dual Cannulas 20G (300 units)',
-      estimatedCost: 145000,
-      priority: 'URGENT',
-      status: 'APPROVED',
-    },
-    {
-      id: 'pr-2',
-      reqNumber: 'REQ-2026-ICU-012',
-      department: 'Intensive Care Unit',
-      purpose: 'Biomedical accessories for Dräger Ventilators (Breathing Circuits)',
-      itemsSummary: 'Adult Disposable Ventilator Circuits (150 units), HEPA Filters (100 units)',
-      estimatedCost: 88000,
-      priority: 'ROUTINE',
-      status: 'PENDING_APPROVAL',
-    },
-  ]);
+  const [requisitions, setRequisitions] = useState<RequisitionItem[]>([]);
 
   // 3. Purchase Orders State
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([
-    {
-      id: 'po-1',
-      poNumber: 'PO-2026-0089',
-      vendorName: 'Sun Pharma Logistics Ltd',
-      itemsSummary: 'Atorvastatin 20mg (1000 tabs), Metoprolol 50mg (500 tabs)',
-      expectedDelivery: '2026-11-12',
-      grandTotal: 184000,
-      status: 'ISSUED',
-    },
-    {
-      id: 'po-2',
-      poNumber: 'PO-2026-0090',
-      vendorName: 'MedTech Surgical Devices India',
-      itemsSummary: 'Surgical Gloves Sterile 7.5 (400 pairs), IV Sets (600 units)',
-      expectedDelivery: '2026-11-14',
-      grandTotal: 92500,
-      status: 'PARTIALLY_RECEIVED',
-    },
-  ]);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
 
   // 4. Goods Receipt Notes State
-  const [grns, setGrns] = useState<GrnItem[]>([
-    {
-      id: 'grn-1',
-      grnNumber: 'GRN-2026-1102',
-      poNumber: 'PO-2026-0089',
-      vendorName: 'Sun Pharma Logistics Ltd',
-      receivedDate: '2026-11-09',
-      receivedQty: 1000,
-      acceptedQty: 980,
-      rejectedQty: 20,
-      quarantinedQty: 0,
-      status: 'PARTIALLY_ACCEPTED',
-    },
-    {
-      id: 'grn-2',
-      grnNumber: 'GRN-2026-1103',
-      poNumber: 'PO-2026-0090',
-      vendorName: 'MedTech Surgical Devices India',
-      receivedDate: '2026-11-09',
-      receivedQty: 400,
-      acceptedQty: 400,
-      rejectedQty: 0,
-      quarantinedQty: 0,
-      status: 'ACCEPTED',
-    },
-  ]);
+  const [grns, setGrns] = useState<GrnItem[]>([]);
 
-  // 5. Stock Balances State
-  const [stockBalances] = useState<StockBalanceItem[]>([
-    {
-      id: 'sb-1',
-      itemCode: 'MED-ATO-020',
-      name: 'Atorvastatin 20mg Tablet',
-      category: 'MEDICINE',
-      warehouse: 'Central Pharmacy Warehouse',
-      availableQty: 1450,
-      uom: 'Tablets',
-      reorderLevel: 500,
-      standardCost: 12.5,
-    },
-    {
-      id: 'sb-2',
-      itemCode: 'SURG-GLV-075',
-      name: 'Surgical Gloves Sterile 7.5',
-      category: 'SURGICAL_CONSUMABLE',
-      warehouse: 'OT Satellite Sub-Store',
-      availableQty: 280,
-      uom: 'Pairs',
-      reorderLevel: 200,
-      standardCost: 45.0,
-    },
-    {
-      id: 'sb-3',
-      itemCode: 'REAG-TROP-HS',
-      name: 'High-Sensitivity Troponin-I Reagent Kit',
-      category: 'LAB_REAGENT',
-      warehouse: 'Central Laboratory Store',
-      availableQty: 45,
-      uom: 'Kits (100 tests)',
-      reorderLevel: 60,
-      standardCost: 3200.0,
-    },
-  ]);
+  // 5. Stock Balances State - Dynamically mapped from HospitalContext inventory
+  const [stockBalances, setStockBalances] = useState<StockBalanceItem[]>([]);
+
+  useEffect(() => {
+    if (inventory && inventory.length > 0) {
+      setStockBalances(
+        inventory.map((item, idx) => ({
+          id: item.id || `sb-${idx + 1}`,
+          itemCode: item.sku || `SKU-${idx + 100}`,
+          name: item.name,
+          category: item.category || 'PHARMACEUTICAL',
+          warehouse: 'Central Pharmacy Warehouse',
+          availableQty: item.stock || 0,
+          uom: item.unit || 'Units',
+          reorderLevel: item.reorderLevel || 10,
+          standardCost: item.unitPrice || 0,
+        }))
+      );
+    } else {
+      setStockBalances([]);
+    }
+  }, [inventory]);
 
   // 6. Fixed Assets & Biomedical Equipment State
-  const [assets] = useState<AssetItem[]>([
-    {
-      id: 'ast-1',
-      assetTag: 'AST-VENT-004',
-      name: 'Hamilton-C6 Intensive Care Ventilator',
-      category: 'BIOMEDICAL_EQUIPMENT',
-      department: 'ICU (Bed 104)',
-      room: 'ICU Isolation Room 4',
-      serialNumber: 'HAM-2023-88192',
-      operationalStatus: 'OPERATIONAL',
-      nextCalibrationDue: '2027-02-15',
-    },
-    {
-      id: 'ast-2',
-      assetTag: 'AST-MON-012',
-      name: 'Philips IntelliVue MX750 Patient Monitor',
-      category: 'BIOMEDICAL_EQUIPMENT',
-      department: 'Operation Theatre',
-      room: 'OT Suite 1',
-      serialNumber: 'MX750-2022-901',
-      operationalStatus: 'OPERATIONAL',
-      nextCalibrationDue: '2027-01-10',
-    },
-    {
-      id: 'ast-3',
-      assetTag: 'AST-DEF-002',
-      name: 'Zoll R Series Biphasic Defibrillator',
-      category: 'BIOMEDICAL_EQUIPMENT',
-      department: 'Emergency & Trauma',
-      room: 'Resuscitation Bay Red',
-      serialNumber: 'ZOLL-2024-4412',
-      operationalStatus: 'CALIBRATION_OVERDUE',
-      nextCalibrationDue: '2026-10-31',
-    },
-  ]);
+  const [assets] = useState<AssetItem[]>([]);
 
   // 7. Breakdown Work Orders State
-  const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([
-    {
-      id: 'wo-1',
-      woNumber: 'WO-2026-0881',
-      assetTag: 'AST-DEF-002',
-      assetName: 'Zoll R Series Defibrillator',
-      department: 'Emergency & Trauma',
-      issue: 'Routine battery discharge test failed; internal calibration overdue.',
-      priority: 'CRITICAL_BREAKDOWN',
-      downtimeHours: 4.2,
-      status: 'OPEN',
-    },
-  ]);
+  const [workOrders, setWorkOrders] = useState<WorkOrderItem[]>([]);
 
   // Modals & Handlers
   const [isReqModalOpen, setIsReqModalOpen] = useState(false);
@@ -384,7 +231,9 @@ export const AdvancedProcurementHub: React.FC = () => {
             <Package className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xl font-bold text-gray-900 dark:text-gray-100">8 Stores</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              {stockBalances.length > 0 ? Array.from(new Set(stockBalances.map(s => s.warehouse))).length : 0} Stores
+            </div>
             <div className="text-xs text-gray-500">Warehouse Nodes</div>
           </div>
         </div>
@@ -394,7 +243,9 @@ export const AdvancedProcurementHub: React.FC = () => {
             <DollarSign className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xl font-bold text-gray-900 dark:text-gray-100">₹4.85M</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              ₹{stockBalances.reduce((sum, item) => sum + (item.availableQty * item.standardCost), 0).toLocaleString('en-IN')}
+            </div>
             <div className="text-xs text-gray-500">Inventory Valuation</div>
           </div>
         </div>
@@ -530,44 +381,50 @@ export const AdvancedProcurementHub: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requisitions.map(req => (
-              <div
-                key={req.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs text-blue-600 font-semibold">{req.reqNumber}</div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{req.purpose}</div>
-                    <div className="text-xs text-gray-500">Department: {req.department}</div>
-                  </div>
-                  <Badge variant={req.status === 'APPROVED' ? 'success' : 'warning'}>
-                    {req.status}
-                  </Badge>
-                </div>
-
-                <p className="text-xs text-gray-600 dark:text-gray-300 italic">{req.itemsSummary}</p>
-
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="text-gray-400">Estimated Cost:</span>{' '}
-                    <span className="font-bold text-gray-900 dark:text-gray-100">₹{req.estimatedCost.toLocaleString('en-IN')}</span>
-                  </div>
-                  {req.status === 'PENDING_APPROVAL' && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveRequisition(req.id)}
-                      className="bg-green-600 hover:bg-green-700 text-xs py-1"
-                    >
-                      Approve Requisition
-                    </Button>
-                  )}
-                  {req.status === 'APPROVED' && (
-                    <span className="text-xs text-green-600 font-medium">Ready for PO Generation</span>
-                  )}
-                </div>
+            {requisitions.length === 0 ? (
+              <div className="col-span-full p-6 text-center text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                No purchase requisitions raised yet. Click "New Purchase Requisition" above to request medical supplies or equipment.
               </div>
-            ))}
+            ) : (
+              requisitions.map(req => (
+                <div
+                  key={req.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-xs text-blue-600 font-semibold">{req.reqNumber}</div>
+                      <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{req.purpose}</div>
+                      <div className="text-xs text-gray-500">Department: {req.department}</div>
+                    </div>
+                    <Badge variant={req.status === 'APPROVED' ? 'success' : 'warning'}>
+                      {req.status}
+                    </Badge>
+                  </div>
+
+                  <p className="text-xs text-gray-600 dark:text-gray-300 italic">{req.itemsSummary}</p>
+
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-gray-400">Estimated Cost:</span>{' '}
+                      <span className="font-bold text-gray-900 dark:text-gray-100">₹{req.estimatedCost.toLocaleString('en-IN')}</span>
+                    </div>
+                    {req.status === 'PENDING_APPROVAL' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleApproveRequisition(req.id)}
+                        className="bg-green-600 hover:bg-green-700 text-xs py-1"
+                      >
+                        Approve Requisition
+                      </Button>
+                    )}
+                    {req.status === 'APPROVED' && (
+                      <span className="text-xs text-green-600 font-medium">Ready for PO Generation</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
@@ -586,20 +443,28 @@ export const AdvancedProcurementHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {purchaseOrders.map(po => (
-                  <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                    <td className="p-3 font-mono font-semibold text-blue-600">{po.poNumber}</td>
-                    <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{po.vendorName}</td>
-                    <td className="p-3 text-gray-600 dark:text-gray-300">{po.itemsSummary}</td>
-                    <td className="p-3 text-gray-500 font-mono">{po.expectedDelivery}</td>
-                    <td className="p-3 font-mono font-bold text-gray-900 dark:text-gray-100">
-                      ₹{po.grandTotal.toLocaleString('en-IN')}
-                    </td>
-                    <td className="p-3">
-                      <Badge variant={po.status === 'COMPLETED' ? 'success' : 'info'}>{po.status}</Badge>
+                {purchaseOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-gray-500">
+                      No purchase orders issued to vendors yet. Approved requisitions will generate formal purchase orders.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  purchaseOrders.map(po => (
+                    <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="p-3 font-mono font-semibold text-blue-600">{po.poNumber}</td>
+                      <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{po.vendorName}</td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300">{po.itemsSummary}</td>
+                      <td className="p-3 text-gray-500 font-mono">{po.expectedDelivery}</td>
+                      <td className="p-3 font-mono font-bold text-gray-900 dark:text-gray-100">
+                        ₹{po.grandTotal.toLocaleString('en-IN')}
+                      </td>
+                      <td className="p-3">
+                        <Badge variant={po.status === 'COMPLETED' ? 'success' : 'info'}>{po.status}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -634,19 +499,27 @@ export const AdvancedProcurementHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {grns.map(g => (
-                  <tr key={g.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                    <td className="p-3 font-mono font-semibold text-blue-600">{g.grnNumber}</td>
-                    <td className="p-3 font-mono text-gray-500">{g.poNumber}</td>
-                    <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{g.vendorName}</td>
-                    <td className="p-3 font-mono">{g.receivedQty}</td>
-                    <td className="p-3 font-mono font-bold text-green-600">{g.acceptedQty}</td>
-                    <td className="p-3 font-mono text-red-600">{g.rejectedQty}</td>
-                    <td className="p-3">
-                      <Badge variant={g.status === 'ACCEPTED' ? 'success' : 'warning'}>{g.status}</Badge>
+                {grns.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-gray-500">
+                      No Goods Receipt Notes recorded yet. Deliveries from vendors undergo QA quarantine inspection here before stock entry.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  grns.map(g => (
+                    <tr key={g.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="p-3 font-mono font-semibold text-blue-600">{g.grnNumber}</td>
+                      <td className="p-3 font-mono text-gray-500">{g.poNumber}</td>
+                      <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{g.vendorName}</td>
+                      <td className="p-3 font-mono">{g.receivedQty}</td>
+                      <td className="p-3 font-mono font-bold text-green-600">{g.acceptedQty}</td>
+                      <td className="p-3 font-mono text-red-600">{g.rejectedQty}</td>
+                      <td className="p-3">
+                        <Badge variant={g.status === 'ACCEPTED' ? 'success' : 'warning'}>{g.status}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -668,47 +541,53 @@ export const AdvancedProcurementHub: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stockBalances.map(sb => (
-              <div
-                key={sb.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{sb.name}</div>
-                    <div className="text-xs text-blue-600 font-mono">{sb.itemCode}</div>
-                  </div>
-                  <Badge variant={sb.availableQty <= sb.reorderLevel ? 'danger' : 'success'}>
-                    {sb.availableQty <= sb.reorderLevel ? 'Reorder Needed' : 'In Stock'}
-                  </Badge>
-                </div>
-
-                <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div>
-                    <span className="font-medium text-gray-500">Store:</span> {sb.warehouse}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Available Qty:</span>{' '}
-                    <span className="font-bold text-gray-900 dark:text-gray-100">
-                      {sb.availableQty} {sb.uom}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Reorder Threshold:</span> {sb.reorderLevel} {sb.uom}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Unit Standard Cost:</span> ₹{sb.standardCost}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Total: ₹{(sb.availableQty * sb.standardCost).toLocaleString('en-IN')}</span>
-                  <Button variant="outline" size="sm" className="text-xs py-0.5">
-                    Transfer Stock
-                  </Button>
-                </div>
+            {stockBalances.length === 0 ? (
+              <div className="col-span-full p-8 text-center text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                No inventory items currently in stock. Items received via approved GRNs or catalog additions will be tracked here.
               </div>
-            ))}
+            ) : (
+              stockBalances.map(sb => (
+                <div
+                  key={sb.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{sb.name}</div>
+                      <div className="text-xs text-blue-600 font-mono">{sb.itemCode}</div>
+                    </div>
+                    <Badge variant={sb.availableQty <= sb.reorderLevel ? 'danger' : 'success'}>
+                      {sb.availableQty <= sb.reorderLevel ? 'Reorder Needed' : 'In Stock'}
+                    </Badge>
+                  </div>
+
+                  <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div>
+                      <span className="font-medium text-gray-500">Store:</span> {sb.warehouse}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Available Qty:</span>{' '}
+                      <span className="font-bold text-gray-900 dark:text-gray-100">
+                        {sb.availableQty} {sb.uom}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Reorder Threshold:</span> {sb.reorderLevel} {sb.uom}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Unit Standard Cost:</span> ₹{sb.standardCost}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Total: ₹{(sb.availableQty * sb.standardCost).toLocaleString('en-IN')}</span>
+                    <Button variant="outline" size="sm" className="text-xs py-0.5">
+                      Transfer Stock
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -726,29 +605,8 @@ export const AdvancedProcurementHub: React.FC = () => {
               </p>
             </div>
 
-            <div className="border border-green-200 dark:border-green-800/40 bg-green-50/50 dark:bg-green-900/10 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-green-800 dark:text-green-300 text-sm">
-                    Verified Match: Sun Pharma Logistics Ltd (PO-2026-0089)
-                  </span>
-                  <Badge variant="success">3-WAY MATCHED</Badge>
-                </div>
-                <div className="text-gray-600 dark:text-gray-300">
-                  PO Value: ₹1,84,000 &bull; GRN Accepted Value: ₹1,84,000 &bull; Supplier Invoice: ₹1,84,000
-                </div>
-                <div className="text-gray-500 text-[11px]">
-                  Accounting: Dr Inventory Asset ₹1,64,285 | Dr Input GST ₹19,715 | Cr Accounts Payable ₹1,84,000
-                </div>
-              </div>
-
-              <Button
-                onClick={() => handle3WayMatchAndPostGL('PO-2026-0089', 184000)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs flex items-center gap-1.5"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Post Balanced JV to General Ledger
-              </Button>
+            <div className="border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/10 p-8 rounded-xl text-center text-xs text-gray-500">
+              No pending invoice reconciliations. Invoices from vendors will automatically match against issued Purchase Orders and accepted GRNs before posting balanced JVs to the General Ledger.
             </div>
           </div>
         </div>
@@ -773,41 +631,47 @@ export const AdvancedProcurementHub: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {assets.map(a => (
-              <div
-                key={a.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{a.name}</div>
-                    <div className="text-xs text-blue-600 font-mono">{a.assetTag}</div>
-                  </div>
-                  <Badge variant={a.operationalStatus === 'OPERATIONAL' ? 'success' : 'danger'}>
-                    {a.operationalStatus}
-                  </Badge>
-                </div>
-
-                <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div>
-                    <span className="font-medium text-gray-500">Location:</span> {a.department} ({a.room})
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Serial #:</span> {a.serialNumber}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Next Calibration:</span> {a.nextCalibrationDue}
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">NABH Safety Checked</span>
-                  <Button variant="outline" size="sm" className="text-xs py-0.5">
-                    Maintenance History
-                  </Button>
-                </div>
+            {assets.length === 0 ? (
+              <div className="col-span-full p-8 text-center text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                No biomedical or fixed assets registered. Click "Tag New Asset" to register medical machinery, serial numbers, and calibration schedules.
               </div>
-            ))}
+            ) : (
+              assets.map(a => (
+                <div
+                  key={a.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{a.name}</div>
+                      <div className="text-xs text-blue-600 font-mono">{a.assetTag}</div>
+                    </div>
+                    <Badge variant={a.operationalStatus === 'OPERATIONAL' ? 'success' : 'danger'}>
+                      {a.operationalStatus}
+                    </Badge>
+                  </div>
+
+                  <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div>
+                      <span className="font-medium text-gray-500">Location:</span> {a.department} ({a.room})
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Serial #:</span> {a.serialNumber}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Next Calibration:</span> {a.nextCalibrationDue}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">NABH Safety Checked</span>
+                    <Button variant="outline" size="sm" className="text-xs py-0.5">
+                      Maintenance History
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -831,37 +695,43 @@ export const AdvancedProcurementHub: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {workOrders.map(wo => (
-              <div
-                key={wo.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-1 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-blue-600">{wo.woNumber}</span>
-                    <span className="font-bold text-gray-900 dark:text-gray-100">{wo.assetName} ({wo.assetTag})</span>
-                    <Badge variant={wo.status === 'CLOSED' ? 'success' : 'danger'}>
-                      {wo.status}
-                    </Badge>
-                  </div>
-                  <div className="text-gray-500">
-                    Department: {wo.department} &bull; Downtime: {wo.downtimeHours} Hours &bull; Priority: {wo.priority}
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 italic">{wo.issue}</p>
-                </div>
-
-                {wo.status !== 'CLOSED' && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleResolveWorkOrder(wo.id)}
-                    className="bg-green-600 hover:bg-green-700 text-xs flex items-center gap-1"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Certify Safety & Return to Service
-                  </Button>
-                )}
+            {workOrders.length === 0 ? (
+              <div className="p-8 text-center text-xs text-gray-500 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+                No active maintenance or facility breakdown work orders. All hospital systems and biomedical equipment are operational.
               </div>
-            ))}
+            ) : (
+              workOrders.map(wo => (
+                <div
+                  key={wo.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-blue-600">{wo.woNumber}</span>
+                      <span className="font-bold text-gray-900 dark:text-gray-100">{wo.assetName} ({wo.assetTag})</span>
+                      <Badge variant={wo.status === 'CLOSED' ? 'success' : 'danger'}>
+                        {wo.status}
+                      </Badge>
+                    </div>
+                    <div className="text-gray-500">
+                      Department: {wo.department} &bull; Downtime: {wo.downtimeHours} Hours &bull; Priority: {wo.priority}
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 italic">{wo.issue}</p>
+                  </div>
+
+                  {wo.status !== 'CLOSED' && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleResolveWorkOrder(wo.id)}
+                      className="bg-green-600 hover:bg-green-700 text-xs flex items-center gap-1"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Certify Safety & Return to Service
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

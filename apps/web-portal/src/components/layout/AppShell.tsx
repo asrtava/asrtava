@@ -222,12 +222,14 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             className="flex items-center space-x-2.5 group cursor-pointer text-left focus:outline-none"
             title="Back to Home page"
           >
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center font-bold text-white shadow-sm transition group-hover:bg-brand-500">
-              A
-            </div>
+            <img
+              src="/asrtava-logo.png"
+              alt="ASRTAVA Logo"
+              className="w-8 h-8 object-contain shrink-0 group-hover:scale-105 transition"
+            />
             <div className="flex flex-col">
               <span className="font-bold tracking-wider text-sm md:text-base text-white leading-tight">ASRTAVA</span>
-              <span className="text-[10px] text-brand-400 font-semibold tracking-widest uppercase">Healthcare SaaS</span>
+              <span className="text-[10px] text-teal-400 font-semibold tracking-widest uppercase">Healthcare HMS</span>
             </div>
           </button>
 

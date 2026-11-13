@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Scan,
   ShieldAlert,
@@ -21,6 +21,7 @@ import {
   FileText
 } from 'lucide-react';
 import { Button, Input, Badge, useToast, Modal } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface Modality {
   id: string;
@@ -77,7 +78,8 @@ interface CriticalFinding {
 
 export const AdvancedRISHub: React.FC = () => {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'modalities' | 'screening' | 'pacs' | 'reporting' | 'critical' | 'contrast'>('modalities');
+  const { radiologyOrders } = useHospital();
+  const [activeTab, setActiveTab] = useState<'modalities' | 'screening' | 'pacs' | 'critical' | 'contrast'>('modalities');
 
   // Modality States
   const [modalities, setModalities] = useState<Modality[]>([
@@ -90,7 +92,7 @@ export const AdvancedRISHub: React.FC = () => {
       port: 104,
       roomNumber: 'Rad-Suite 101',
       status: 'ONLINE',
-      activeAppointmentsToday: 18,
+      activeAppointmentsToday: 0,
     },
     {
       id: 'mod-2',
@@ -100,8 +102,8 @@ export const AdvancedRISHub: React.FC = () => {
       ipAddress: '192.168.10.46',
       port: 104,
       roomNumber: 'MRI Shielded Suite 102',
-      status: 'ACQUIRING',
-      activeAppointmentsToday: 12,
+      status: 'ONLINE',
+      activeAppointmentsToday: 0,
     },
     {
       id: 'mod-3',
@@ -112,7 +114,7 @@ export const AdvancedRISHub: React.FC = () => {
       port: 104,
       roomNumber: 'X-Ray Bay 103',
       status: 'ONLINE',
-      activeAppointmentsToday: 26,
+      activeAppointmentsToday: 0,
     },
     {
       id: 'mod-4',
@@ -123,123 +125,54 @@ export const AdvancedRISHub: React.FC = () => {
       port: 104,
       roomNumber: 'Sonography Room 104',
       status: 'ONLINE',
-      activeAppointmentsToday: 14,
+      activeAppointmentsToday: 0,
     },
   ]);
 
   // Safety Screening Checklist
-  const [screenings, setScreenings] = useState<SafetyScreening[]>([
-    {
-      id: 'scr-1',
-      patientName: 'Vikram Joshi',
-      uhid: 'APEX-2026-00051',
-      modalityType: 'CT with IV Contrast',
-      hasPacemakerOrImplant: false,
-      hasClaustrophobia: false,
-      pregnancyStatus: 'NOT_APPLICABLE',
-      renalFunctionEgfr: 78,
-      iodineAllergyHistory: false,
-      clearanceStatus: 'CLEARED',
-      clearedBy: 'Dr. Vikram Sethi',
-    },
-    {
-      id: 'scr-2',
-      patientName: 'Kavita Patel',
-      uhid: 'APEX-2026-00087',
-      modalityType: 'MRI Pelvis with Gadolinium',
-      hasPacemakerOrImplant: false,
-      hasClaustrophobia: true,
-      pregnancyStatus: 'NOT_PREGNANT',
-      renalFunctionEgfr: 28,
-      iodineAllergyHistory: false,
-      clearanceStatus: 'REQUIRES_NEPHROLOGY_CLEARANCE',
-      clearedBy: 'Dr. Suresh Nair',
-    },
-    {
-      id: 'scr-3',
-      patientName: 'Priya Iyer',
-      uhid: 'APEX-2026-00085',
-      modalityType: 'CT Abdomen',
-      hasPacemakerOrImplant: false,
-      hasClaustrophobia: false,
-      pregnancyStatus: 'CONFIRMED',
-      renalFunctionEgfr: 94,
-      iodineAllergyHistory: false,
-      clearanceStatus: 'CONTRAINDICATED',
-      clearedBy: 'Dr. Ananya Roy',
-    },
-  ]);
+  const [screenings, setScreenings] = useState<SafetyScreening[]>([]);
 
-  // PACS Studies
-  const [pacsStudies, setPacsStudies] = useState<PACSStudyItem[]>([
-    {
-      id: 'pacs-1',
-      accessionNumber: 'ACC-2026-9041',
-      patientName: 'Vikram Joshi',
-      uhid: 'APEX-2026-00051',
-      modality: 'CT',
-      studyDescription: 'CT Thorax High-Resolution (HRCT)',
-      seriesCount: 4,
-      instanceCount: 684,
-      studyDate: '2026-11-09 10:15',
-      storageUri: 'dicom-archive://pacs/ct/2026/11/09/ACC-2026-9041.tar',
-      status: 'INTERPRETING',
-    },
-    {
-      id: 'pacs-2',
-      accessionNumber: 'ACC-2026-9042',
-      patientName: 'Ramesh Verma',
-      uhid: 'APEX-2026-00084',
-      modality: 'CT',
-      studyDescription: 'CT Angiography Coronary Arteries',
-      seriesCount: 8,
-      instanceCount: 1240,
-      studyDate: '2026-11-09 09:30',
-      storageUri: 'dicom-archive://pacs/ct/2026/11/09/ACC-2026-9042.tar',
-      status: 'FINALIZED',
-    },
-    {
-      id: 'pacs-3',
-      accessionNumber: 'ACC-2026-9043',
-      patientName: 'Meenakshi Sundaram',
-      uhid: 'APEX-2026-00099',
-      modality: 'MRI',
-      studyDescription: 'MRI Brain with DWI & FLAIR',
-      seriesCount: 6,
-      instanceCount: 412,
-      studyDate: '2026-11-09 11:00',
-      storageUri: 'dicom-archive://pacs/mri/2026/11/09/ACC-2026-9043.tar',
-      status: 'ACQUIRED',
-    },
-  ]);
+  // PACS Studies - Dynamically synchronized with radiologyOrders
+  const [pacsStudies, setPacsStudies] = useState<PACSStudyItem[]>([]);
 
   // Critical Panic Findings Log
-  const [criticalFindings, setCriticalFindings] = useState<CriticalFinding[]>([
-    {
-      id: 'cf-1',
-      accessionNumber: 'ACC-2026-9018',
-      patientName: 'Sunil Gavaskar',
-      uhid: 'APEX-2026-00032',
-      findingDescription: 'Acute middle cerebral artery (MCA) occlusion with developing cytotoxic edema.',
-      orderingDoctor: 'Dr. Rajesh Sharma (Emergency)',
-      communicatedTo: 'Dr. Rajesh Sharma',
-      readBackConfirmed: true,
-      urgencyLevel: 'EMERGENT_STAT',
-      loggedAt: '2026-11-09 08:45 AM',
-    },
-    {
-      id: 'cf-2',
-      accessionNumber: 'ACC-2026-9022',
-      patientName: 'Harish Rao',
-      uhid: 'APEX-2026-00041',
-      findingDescription: 'Tension pneumothorax right hemithorax with mediastinal shift.',
-      orderingDoctor: 'Dr. Vikram Sethi (ICU)',
-      communicatedTo: 'Sister-in-Charge Reena',
-      readBackConfirmed: true,
-      urgencyLevel: 'EMERGENT_STAT',
-      loggedAt: '2026-11-09 09:15 AM',
-    },
-  ]);
+  const [criticalFindings, setCriticalFindings] = useState<CriticalFinding[]>([]);
+
+  useEffect(() => {
+    if (radiologyOrders && radiologyOrders.length > 0) {
+      const mapped = radiologyOrders.map((ro, idx) => {
+        const procedureDesc = (ro as any).testName || (ro.procedures && ro.procedures.length > 0 ? ro.procedures.join(', ') : 'Diagnostic Scan');
+        const modality = (ro as any).modality || (procedureDesc.includes('MRI') ? 'MRI' : procedureDesc.includes('Ultrasound') || procedureDesc.includes('USG') ? 'USG' : procedureDesc.includes('X-Ray') ? 'XRAY' : 'CT');
+        const isFinal = ro.status === 'Reported & Signed';
+        const isInterpreting = ro.status === 'Study Ready';
+        return {
+          id: ro.id || `pacs-${idx + 1}`,
+          accessionNumber: ro.pacsStudyId || `ACC-2026-${ro.id ? String(ro.id).replace(/\D/g, '').slice(-4).padStart(4, '0') : 9041 + idx}`,
+          patientName: ro.patientName || 'Inpatient',
+          uhid: ro.uhid || (ro.patientId ? `UHID-2026-${String(ro.patientId).slice(-4)}` : `UHID-2026-00${idx + 10}`),
+          modality: modality as any,
+          studyDescription: procedureDesc,
+          seriesCount: 4,
+          instanceCount: 350,
+          studyDate: ro.orderedAt ? new Date(ro.orderedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Recent',
+          storageUri: `dicom-archive://pacs/${modality.toLowerCase()}/2026/ACC-${idx + 1}.tar`,
+          status: (isFinal ? 'FINALIZED' : isInterpreting ? 'INTERPRETING' : 'ACQUIRED') as any,
+        };
+      });
+      setPacsStudies(mapped);
+
+      // Update modalities scan counts dynamically
+      setModalities(prev =>
+        prev.map(m => ({
+          ...m,
+          activeAppointmentsToday: mapped.filter(p => p.modality === m.modalityType).length,
+        }))
+      );
+    } else {
+      setPacsStudies([]);
+      setModalities(prev => prev.map(m => ({ ...m, activeAppointmentsToday: 0 })));
+    }
+  }, [radiologyOrders]);
 
   // Modals
   const [isViewerModalOpen, setIsViewerModalOpen] = useState(false);
@@ -289,11 +222,15 @@ export const AdvancedRISHub: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <div className="px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700 text-xs">
               <span className="text-slate-400">Total DICOM Storage: </span>
-              <span className="font-mono font-bold text-teal-300">4.8 TB</span>
+              <span className="font-mono font-bold text-teal-300">
+                {(pacsStudies.reduce((sum, s) => sum + s.instanceCount * 0.0005, 0)).toFixed(1)} GB
+              </span>
             </div>
             <div className="px-3 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700 text-xs">
               <span className="text-slate-400">Instances Indexed: </span>
-              <span className="font-mono font-bold text-emerald-300">842,109</span>
+              <span className="font-mono font-bold text-emerald-300">
+                {pacsStudies.reduce((sum, s) => sum + s.instanceCount, 0).toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -425,63 +362,71 @@ export const AdvancedRISHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {screenings.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50/60">
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-slate-900">{s.patientName}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{s.uhid}</div>
-                  </td>
-                  <td className="py-3 px-3 font-medium text-slate-800">{s.modalityType}</td>
-                  <td className="py-3 px-3">
-                    <span
-                      className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
-                        s.renalFunctionEgfr >= 60
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : s.renalFunctionEgfr >= 30
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-rose-50 text-rose-700'
-                      }`}
-                    >
-                      {s.renalFunctionEgfr} mL/min
-                    </span>
-                  </td>
-                  <td className="py-3 px-3">
-                    {s.hasPacemakerOrImplant ? (
-                      <span className="text-rose-600 font-bold flex items-center">
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                        Implant Detected
-                      </span>
-                    ) : (
-                      <span className="text-emerald-600 flex items-center">
-                        <Check className="w-3.5 h-3.5 mr-1" />
-                        No Ferromagnetic Metal
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="text-slate-700 font-medium">{s.pregnancyStatus}</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <Badge
-                      variant={
-                        s.clearanceStatus === 'CLEARED'
-                          ? 'success'
-                          : s.clearanceStatus === 'REQUIRES_NEPHROLOGY_CLEARANCE'
-                          ? 'warning'
-                          : 'danger'
-                      }
-                      size="sm"
-                    >
-                      {s.clearanceStatus.replace(/_/g, ' ')}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <Button size="sm" variant="outline">
-                      Review Safety Form
-                    </Button>
+              {screenings.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                    No radiation or MRI safety screenings recorded today. Pre-procedure safety checklists will populate here.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                screenings.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/60">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-slate-900">{s.patientName}</div>
+                      <div className="text-[11px] font-mono text-slate-400">{s.uhid}</div>
+                    </td>
+                    <td className="py-3 px-3 font-medium text-slate-800">{s.modalityType}</td>
+                    <td className="py-3 px-3">
+                      <span
+                        className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+                          s.renalFunctionEgfr >= 60
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : s.renalFunctionEgfr >= 30
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-rose-50 text-rose-700'
+                        }`}
+                      >
+                        {s.renalFunctionEgfr} mL/min
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      {s.hasPacemakerOrImplant ? (
+                        <span className="text-rose-600 font-bold flex items-center">
+                          <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                          Implant Detected
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 flex items-center">
+                          <Check className="w-3.5 h-3.5 mr-1" />
+                          No Ferromagnetic Metal
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="text-slate-700 font-medium">{s.pregnancyStatus}</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <Badge
+                        variant={
+                          s.clearanceStatus === 'CLEARED'
+                            ? 'success'
+                            : s.clearanceStatus === 'REQUIRES_NEPHROLOGY_CLEARANCE'
+                            ? 'warning'
+                            : 'danger'
+                        }
+                        size="sm"
+                      >
+                        {s.clearanceStatus.replace(/_/g, ' ')}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <Button size="sm" variant="outline">
+                        Review Safety Form
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -512,62 +457,70 @@ export const AdvancedRISHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {pacsStudies.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/60">
-                  <td className="py-3.5 px-4">
-                    <div className="font-mono font-bold text-teal-800">{p.accessionNumber}</div>
-                    <div className="text-[11px] text-slate-400">{p.studyDate}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-slate-900">{p.patientName}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{p.uhid}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
-                      {p.modality}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 font-semibold text-slate-800">{p.studyDescription}</td>
-                  <td className="py-3 px-3 font-mono">
-                    {p.seriesCount} series · <span className="text-teal-700 font-bold">{p.instanceCount} slices</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <Badge
-                      variant={
-                        p.status === 'FINALIZED'
-                          ? 'success'
-                          : p.status === 'ADDENDUM_ATTACHED'
-                          ? 'brand'
-                          : p.status === 'INTERPRETING'
-                          ? 'warning'
-                          : 'neutral'
-                      }
-                      size="sm"
-                    >
-                      {p.status.replace(/_/g, ' ')}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-right space-x-2">
-                    <Button size="sm" variant="primary" onClick={() => handleOpenDicomViewer(p)}>
-                      <Eye className="w-3.5 h-3.5 mr-1" />
-                      Launch DICOM Viewer
-                    </Button>
-                    {p.status === 'FINALIZED' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPacsStudy(p);
-                          setIsAddendumModalOpen(true);
-                        }}
-                      >
-                        <FileText className="w-3.5 h-3.5 mr-1" />
-                        Addendum
-                      </Button>
-                    )}
+              {pacsStudies.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                    No DICOM studies indexed in PACS archive. Images acquired from modalities or ordered for patients will appear here.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                pacsStudies.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/60">
+                    <td className="py-3.5 px-4">
+                      <div className="font-mono font-bold text-teal-800">{p.accessionNumber}</div>
+                      <div className="text-[11px] text-slate-400">{p.studyDate}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-bold text-slate-900">{p.patientName}</div>
+                      <div className="text-[11px] font-mono text-slate-400">{p.uhid}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-cyan-800 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">
+                        {p.modality}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-semibold text-slate-800">{p.studyDescription}</td>
+                    <td className="py-3 px-3 font-mono">
+                      {p.seriesCount} series · <span className="text-teal-700 font-bold">{p.instanceCount} slices</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <Badge
+                        variant={
+                          p.status === 'FINALIZED'
+                            ? 'success'
+                            : p.status === 'ADDENDUM_ATTACHED'
+                            ? 'brand'
+                            : p.status === 'INTERPRETING'
+                            ? 'warning'
+                            : 'neutral'
+                        }
+                        size="sm"
+                      >
+                        {p.status.replace(/_/g, ' ')}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      <Button size="sm" variant="primary" onClick={() => handleOpenDicomViewer(p)}>
+                        <Eye className="w-3.5 h-3.5 mr-1" />
+                        Launch DICOM Viewer
+                      </Button>
+                      {p.status === 'FINALIZED' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedPacsStudy(p);
+                            setIsAddendumModalOpen(true);
+                          }}
+                        >
+                          <FileText className="w-3.5 h-3.5 mr-1" />
+                          Addendum
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -604,36 +557,44 @@ export const AdvancedRISHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {criticalFindings.map((cf) => (
-                <tr key={cf.id} className="hover:bg-rose-50/30">
-                  <td className="py-3.5 px-4">
-                    <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[11px] block w-fit mb-1">
-                      {cf.urgencyLevel.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-mono">{cf.loggedAt}</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-slate-900">{cf.patientName}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{cf.uhid}</div>
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-rose-900">{cf.findingDescription}</td>
-                  <td className="py-3 px-3 text-slate-800">{cf.orderingDoctor}</td>
-                  <td className="py-3 px-3 font-medium text-slate-800">{cf.communicatedTo}</td>
-                  <td className="py-3 px-3">
-                    {cf.readBackConfirmed ? (
-                      <span className="text-emerald-700 font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded w-fit border border-emerald-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                        Telephone Read-Back Confirmed
-                      </span>
-                    ) : (
-                      <span className="text-amber-700 font-bold flex items-center">
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                        Pending Read-Back
-                      </span>
-                    )}
+              {criticalFindings.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
+                    No critical panic findings logged. Urgent life-threatening radiological abnormalities requiring telephone read-back will log here.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                criticalFindings.map((cf) => (
+                  <tr key={cf.id} className="hover:bg-rose-50/30">
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[11px] block w-fit mb-1">
+                        {cf.urgencyLevel.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">{cf.loggedAt}</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-bold text-slate-900">{cf.patientName}</div>
+                      <div className="text-[11px] font-mono text-slate-400">{cf.uhid}</div>
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-rose-900">{cf.findingDescription}</td>
+                    <td className="py-3 px-3 text-slate-800">{cf.orderingDoctor}</td>
+                    <td className="py-3 px-3 font-medium text-slate-800">{cf.communicatedTo}</td>
+                    <td className="py-3 px-3">
+                      {cf.readBackConfirmed ? (
+                        <span className="text-emerald-700 font-bold flex items-center bg-emerald-50 px-2 py-0.5 rounded w-fit border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                          Telephone Read-Back Confirmed
+                        </span>
+                      ) : (
+                        <span className="text-amber-700 font-bold flex items-center">
+                          <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                          Pending Read-Back
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

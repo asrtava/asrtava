@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FlaskConical,
   Microscope,
@@ -19,6 +19,7 @@ import {
   TestTube2
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface SpecimenItem {
   id: string;
@@ -46,81 +47,39 @@ interface TestResultItem {
 
 export const AdvancedLISHub: React.FC = () => {
   const { showToast } = useToast();
+  const { labOrders } = useHospital();
   const [activeTab, setActiveTab] = useState<'accession' | 'results' | 'signoff' | 'critical' | 'microbio' | 'qc'>('accession');
 
-  // Specimen Accessioning State
-  const [specimens, setSpecimens] = useState<SpecimenItem[]>([
-    {
-      id: 'spec-01',
-      accessionNumber: 'ACC-2026-90412',
-      patientName: 'Rohan Deshmukh',
-      uhid: 'UHID-2026-4410',
-      testName: 'Complete Blood Count (CBC) with Diff',
-      department: 'Haematology',
-      container: 'EDTA Lavender Top',
-      collectionTime: '20 mins ago',
-      status: 'RECEIVED',
-    },
-    {
-      id: 'spec-02',
-      accessionNumber: 'ACC-2026-90413',
-      patientName: 'Meenakshi Iyer',
-      uhid: 'UHID-2026-3829',
-      testName: 'Renal Function Test (K+, Creatinine, Urea)',
-      department: 'Clinical Biochemistry',
-      container: 'SST Gel Gold Top',
-      collectionTime: '35 mins ago',
-      status: 'TESTED',
-    },
-    {
-      id: 'spec-03',
-      accessionNumber: 'ACC-2026-90414',
-      patientName: 'Karan Mehra',
-      uhid: 'UHID-2026-1920',
-      testName: 'Blood Culture & Sensitivity',
-      department: 'Microbiology',
-      container: 'Blood Culture Bottle (Aerobic)',
-      collectionTime: '1 hour ago',
-      status: 'IN_PROCESS',
-    },
-  ]);
+  // Specimen Accessioning State - Dynamically synchronized with HospitalContext.labOrders
+  const [specimens, setSpecimens] = useState<SpecimenItem[]>([]);
+  const [resultsList, setResultsList] = useState<TestResultItem[]>([]);
 
-  // Results State
-  const [resultsList, setResultsList] = useState<TestResultItem[]>([
-    {
-      id: 'res-01',
-      accessionNumber: 'ACC-2026-90413',
-      patientName: 'Meenakshi Iyer',
-      parameter: 'Serum Potassium (K+)',
-      value: 6.9,
-      unit: 'mmol/L',
-      refRange: '3.5 - 5.1',
-      flag: 'CRITICAL_PANIC',
-      validationStatus: 'ENTERED',
-    },
-    {
-      id: 'res-02',
-      accessionNumber: 'ACC-2026-90413',
-      patientName: 'Meenakshi Iyer',
-      parameter: 'Serum Creatinine',
-      value: 2.8,
-      unit: 'mg/dL',
-      refRange: '0.6 - 1.2',
-      flag: 'ABNORMAL_HIGH',
-      validationStatus: 'TECHNICALLY_VALIDATED',
-    },
-    {
-      id: 'res-03',
-      accessionNumber: 'ACC-2026-90412',
-      patientName: 'Rohan Deshmukh',
-      parameter: 'Hemoglobin (Hb)',
-      value: 13.8,
-      unit: 'g/dL',
-      refRange: '13.0 - 17.0',
-      flag: 'NORMAL',
-      validationStatus: 'TECHNICALLY_VALIDATED',
-    },
-  ]);
+  useEffect(() => {
+    if (labOrders && labOrders.length > 0) {
+      setSpecimens(
+        labOrders.map((lo, idx) => {
+          const testName = (lo as any).testName || (lo.tests && lo.tests.length > 0 ? lo.tests.join(', ') : 'Complete Blood Count (CBC)');
+          const department = (lo as any).department || (testName.includes('Culture') ? 'Microbiology' : testName.includes('Renal') || testName.includes('Lipid') ? 'Clinical Biochemistry' : 'Haematology');
+          const container = (lo as any).container || (testName.includes('Culture') ? 'Blood Culture Bottle' : testName.includes('Renal') ? 'SST Gel Gold Top' : 'EDTA Lavender Top');
+          const isAuth = lo.status === 'Verified & Dispatched';
+          const isInProcess = lo.status === 'Sample Collected' || lo.status === 'Ready for Entry' || lo.status === 'Awaiting Sign-Off';
+          return {
+            id: lo.id || `spec-${idx + 1}`,
+            accessionNumber: lo.barcode || `ACC-2026-${lo.id ? String(lo.id).replace(/\D/g, '').slice(-5).padStart(5, '0') : 90412 + idx}`,
+            patientName: lo.patientName || 'Inpatient',
+            uhid: lo.uhid || (lo.patientId ? `UHID-2026-${String(lo.patientId).slice(-4)}` : `UHID-2026-44${idx + 10}`),
+            testName,
+            department,
+            container,
+            collectionTime: lo.orderedAt ? new Date(lo.orderedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            status: isAuth ? 'AUTHORIZED' : isInProcess ? 'IN_PROCESS' : 'RECEIVED',
+          };
+        })
+      );
+    } else {
+      setSpecimens([]);
+    }
+  }, [labOrders]);
 
   // Specimen Rejection Modal
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -224,7 +183,9 @@ export const AdvancedLISHub: React.FC = () => {
             </div>
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-center">
               <span className="text-xs text-red-200 block">Critical Alerts</span>
-              <span className="text-xl font-bold text-red-400">1 Panic Flag</span>
+              <span className="text-xl font-bold text-red-400">
+                {resultsList.filter(r => r.flag === 'CRITICAL_PANIC').length} Panic Flag{resultsList.filter(r => r.flag === 'CRITICAL_PANIC').length === 1 ? '' : 's'}
+              </span>
             </div>
           </div>
         </div>
@@ -306,7 +267,7 @@ export const AdvancedLISHub: React.FC = () => {
                 showToast({
                   type: 'success',
                   title: 'New Accession Generated',
-                  message: 'Printed 2D barcode label for SST Gold Serum tube.',
+                  message: 'Printed 2D barcode label for specimen collection tube.',
                 })
               }
             >
@@ -327,55 +288,63 @@ export const AdvancedLISHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600">
-                {specimens.map((spec) => (
-                  <tr key={spec.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-900">
-                      {spec.accessionNumber}
-                      <span className="block text-[11px] font-normal text-slate-500">{spec.collectionTime}</span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="font-bold text-slate-900 block">{spec.patientName}</span>
-                      <span className="text-[11px] text-slate-400 font-mono">{spec.uhid}</span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="font-semibold text-slate-800 block">{spec.testName}</span>
-                      <span className="text-[11px] text-blue-600 font-medium">{spec.department}</span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-medium">
-                        {spec.container}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <Badge
-                        variant={
-                          spec.status === 'AUTHORIZED'
-                            ? 'success'
-                            : spec.status === 'REJECTED'
-                            ? 'danger'
-                            : spec.status === 'TESTED'
-                            ? 'info'
-                            : 'warning'
-                        }
-                      >
-                        {spec.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {spec.status !== 'REJECTED' ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleOpenRejectModal(spec)}
-                        >
-                          Reject Sample
-                        </Button>
-                      ) : (
-                        <span className="text-red-600 text-xs font-semibold">Recollection Pending</span>
-                      )}
+                {specimens.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-500">
+                      No laboratory specimens currently accessioned. Orders created in Doctor or Nursing portals automatically stream here.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  specimens.map((spec) => (
+                    <tr key={spec.id} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3 px-4 font-mono font-bold text-blue-900">
+                        {spec.accessionNumber}
+                        <span className="block text-[11px] font-normal text-slate-500">{spec.collectionTime}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-slate-900 block">{spec.patientName}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">{spec.uhid}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-semibold text-slate-800 block">{spec.testName}</span>
+                        <span className="text-[11px] text-blue-600 font-medium">{spec.department}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-medium">
+                          {spec.container}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <Badge
+                          variant={
+                            spec.status === 'AUTHORIZED'
+                              ? 'success'
+                              : spec.status === 'REJECTED'
+                              ? 'danger'
+                              : spec.status === 'TESTED'
+                              ? 'info'
+                              : 'warning'
+                          }
+                        >
+                          {spec.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {spec.status !== 'REJECTED' ? (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleOpenRejectModal(spec)}
+                          >
+                            Reject Sample
+                          </Button>
+                        ) : (
+                          <span className="text-red-600 text-xs font-semibold">Recollection Pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -404,43 +373,51 @@ export const AdvancedLISHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600">
-                {resultsList.map((res) => (
-                  <tr key={res.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-900">{res.accessionNumber}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-900">{res.patientName}</td>
-                    <td className="py-3 px-3 font-medium text-slate-800">{res.parameter}</td>
-                    <td className="py-3 px-3 font-bold text-slate-900">
-                      {res.value} {res.unit}
-                    </td>
-                    <td className="py-3 px-3 text-slate-500">{res.refRange}</td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded ${
-                          res.flag === 'CRITICAL_PANIC'
-                            ? 'bg-red-100 text-red-800 border border-red-300 animate-pulse'
-                            : res.flag === 'ABNORMAL_HIGH' || res.flag === 'ABNORMAL_LOW'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {res.flag}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {res.validationStatus === 'ENTERED' ? (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleValidateTechnologist(res.id)}
-                        >
-                          Technologist Validate
-                        </Button>
-                      ) : (
-                        <Badge variant="success">Technically Verified</Badge>
-                      )}
+                {resultsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                      No analyzer test results pending technical verification. Analyzer instrument data will populate here upon sample processing.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  resultsList.map((res) => (
+                    <tr key={res.id} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3 px-4 font-mono font-bold text-blue-900">{res.accessionNumber}</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">{res.patientName}</td>
+                      <td className="py-3 px-3 font-medium text-slate-800">{res.parameter}</td>
+                      <td className="py-3 px-3 font-bold text-slate-900">
+                        {res.value} {res.unit}
+                      </td>
+                      <td className="py-3 px-3 text-slate-500">{res.refRange}</td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded ${
+                            res.flag === 'CRITICAL_PANIC'
+                              ? 'bg-red-100 text-red-800 border border-red-300 animate-pulse'
+                              : res.flag === 'ABNORMAL_HIGH' || res.flag === 'ABNORMAL_LOW'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {res.flag}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {res.validationStatus === 'ENTERED' ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleValidateTechnologist(res.id)}
+                          >
+                            Technologist Validate
+                          </Button>
+                        ) : (
+                          <Badge variant="success">Technically Verified</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -456,41 +433,47 @@ export const AdvancedLISHub: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {resultsList.map((res) => (
-              <div
-                key={res.id}
-                className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
-                      {res.accessionNumber}
-                    </span>
-                    <span className="text-xs text-slate-600 font-semibold">{res.patientName}</span>
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-base">
-                    {res.parameter}: {res.value} {res.unit}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Biological Reference: {res.refRange} | Status: <strong>{res.validationStatus}</strong>
-                  </p>
-                </div>
-
-                <div>
-                  {res.validationStatus === 'PATHOLOGIST_AUTHORIZED' ? (
-                    <Badge variant="success">Medically Authorized & Released</Badge>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleAuthorizePathologist(res.id)}
-                    >
-                      Authorize & Apply Digital Seal
-                    </Button>
-                  )}
-                </div>
+            {resultsList.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+                No lab reports currently pending Pathologist sign-off. Technologist-verified batches will queue here for medical release.
               </div>
-            ))}
+            ) : (
+              resultsList.map((res) => (
+                <div
+                  key={res.id}
+                  className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded">
+                        {res.accessionNumber}
+                      </span>
+                      <span className="text-xs text-slate-600 font-semibold">{res.patientName}</span>
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-base">
+                      {res.parameter}: {res.value} {res.unit}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Biological Reference: {res.refRange} | Status: <strong>{res.validationStatus}</strong>
+                    </p>
+                  </div>
+
+                  <div>
+                    {res.validationStatus === 'PATHOLOGIST_AUTHORIZED' ? (
+                      <Badge variant="success">Medically Authorized & Released</Badge>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleAuthorizePathologist(res.id)}
+                      >
+                        Authorize & Apply Digital Seal
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -509,27 +492,37 @@ export const AdvancedLISHub: React.FC = () => {
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <div>
-                <span className="text-xs font-bold text-red-800 bg-red-100 px-2.5 py-0.5 rounded">
-                  PANIC ALERT — POTASSIUM 6.9 mmol/L (Severe Hyperkalemia)
-                </span>
-                <h4 className="text-base font-bold text-slate-900 mt-2">Patient: Meenakshi Iyer (UHID-2026-3829)</h4>
-                <p className="text-xs text-slate-600">Location: Ward 4 Bed 12 | Attending Physician: Dr. Rajesh Sharma</p>
+            {resultsList.filter(r => r.flag === 'CRITICAL_PANIC').length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-500">
+                No critical or panic physiological alerts flagged across active investigations.
               </div>
-              <Button
-                variant="danger"
-                onClick={() =>
-                  showToast({
-                    type: 'success',
-                    title: 'Telephone Read-Back Confirmed',
-                    message: 'Dr. Rajesh Sharma notified verbally at 16:32 IST. Read-back verified.',
-                  })
-                }
-              >
-                Log Verbal Read-Back Confirmed
-              </Button>
-            </div>
+            ) : (
+              resultsList
+                .filter(r => r.flag === 'CRITICAL_PANIC')
+                .map(r => (
+                  <div key={r.id} className="flex justify-between items-center pb-4 border-b border-slate-100 last:border-b-0 last:pb-0">
+                    <div>
+                      <span className="text-xs font-bold text-red-800 bg-red-100 px-2.5 py-0.5 rounded">
+                        PANIC ALERT — {r.parameter} {r.value} {r.unit}
+                      </span>
+                      <h4 className="text-base font-bold text-slate-900 mt-2">Patient: {r.patientName}</h4>
+                      <p className="text-xs text-slate-600">Accession: {r.accessionNumber} | Reference: {r.refRange}</p>
+                    </div>
+                    <Button
+                      variant="danger"
+                      onClick={() =>
+                        showToast({
+                          type: 'success',
+                          title: 'Telephone Read-Back Confirmed',
+                          message: `Attending physician notified verbally for ${r.patientName}. Verbal read-back documented.`,
+                        })
+                      }
+                    >
+                      Log Verbal Read-Back Confirmed
+                    </Button>
+                  </div>
+                ))
+            )}
           </div>
         </div>
       )}
@@ -537,47 +530,55 @@ export const AdvancedLISHub: React.FC = () => {
       {/* Tab 5: Microbiology & AST */}
       {activeTab === 'microbio' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-              <Bug className="w-5 h-5 text-blue-600" /> Blood Culture Isolation
-            </h3>
-            <div className="space-y-2 text-xs">
-              <p><strong>Accession:</strong> ACC-2026-90414 (Karan Mehra)</p>
-              <p><strong>Incubation Time:</strong> 48 Hours Aerobic</p>
-              <p><strong>Organism Isolated:</strong> <em>Escherichia coli</em> (ESBL Positive)</p>
-              <p><strong>Colony Count:</strong> &gt; 100,000 CFU/mL</p>
+          {specimens.filter(s => s.department === 'Microbiology').length === 0 ? (
+            <div className="col-span-full p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+              No active microbiology blood culture or antimicrobial susceptibility testing (AST) orders staged.
             </div>
-          </div>
+          ) : (
+            specimens
+              .filter(s => s.department === 'Microbiology')
+              .map(s => (
+                <React.Fragment key={s.id}>
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                      <Bug className="w-5 h-5 text-blue-600" /> Culture Isolation Tracker
+                    </h3>
+                    <div className="space-y-2 text-xs">
+                      <p><strong>Accession:</strong> {s.accessionNumber} ({s.patientName})</p>
+                      <p><strong>Test:</strong> {s.testName}</p>
+                      <p><strong>Status:</strong> {s.status}</p>
+                      <p><strong>Container:</strong> {s.container}</p>
+                    </div>
+                  </div>
 
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="text-base font-bold text-slate-900 mb-3">Antimicrobial Susceptibility Testing (AST)</h3>
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50 text-slate-700 uppercase font-semibold">
-                <tr>
-                  <th className="py-2 px-3">Antibiotic Agent</th>
-                  <th className="py-2 px-3">MIC (mcg/mL)</th>
-                  <th className="py-2 px-3">Interpretation</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="py-2 px-3 font-semibold">Meropenem</td>
-                  <td className="py-2 px-3">&lt;= 0.5</td>
-                  <td className="py-2 px-3"><span className="text-emerald-700 font-bold">SENSITIVE</span></td>
-                </tr>
-                <tr>
-                  <td className="py-2 px-3 font-semibold">Amikacin</td>
-                  <td className="py-2 px-3">&lt;= 4.0</td>
-                  <td className="py-2 px-3"><span className="text-emerald-700 font-bold">SENSITIVE</span></td>
-                </tr>
-                <tr>
-                  <td className="py-2 px-3 font-semibold">Ciprofloxacin</td>
-                  <td className="py-2 px-3">&gt;= 8.0</td>
-                  <td className="py-2 px-3"><span className="text-red-700 font-bold">RESISTANT</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 className="text-base font-bold text-slate-900 mb-3">Antimicrobial Susceptibility Testing (AST)</h3>
+                    <p className="text-xs text-slate-500 mb-2">Automated AST panel for {s.accessionNumber}:</p>
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-700 uppercase font-semibold">
+                        <tr>
+                          <th className="py-2 px-3">Antibiotic Agent</th>
+                          <th className="py-2 px-3">MIC (mcg/mL)</th>
+                          <th className="py-2 px-3">Interpretation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr>
+                          <td className="py-2 px-3 font-semibold">Meropenem</td>
+                          <td className="py-2 px-3">&lt;= 0.5</td>
+                          <td className="py-2 px-3"><span className="text-emerald-700 font-bold">SENSITIVE</span></td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 px-3 font-semibold">Amikacin</td>
+                          <td className="py-2 px-3">&lt;= 4.0</td>
+                          <td className="py-2 px-3"><span className="text-emerald-700 font-bold">SENSITIVE</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </React.Fragment>
+              ))
+          )}
         </div>
       )}
 

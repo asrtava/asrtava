@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   DollarSign,
   TrendingUp,
@@ -18,6 +18,7 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import { Button, Input, Badge, Modal, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface JournalEntryLine {
   accountCode: string;
@@ -29,6 +30,7 @@ interface JournalEntryLine {
 
 export const RevenueCycleAccountingHub: React.FC = () => {
   const { showToast } = useToast();
+  const { invoices = [] } = useHospital();
   const [subTab, setSubTab] = useState<'trial-balance' | 'ar-aging' | 'cashier-shifts' | 'gst-returns' | 'profit-loss'>('trial-balance');
 
   // New Journal Voucher Modal State
@@ -43,36 +45,80 @@ export const RevenueCycleAccountingHub: React.FC = () => {
   // Cashier Close Modal State
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [shiftCounter, setShiftCounter] = useState('Counter-OPD-1');
-  const [countedCash, setCountedCash] = useState<number>(23000);
+  const [countedCash, setCountedCash] = useState<number>(0);
   const [supervisorPin, setSupervisorPin] = useState('');
 
-  // Sample Live Chart of Accounts & Trial Balance Data
-  const trialBalanceAccounts = [
-    { code: '1001', name: 'Cash in Hand (Counter Float)', type: 'ASSET', debit: 45000.0, credit: 0.0 },
-    { code: '1002', name: 'Hospital Operating Bank Account', type: 'ASSET', debit: 3840000.0, credit: 0.0 },
-    { code: '1201', name: 'Accounts Receivable - Outpatient (OPD)', type: 'ASSET', debit: 385000.0, credit: 0.0 },
-    { code: '1202', name: 'Accounts Receivable - Inpatient (IPD)', type: 'ASSET', debit: 780000.0, credit: 0.0 },
-    { code: '1203', name: 'Accounts Receivable - Corporate / TPA', type: 'ASSET', debit: 260000.0, credit: 0.0 },
-    { code: '1301', name: 'Pharmaceutical Inventory', type: 'ASSET', debit: 1250000.0, credit: 0.0 },
-    { code: '2001', name: 'Accounts Payable - Medical Vendors', type: 'LIABILITY', debit: 0.0, credit: 890000.0 },
-    { code: '2002', name: 'CGST Output Tax Payable (9%)', type: 'LIABILITY', debit: 0.0, credit: 45000.0 },
-    { code: '2003', name: 'SGST Output Tax Payable (9%)', type: 'LIABILITY', debit: 0.0, credit: 45000.0 },
-    { code: '2101', name: 'Patient Advances & Security Deposits', type: 'LIABILITY', debit: 0.0, credit: 620000.0 },
-    { code: '3001', name: 'Hospital Capital & Reserves', type: 'EQUITY', debit: 0.0, credit: 4955000.0 },
-    { code: '4001', name: 'OPD Consultation Revenue', type: 'REVENUE', debit: 0.0, credit: 320000.0 },
-    { code: '4002', name: 'IPD Room & Nursing Care Revenue', type: 'REVENUE', debit: 0.0, credit: 680000.0 },
-    { code: '4003', name: 'Laboratory Diagnostics Revenue', type: 'REVENUE', debit: 0.0, credit: 245000.0 },
-    { code: '4004', name: 'Radiology Imaging Revenue', type: 'REVENUE', debit: 0.0, credit: 195000.0 },
-    { code: '4005', name: 'Pharmacy Sales Revenue', type: 'REVENUE', debit: 0.0, credit: 410000.0 },
-    { code: '4006', name: 'Surgery & OT Revenue', type: 'REVENUE', debit: 0.0, credit: 520000.0 },
-    { code: '5001', name: 'Medical Consumables & Surgical Expense', type: 'EXPENSE', debit: 185000.0, credit: 0.0 },
-    { code: '5002', name: 'Hospital Staff Salaries', type: 'EXPENSE', debit: 415000.0, credit: 0.0 },
-    { code: '5004', name: 'Patient Discounts & Adjustments', type: 'EXPENSE', debit: 85000.0, credit: 0.0 },
-  ];
+  // Cashier Shifts State
+  const [cashierShifts, setCashierShifts] = useState<any[]>([]);
+
+  // 1. Dynamic Financial Metrics
+  const grossBilled = useMemo(() => {
+    return invoices.reduce((sum, inv) => sum + ((inv as any).amount || inv.total || 0), 0);
+  }, [invoices]);
+
+  const collectionsToday = useMemo(() => {
+    return invoices
+      .filter(inv => inv.status === 'Paid' || ((inv as any).paidAmount && (inv as any).paidAmount > 0) || inv.paid > 0)
+      .reduce((sum, inv) => sum + ((inv as any).paidAmount || inv.paid || (inv.status === 'Paid' ? ((inv as any).amount || inv.total || 0) : 0)), 0);
+  }, [invoices]);
+
+  const totalReceivables = useMemo(() => {
+    return Math.max(0, grossBilled - collectionsToday);
+  }, [grossBilled, collectionsToday]);
+
+  const totalDiscounts = useMemo(() => {
+    return invoices.reduce((sum, inv) => sum + ((inv as any).discount || 0), 0);
+  }, [invoices]);
+
+  const netRevenue = useMemo(() => {
+    return Math.max(0, grossBilled - totalDiscounts);
+  }, [grossBilled, totalDiscounts]);
+
+  const collectionRate = grossBilled > 0 ? ((collectionsToday / grossBilled) * 100).toFixed(1) + '%' : '0.0%';
+
+  // 2. Dynamic AR Aging Buckets
+  const unpaidInvoices = useMemo(() => {
+    return invoices.filter(inv => inv.status !== 'Paid');
+  }, [invoices]);
+
+  const agingBuckets = useMemo(() => {
+    let b0to30 = 0;
+    let b31to60 = 0;
+    let b61to90 = 0;
+    let b90plus = 0;
+
+    unpaidInvoices.forEach(inv => {
+      const bal = inv.balance !== undefined ? inv.balance : (((inv as any).amount || inv.total || 0) - ((inv as any).paidAmount || inv.paid || 0));
+      const invoiceDate = (inv as any).createdAt || inv.date;
+      const days = invoiceDate ? Math.floor((Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      if (days <= 30) b0to30 += bal;
+      else if (days <= 60) b31to60 += bal;
+      else if (days <= 90) b61to90 += bal;
+      else b90plus += bal;
+    });
+
+    return { b0to30, b31to60, b61to90, b90plus };
+  }, [unpaidInvoices]);
+
+  // 3. Dynamic Trial Balance Accounts
+  const trialBalanceAccounts = useMemo(() => {
+    if (invoices.length === 0) {
+      return [];
+    }
+    const cash = collectionsToday;
+    const ar = totalReceivables;
+    const rev = grossBilled;
+    return [
+      { code: '1001', name: 'Cash in Hand (Counter Float)', type: 'ASSET', debit: cash * 0.4, credit: 0.0 },
+      { code: '1002', name: 'Hospital Operating Bank Account', type: 'ASSET', debit: cash * 0.6, credit: 0.0 },
+      { code: '1201', name: 'Accounts Receivable (Patients & Payers)', type: 'ASSET', debit: ar, credit: 0.0 },
+      { code: '4001', name: 'Hospital Clinical & Service Revenue', type: 'REVENUE', debit: 0.0, credit: rev },
+    ];
+  }, [invoices, collectionsToday, totalReceivables, grossBilled]);
 
   const totalDebits = trialBalanceAccounts.reduce((sum, a) => sum + a.debit, 0);
   const totalCredits = trialBalanceAccounts.reduce((sum, a) => sum + a.credit, 0);
-  const isTBBalanced = Math.abs(totalDebits - totalCredits) < 0.01;
+  const isTBBalanced = trialBalanceAccounts.length === 0 || Math.abs(totalDebits - totalCredits) < 0.01;
 
   // Total Journal Entry Inputs Calculation
   const jvTotalDebit = jvLines.reduce((sum, l) => sum + (Number(l.debit) || 0), 0);
@@ -114,21 +160,25 @@ export const RevenueCycleAccountingHub: React.FC = () => {
       });
       return;
     }
-    const expectedCash = 23000;
+    const expectedCash = 0;
     const variance = countedCash - expectedCash;
-    if (variance === 0) {
-      showToast({
-        type: 'success',
-        title: 'Shift Closed (Balanced)',
-        message: `Counter Shift ${shiftCounter} closed and verified BALANCED. Settlement voucher posted.`,
-      });
-    } else {
-      showToast({
-        type: 'warning',
-        title: 'Shift Discrepancy Recorded',
-        message: `Counter Shift ${shiftCounter} closed with variance of ₹${variance}. Variance hold recorded.`,
-      });
-    }
+    const newShift = {
+      counter: shiftCounter,
+      cashier: 'Billing Cashier',
+      openingFloat: 0,
+      cashIn: countedCash,
+      cashOut: 0,
+      expected: expectedCash,
+      counted: countedCash,
+      variance,
+      status: 'CLOSED',
+    };
+    setCashierShifts([newShift, ...cashierShifts]);
+    showToast({
+      type: 'success',
+      title: 'Shift Closed & Reconciled',
+      message: `Counter Shift ${shiftCounter} closed and verified. Settlement voucher posted.`,
+    });
     setIsShiftModalOpen(false);
     setSupervisorPin('');
   };
@@ -142,10 +192,10 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Gross Billed</span>
             <DollarSign className="w-4 h-4 text-teal-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-800">₹48,50,000</div>
+          <div className="text-2xl font-bold text-slate-800">₹{grossBilled.toLocaleString('en-IN')}</div>
           <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2 font-medium">
             <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>+14.2% vs last month</span>
+            <span>{invoices.length} Invoices Generated</span>
           </div>
         </div>
 
@@ -154,9 +204,9 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Net Revenue</span>
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-800">₹47,65,000</div>
+          <div className="text-2xl font-bold text-slate-800">₹{netRevenue.toLocaleString('en-IN')}</div>
           <div className="flex items-center gap-1 text-xs text-slate-500 mt-2 font-medium">
-            <span>Deductions: ₹85,000 (1.8%)</span>
+            <span>Deductions: ₹{totalDiscounts.toLocaleString('en-IN')}</span>
           </div>
         </div>
 
@@ -165,9 +215,9 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Collections Today</span>
             <Receipt className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-800">₹4,12,500</div>
+          <div className="text-2xl font-bold text-slate-800">₹{collectionsToday.toLocaleString('en-IN')}</div>
           <div className="flex items-center gap-1 text-xs text-blue-600 mt-2 font-medium">
-            <span>48.5% UPI • 26.2% Card</span>
+            <span>Direct Settlements</span>
           </div>
         </div>
 
@@ -176,9 +226,9 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Total AR Receivables</span>
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-800">₹14,25,000</div>
+          <div className="text-2xl font-bold text-slate-800">₹{totalReceivables.toLocaleString('en-IN')}</div>
           <div className="flex items-center gap-1 text-xs text-amber-600 mt-2 font-medium">
-            <span>₹7.8L TPA Insurance</span>
+            <span>{unpaidInvoices.length} Pending Accounts</span>
           </div>
         </div>
 
@@ -187,7 +237,7 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Collection Rate</span>
             <Percent className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-2xl font-bold text-purple-700">94.2%</div>
+          <div className="text-2xl font-bold text-purple-700">{collectionRate}</div>
           <div className="flex items-center gap-1 text-xs text-emerald-600 mt-2 font-medium">
             <span>SLA Target: &gt; 92.0%</span>
           </div>
@@ -320,46 +370,56 @@ export const RevenueCycleAccountingHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {trialBalanceAccounts.map((ac) => (
-                    <tr key={ac.code} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-3 font-mono font-medium text-slate-800">{ac.code}</td>
-                      <td className="px-4 py-3 font-medium text-slate-800">{ac.name}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                            ac.type === 'ASSET'
-                              ? 'bg-blue-100 text-blue-700'
-                              : ac.type === 'LIABILITY'
-                              ? 'bg-amber-100 text-amber-700'
-                              : ac.type === 'EQUITY'
-                              ? 'bg-purple-100 text-purple-700'
-                              : ac.type === 'REVENUE'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-rose-100 text-rose-700'
-                          }`}
-                        >
-                          {ac.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-900">
-                        {ac.debit > 0 ? ac.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-900">
-                        {ac.credit > 0 ? ac.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                  {trialBalanceAccounts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500 font-sans">
+                        No transactions recorded in general ledger yet. Posted invoices and collections will generate balanced trial balance entries.
                       </td>
                     </tr>
-                  ))}
-                  <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
-                    <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider">
-                      Grand Totals:
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-teal-800 text-base">
-                      ₹{totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-teal-800 text-base">
-                      ₹{totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
+                  ) : (
+                    trialBalanceAccounts.map((ac) => (
+                      <tr key={ac.code} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3 font-mono font-medium text-slate-800">{ac.code}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{ac.name}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                              ac.type === 'ASSET'
+                                ? 'bg-blue-100 text-blue-700'
+                                : ac.type === 'LIABILITY'
+                                ? 'bg-amber-100 text-amber-700'
+                                : ac.type === 'EQUITY'
+                                ? 'bg-purple-100 text-purple-700'
+                                : ac.type === 'REVENUE'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {ac.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-900">
+                          {ac.debit > 0 ? ac.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-slate-900">
+                          {ac.credit > 0 ? ac.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                  {trialBalanceAccounts.length > 0 && (
+                    <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+                      <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider">
+                        Grand Totals:
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-teal-800 text-base">
+                        ₹{totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-teal-800 text-base">
+                        ₹{totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -379,23 +439,31 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                 <div className="text-xs font-semibold text-emerald-700 uppercase">0 – 30 Days (Current)</div>
-                <div className="text-xl font-bold text-emerald-900 mt-1">₹8,50,000</div>
-                <div className="text-xs text-emerald-700 mt-2 font-medium">59.6% of outstanding • Normal flow</div>
+                <div className="text-xl font-bold text-emerald-900 mt-1">₹{agingBuckets.b0to30.toLocaleString('en-IN')}</div>
+                <div className="text-xs text-emerald-700 mt-2 font-medium">
+                  {totalReceivables > 0 ? ((agingBuckets.b0to30 / totalReceivables) * 100).toFixed(1) : '0.0'}% of outstanding
+                </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="text-xs font-semibold text-blue-700 uppercase">31 – 60 Days</div>
-                <div className="text-xl font-bold text-blue-900 mt-1">₹3,20,000</div>
-                <div className="text-xs text-blue-700 mt-2 font-medium">22.5% • TPA query response required</div>
+                <div className="text-xl font-bold text-blue-900 mt-1">₹{agingBuckets.b31to60.toLocaleString('en-IN')}</div>
+                <div className="text-xs text-blue-700 mt-2 font-medium">
+                  {totalReceivables > 0 ? ((agingBuckets.b31to60 / totalReceivables) * 100).toFixed(1) : '0.0'}% of outstanding
+                </div>
               </div>
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                 <div className="text-xs font-semibold text-amber-700 uppercase">61 – 90 Days</div>
-                <div className="text-xl font-bold text-amber-900 mt-1">₹1,65,000</div>
-                <div className="text-xs text-amber-700 mt-2 font-medium">11.6% • High-priority escalation</div>
+                <div className="text-xl font-bold text-amber-900 mt-1">₹{agingBuckets.b61to90.toLocaleString('en-IN')}</div>
+                <div className="text-xs text-amber-700 mt-2 font-medium">
+                  {totalReceivables > 0 ? ((agingBuckets.b61to90 / totalReceivables) * 100).toFixed(1) : '0.0'}% of outstanding
+                </div>
               </div>
               <div className="bg-rose-50 border border-rose-200 rounded-xl p-4">
                 <div className="text-xs font-semibold text-rose-700 uppercase">90+ Days (Doubtful)</div>
-                <div className="text-xl font-bold text-rose-900 mt-1">₹90,000</div>
-                <div className="text-xs text-rose-700 mt-2 font-medium">6.3% • Subject to bad-debt provisioning</div>
+                <div className="text-xl font-bold text-rose-900 mt-1">₹{agingBuckets.b90plus.toLocaleString('en-IN')}</div>
+                <div className="text-xs text-rose-700 mt-2 font-medium">
+                  {totalReceivables > 0 ? ((agingBuckets.b90plus / totalReceivables) * 100).toFixed(1) : '0.0'}% of outstanding
+                </div>
               </div>
             </div>
 
@@ -404,29 +472,11 @@ export const RevenueCycleAccountingHub: React.FC = () => {
               <div className="space-y-2">
                 <div>
                   <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
-                    <span>TPA & Private Health Insurers</span>
-                    <span>₹7,80,000 (54.7%)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div className="bg-teal-600 h-2 rounded-full" style={{ width: '54.7%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
                     <span>Self-Pay Patients</span>
-                    <span>₹3,85,000 (27.0%)</span>
+                    <span>₹{totalReceivables.toLocaleString('en-IN')} (100%)</span>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: '27.0%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
-                    <span>Corporate & PSU Credit Panels</span>
-                    <span>₹2,60,000 (18.3%)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div className="bg-purple-600 h-2 rounded-full" style={{ width: '18.3%' }}></div>
+                    <div className="bg-teal-600 h-2 rounded-full" style={{ width: totalReceivables > 0 ? '100%' : '0%' }}></div>
                   </div>
                 </div>
               </div>
@@ -462,38 +512,33 @@ export const RevenueCycleAccountingHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-semibold text-slate-800">Counter-OPD-1</td>
-                    <td className="px-4 py-3 font-medium text-slate-700">Rohit Sharma</td>
-                    <td className="px-4 py-3 text-right font-mono">₹5,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono">₹20,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono">₹2,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">₹23,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">₹23,000.00</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                        ₹0.00 (Balanced)
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant="success">CLOSED</Badge>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-semibold text-slate-800">Counter-EMERG-2</td>
-                    <td className="px-4 py-3 font-medium text-slate-700">Meera Iyer</td>
-                    <td className="px-4 py-3 text-right font-mono">₹10,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono">₹34,500.00</td>
-                    <td className="px-4 py-3 text-right font-mono">₹0.00</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">₹44,500.00</td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">-</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-xs text-slate-400">Shift In-Progress</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Badge variant="warning">OPEN</Badge>
-                    </td>
-                  </tr>
+                  {cashierShifts.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-500 font-sans">
+                        No cashier shifts recorded. Click "Close Counter & Reconcile" above to close an active shift and post settlement.
+                      </td>
+                    </tr>
+                  ) : (
+                    cashierShifts.map((s, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3 font-semibold text-slate-800">{s.counter}</td>
+                        <td className="px-4 py-3 font-medium text-slate-700">{s.cashier}</td>
+                        <td className="px-4 py-3 text-right font-mono">₹{s.openingFloat.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono">₹{s.cashIn.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono">₹{s.cashOut.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold">₹{s.expected.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold">₹{s.counted.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded ${s.variance === 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                            ₹{s.variance.toFixed(2)} ({s.variance === 0 ? 'Balanced' : 'Discrepancy'})
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant={s.status === 'CLOSED' ? 'success' : 'warning'}>{s.status}</Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -507,7 +552,7 @@ export const RevenueCycleAccountingHub: React.FC = () => {
               <div>
                 <h4 className="text-base font-bold text-slate-800">GST Compliance & Tax Schedules (India)</h4>
                 <p className="text-xs text-slate-500">
-                  GSTIN: <span className="font-mono font-semibold text-slate-800">07AAAAA0000A1Z5</span> • FY 2026-27 (Q1)
+                  SAC 999312 Healthcare Exempt Turnover & Tax Schedules
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -525,20 +570,20 @@ export const RevenueCycleAccountingHub: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
                 <div className="text-xs font-semibold text-emerald-800 uppercase">Exempt Healthcare (SAC 999312)</div>
-                <div className="text-2xl font-bold text-emerald-950 mt-1">₹39,50,000</div>
+                <div className="text-2xl font-bold text-emerald-950 mt-1">₹{grossBilled.toLocaleString('en-IN')}</div>
                 <div className="text-xs text-emerald-800 mt-2 font-medium">
                   Notification 12/2017-Central Tax Rate (0% GST)
                 </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
                 <div className="text-xs font-semibold text-blue-800 uppercase">Taxable Pharmacy Turnover</div>
-                <div className="text-2xl font-bold text-blue-950 mt-1">₹9,00,000</div>
+                <div className="text-2xl font-bold text-blue-950 mt-1">₹0</div>
                 <div className="text-xs text-blue-800 mt-2 font-medium">HSN 3004 (5%) & HSN 300490 (12%)</div>
               </div>
               <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl">
                 <div className="text-xs font-semibold text-purple-800 uppercase">Total Tax Liability (CGST + SGST)</div>
-                <div className="text-2xl font-bold text-purple-950 mt-1">₹90,000</div>
-                <div className="text-xs text-purple-800 mt-2 font-medium">CGST: ₹45,000 | SGST: ₹45,000</div>
+                <div className="text-2xl font-bold text-purple-950 mt-1">₹0</div>
+                <div className="text-xs text-purple-800 mt-2 font-medium">CGST: ₹0 | SGST: ₹0</div>
               </div>
             </div>
 
@@ -564,26 +609,8 @@ export const RevenueCycleAccountingHub: React.FC = () => {
                         0% (Exempt)
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">39,50,000.00</td>
+                    <td className="px-4 py-3 text-right font-mono">{grossBilled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">0.00</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-mono font-semibold text-slate-800">3004</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">Medicaments in measured doses (Retail Pharmacy)</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-xs font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded">5% GST</span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">6,00,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-900 font-semibold">30,000.00</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-mono font-semibold text-slate-800">300490</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">Diagnostic reagents & consumables</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded">12% GST</span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">3,00,000.00</td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-900 font-semibold">36,000.00</td>
                   </tr>
                 </tbody>
               </table>
@@ -601,7 +628,7 @@ export const RevenueCycleAccountingHub: React.FC = () => {
               </div>
               <div className="text-right">
                 <div className="text-xs text-slate-500 uppercase font-semibold">Net Operating Surplus</div>
-                <div className="text-2xl font-bold text-teal-800">₹16,85,000</div>
+                <div className="text-2xl font-bold text-teal-800">₹{netRevenue.toLocaleString('en-IN')}</div>
               </div>
             </div>
 
@@ -613,32 +640,12 @@ export const RevenueCycleAccountingHub: React.FC = () => {
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                     Operating Revenues
                   </h5>
-                  <span className="text-sm font-bold text-emerald-700">₹23,70,000</span>
+                  <span className="text-sm font-bold text-emerald-700">₹{grossBilled.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-slate-700">
-                    <span>IPD Room & Nursing Care</span>
-                    <span className="font-mono font-medium">₹6,80,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Surgery & Operation Theatre</span>
-                    <span className="font-mono font-medium">₹5,20,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Pharmacy Sales</span>
-                    <span className="font-mono font-medium">₹4,10,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>OPD Consultations</span>
-                    <span className="font-mono font-medium">₹3,20,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Laboratory Diagnostics</span>
-                    <span className="font-mono font-medium">₹2,45,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Radiology & Imaging</span>
-                    <span className="font-mono font-medium">₹1,95,000</span>
+                    <span>Clinical Healthcare Services</span>
+                    <span className="font-mono font-medium">₹{grossBilled.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>
@@ -650,20 +657,12 @@ export const RevenueCycleAccountingHub: React.FC = () => {
                     <ArrowDownRight className="w-4 h-4 text-rose-600" />
                     Operating Expenses & Deductions
                   </h5>
-                  <span className="text-sm font-bold text-rose-700">₹6,85,000</span>
+                  <span className="text-sm font-bold text-rose-700">₹{totalDiscounts.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-slate-700">
-                    <span>Staff & Clinical Salaries</span>
-                    <span className="font-mono font-medium">₹4,15,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Medical & Surgical Consumables</span>
-                    <span className="font-mono font-medium">₹1,85,000</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>Discounts & Adjustments</span>
-                    <span className="font-mono font-medium">₹85,000</span>
+                    <span>Discounts & Concessions</span>
+                    <span className="font-mono font-medium">₹{totalDiscounts.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>

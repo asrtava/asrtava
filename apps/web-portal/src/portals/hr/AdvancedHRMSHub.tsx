@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   UserPlus,
@@ -21,6 +21,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { Button, Badge, Modal, Input, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface EmployeeRecord {
   id: string;
@@ -117,181 +118,47 @@ interface SeparationRecord {
 
 export const AdvancedHRMSHub: React.FC = () => {
   const { showToast } = useToast();
+  const { staff } = useHospital();
   const [activeTab, setActiveTab] = useState<
     'workforce' | 'recruitment' | 'attendance' | 'rostering' | 'leaves' | 'payroll' | 'credentials' | 'separation'
   >('workforce');
 
   // 1. Workforce Directory State
-  const [employees, setEmployees] = useState<EmployeeRecord[]>([
-    {
-      id: 'emp-101',
-      employeeNumber: 'EMP-DOC-101',
-      name: 'Dr. Rajesh Sharma',
-      department: 'Cardiology',
-      designation: 'Chief of Cardiology',
-      employmentType: 'FULL_TIME',
-      employmentStatus: 'ACTIVE',
-      dateOfJoining: '2020-03-15',
-      phone: '+91 98765 43210',
-      email: 'rajesh.sharma@asrtava-health.in',
-      bloodGroup: 'B+',
-      emergencyContact: 'Sunita Sharma (+91 98765 43211)',
-      isAccountLinked: true,
-    },
-    {
-      id: 'emp-102',
-      employeeNumber: 'EMP-NUR-204',
-      name: 'Nurse Anjali Verma',
-      department: 'ICU',
-      designation: 'Head Critical Care Nurse',
-      employmentType: 'FULL_TIME',
-      employmentStatus: 'ACTIVE',
-      dateOfJoining: '2022-06-01',
-      phone: '+91 98111 22334',
-      email: 'anjali.verma@asrtava-health.in',
-      bloodGroup: 'O+',
-      emergencyContact: 'Kavita Verma (+91 98111 22335)',
-      isAccountLinked: true,
-    },
-    {
-      id: 'emp-103',
-      employeeNumber: 'EMP-PHM-301',
-      name: 'Suresh Nair',
-      department: 'Pharmacy',
-      designation: 'Senior Clinical Pharmacist',
-      employmentType: 'FULL_TIME',
-      employmentStatus: 'ACTIVE',
-      dateOfJoining: '2023-01-10',
-      phone: '+91 98222 33445',
-      email: 'suresh.nair@asrtava-health.in',
-      bloodGroup: 'A+',
-      emergencyContact: 'Meera Nair (+91 98222 33446)',
-      isAccountLinked: true,
-    },
-    {
-      id: 'emp-104',
-      employeeNumber: 'EMP-TRA-405',
-      name: 'Rohan Mehra',
-      department: 'Front Desk',
-      designation: 'Patient Reception Executive',
-      employmentType: 'TRAINEE',
-      employmentStatus: 'PROBATION',
-      dateOfJoining: '2026-10-01',
-      phone: '+91 98333 44556',
-      email: 'rohan.mehra@asrtava-health.in',
-      bloodGroup: 'AB+',
-      emergencyContact: 'Vijay Mehra (+91 98333 44557)',
-      isAccountLinked: false,
-    },
-  ]);
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+
+  useEffect(() => {
+    if (staff && staff.length > 0) {
+      setEmployees(
+        staff.map((s, idx) => ({
+          id: s.id || `emp-${idx + 101}`,
+          employeeNumber: `EMP-${(s.role || 'STF').slice(0, 3).toUpperCase()}-${idx + 101}`,
+          name: s.name,
+          department: s.department || 'General',
+          designation: s.role || 'Staff Member',
+          employmentType: 'FULL_TIME',
+          employmentStatus: s.status === 'On Duty' ? 'ACTIVE' : s.status === 'On Leave' ? 'PROBATION' : 'ACTIVE',
+          dateOfJoining: '2026-01-01',
+          phone: s.phone || '+91 98000 00000',
+          email: s.email || `${s.name.toLowerCase().replace(/[^a-z]/g, '')}@asrtava-health.in`,
+          bloodGroup: 'B+',
+          emergencyContact: 'Family Contact',
+          isAccountLinked: true,
+        }))
+      );
+    }
+  }, [staff]);
 
   // 2. Recruitment State
-  const [requisitions, setRequisitions] = useState<RequisitionRecord[]>([
-    {
-      id: 'req-01',
-      requisitionNumber: 'REQ-2026-CARDIO-02',
-      department: 'Cardiology',
-      designation: 'Consultant Interventional Cardiologist',
-      vacancies: 2,
-      priority: 'HIGH',
-      status: 'OPEN',
-      appliedCount: 8,
-    },
-    {
-      id: 'req-02',
-      requisitionNumber: 'REQ-2026-ICU-05',
-      department: 'ICU',
-      designation: 'Staff Nurse (Critical Care)',
-      vacancies: 5,
-      priority: 'URGENT',
-      status: 'OPEN',
-      appliedCount: 14,
-    },
-  ]);
+  const [requisitions, setRequisitions] = useState<RequisitionRecord[]>([]);
 
   // 3. Attendance Punch Log State
-  const [punches, setPunches] = useState<AttendancePunch[]>([
-    {
-      id: 'p-1',
-      employeeName: 'Dr. Rajesh Sharma',
-      time: '07:54 AM',
-      punchType: 'CHECK_IN',
-      source: 'BIOMETRIC_DEVICE',
-      verificationMode: 'FINGERPRINT (Bio-Device North Tower)',
-      status: 'NORMAL',
-    },
-    {
-      id: 'p-2',
-      employeeName: 'Nurse Anjali Verma',
-      time: '07:48 AM',
-      punchType: 'CHECK_IN',
-      source: 'BIOMETRIC_DEVICE',
-      verificationMode: 'FACIAL_SCAN (ICU Gate A)',
-      status: 'NORMAL',
-    },
-    {
-      id: 'p-3',
-      employeeName: 'Suresh Nair',
-      time: '08:02 AM',
-      punchType: 'CHECK_IN',
-      source: 'WEB_PORTAL',
-      verificationMode: 'MFA_PORTAL_OVERRIDE',
-      status: 'NORMAL',
-    },
-  ]);
+  const [punches, setPunches] = useState<AttendancePunch[]>([]);
 
   // 4. Shift Rostering State
-  const [rosters, setRosters] = useState<DutyRosterItem[]>([
-    {
-      id: 'ros-1',
-      date: '2026-11-09',
-      employeeName: 'Dr. Rajesh Sharma',
-      department: 'Cardiology',
-      shiftName: 'Morning Specialist (OPD & CathLab)',
-      shiftHours: '08:00 - 16:00',
-      role: 'PRIMARY_CONSULTANT',
-    },
-    {
-      id: 'ros-2',
-      date: '2026-11-09',
-      employeeName: 'Nurse Anjali Verma',
-      department: 'ICU',
-      shiftName: 'Morning Intensive Coverage',
-      shiftHours: '07:00 - 15:00',
-      role: 'HEAD_NURSE',
-    },
-    {
-      id: 'ros-3',
-      date: '2026-11-09',
-      employeeName: 'Dr. Vikram Sethi',
-      department: 'Emergency & Trauma',
-      shiftName: '24/7 On-Call Trauma Lead',
-      shiftHours: 'ON_CALL (24 Hours)',
-      role: 'ON_CALL_SURGEON',
-    },
-  ]);
+  const [rosters, setRosters] = useState<DutyRosterItem[]>([]);
 
   // 5. Leave Applications State
-  const [leaves, setLeaves] = useState<LeaveRecord[]>([
-    {
-      id: 'lv-01',
-      employeeName: 'Nurse Anjali Verma',
-      leaveType: 'Casual Leave (CL)',
-      dates: '14 Nov - 16 Nov 2026',
-      days: 3,
-      reason: 'Family wedding out of state. Ward handoff arranged with Nurse Kavita.',
-      status: 'PENDING',
-    },
-    {
-      id: 'lv-02',
-      employeeName: 'Dr. Rajesh Sharma',
-      leaveType: 'Conference / Academic (CME)',
-      dates: '22 Nov - 24 Nov 2026',
-      days: 3,
-      reason: 'Keynote Speaker at National Cardiology Congress 2026.',
-      status: 'APPROVED',
-    },
-  ]);
+  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
   // 6. Monthly Payroll Batch State
   const [payrollBatch, setPayrollBatch] = useState<{
@@ -304,101 +171,19 @@ export const AdvancedHRMSHub: React.FC = () => {
   }>({
     batchCode: 'PAY-2026-11-CORP',
     periodMonth: '2026-11',
-    status: 'APPROVED',
-    totalGross: 485000,
-    totalDeductions: 54600,
-    totalNet: 430400,
+    status: 'DRAFT',
+    totalGross: 0,
+    totalDeductions: 0,
+    totalNet: 0,
   });
 
-  const [payslips] = useState<PayslipSummary[]>([
-    {
-      id: 'ps-101',
-      employeeNumber: 'EMP-DOC-101',
-      employeeName: 'Dr. Rajesh Sharma',
-      basicEarned: 150000,
-      hraEarned: 60000,
-      allowances: 40000,
-      pfDeduction: 18000,
-      ptDeduction: 200,
-      tdsDeduction: 15000,
-      netPayable: 216800,
-      status: 'APPROVED',
-    },
-    {
-      id: 'ps-102',
-      employeeNumber: 'EMP-NUR-204',
-      employeeName: 'Nurse Anjali Verma',
-      basicEarned: 45000,
-      hraEarned: 18000,
-      allowances: 12000,
-      pfDeduction: 5400,
-      ptDeduction: 200,
-      tdsDeduction: 2000,
-      netPayable: 67400,
-      status: 'APPROVED',
-    },
-    {
-      id: 'ps-103',
-      employeeNumber: 'EMP-PHM-301',
-      employeeName: 'Suresh Nair',
-      basicEarned: 35000,
-      hraEarned: 14000,
-      allowances: 9000,
-      pfDeduction: 4200,
-      ptDeduction: 200,
-      tdsDeduction: 1200,
-      netPayable: 52400,
-      status: 'APPROVED',
-    },
-  ]);
+  const [payslips] = useState<PayslipSummary[]>([]);
 
   // 7. Professional Credentials State
-  const [credentials, setCredentials] = useState<CredentialRecord[]>([
-    {
-      id: 'c-1',
-      employeeName: 'Dr. Rajesh Sharma',
-      type: 'NMC / State Medical Council Registration',
-      licenseNumber: 'MCI-1998-44120',
-      authority: 'National Medical Commission',
-      expiryDate: '2028-04-30',
-      daysRemaining: 538,
-      status: 'VERIFIED',
-    },
-    {
-      id: 'c-2',
-      employeeName: 'Nurse Anjali Verma',
-      type: 'Indian Nursing Council (INC) & BLS/ACLS',
-      licenseNumber: 'INC-RN-2012-881',
-      authority: 'State Nursing Council & AHA',
-      expiryDate: '2026-12-05',
-      daysRemaining: 26,
-      status: 'EXPIRING_SOON',
-    },
-    {
-      id: 'c-3',
-      employeeName: 'Suresh Nair',
-      type: 'Pharmacy Council of India (PCI) Reg',
-      licenseNumber: 'PCI-PHARM-2010-992',
-      authority: 'State Pharmacy Council',
-      expiryDate: '2027-09-15',
-      daysRemaining: 310,
-      status: 'VERIFIED',
-    },
-  ]);
+  const [credentials, setCredentials] = useState<CredentialRecord[]>([]);
 
   // 8. Employee Separation State
-  const [separations, setSeparations] = useState<SeparationRecord[]>([
-    {
-      id: 'sep-01',
-      employeeName: 'Pooja Iyer (Staff Nurse)',
-      resignationDate: '2026-10-15',
-      relievingDate: '2026-11-15',
-      handoverDone: true,
-      assetsReturned: true,
-      accessRevoked: false,
-      status: 'IN_CLEARANCE',
-    },
-  ]);
+  const [separations, setSeparations] = useState<SeparationRecord[]>([]);
 
   // Modal Handlers
   const [isAddEmpModalOpen, setIsAddEmpModalOpen] = useState(false);
@@ -660,47 +445,55 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {employees.map(emp => (
-              <div
-                key={emp.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{emp.name}</div>
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">{emp.employeeNumber}</div>
+          {employees.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <Users className="w-10 h-10 mx-auto mb-2 text-blue-500 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No workforce personnel registered yet</p>
+              <p className="text-xs text-gray-400 mt-1">Click &apos;Onboard Employee&apos; to register doctors, nurses, and administrative staff into the HR master.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {employees.map(emp => (
+                <div
+                  key={emp.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{emp.name}</div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">{emp.employeeNumber}</div>
+                    </div>
+                    <Badge variant={emp.employmentStatus === 'ACTIVE' ? 'success' : 'warning'}>
+                      {emp.employmentStatus}
+                    </Badge>
                   </div>
-                  <Badge variant={emp.employmentStatus === 'ACTIVE' ? 'success' : 'warning'}>
-                    {emp.employmentStatus}
-                  </Badge>
-                </div>
 
-                <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div>
-                    <span className="font-medium text-gray-500">Dept:</span> {emp.department}
+                  <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div>
+                      <span className="font-medium text-gray-500">Dept:</span> {emp.department}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Designation:</span> {emp.designation}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Phone:</span> {emp.phone}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Blood Group:</span> {emp.bloodGroup}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Designation:</span> {emp.designation}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Phone:</span> {emp.phone}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Blood Group:</span> {emp.bloodGroup}
-                  </div>
-                </div>
 
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-gray-500">
-                    <ShieldCheck className={`w-3.5 h-3.5 ${emp.isAccountLinked ? 'text-green-500' : 'text-gray-400'}`} />
-                    {emp.isAccountLinked ? 'Account Active' : 'Unlinked Profile'}
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-gray-500">
+                      <ShieldCheck className={`w-3.5 h-3.5 ${emp.isAccountLinked ? 'text-green-500' : 'text-gray-400'}`} />
+                      {emp.isAccountLinked ? 'Account Active' : 'Unlinked Profile'}
+                    </div>
+                    <span className="text-gray-400">Joined {emp.dateOfJoining}</span>
                   </div>
-                  <span className="text-gray-400">Joined {emp.dateOfJoining}</span>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -722,40 +515,48 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {requisitions.map(req => (
-              <div
-                key={req.id}
-                className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs text-blue-600 font-semibold">{req.requisitionNumber}</div>
-                    <div className="text-base font-bold text-gray-900 dark:text-gray-100">{req.designation}</div>
-                    <div className="text-xs text-gray-500">Department: {req.department}</div>
+          {requisitions.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <Briefcase className="w-10 h-10 mx-auto mb-2 text-amber-500 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No active job requisitions</p>
+              <p className="text-xs text-gray-400 mt-1">Click &apos;New Requisition&apos; to initiate recruitment for open department vacancies.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {requisitions.map(req => (
+                <div
+                  key={req.id}
+                  className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-xs text-blue-600 font-semibold">{req.requisitionNumber}</div>
+                      <div className="text-base font-bold text-gray-900 dark:text-gray-100">{req.designation}</div>
+                      <div className="text-xs text-gray-500">Department: {req.department}</div>
+                    </div>
+                    <Badge variant={req.priority === 'URGENT' ? 'danger' : 'warning'}>
+                      {req.priority} PRIORITY
+                    </Badge>
                   </div>
-                  <Badge variant={req.priority === 'URGENT' ? 'danger' : 'warning'}>
-                    {req.priority} PRIORITY
-                  </Badge>
-                </div>
 
-                <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-100 dark:border-gray-700/50">
-                  <div className="text-gray-600 dark:text-gray-300">
-                    <span className="font-semibold text-gray-900 dark:text-gray-100">{req.vacancies}</span> Vacancies &bull;{' '}
-                    <span className="font-semibold text-blue-600">{req.appliedCount}</span> Applied
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="text-xs">
-                      View Pipeline
-                    </Button>
-                    <Button size="sm" className="text-xs">
-                      Schedule Interview
-                    </Button>
+                  <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                    <div className="text-gray-600 dark:text-gray-300">
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">{req.vacancies}</span> Vacancies &bull;{' '}
+                      <span className="font-semibold text-blue-600">{req.appliedCount}</span> Applied
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="text-xs">
+                        View Pipeline
+                      </Button>
+                      <Button size="sm" className="text-xs">
+                        Schedule Interview
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -774,7 +575,7 @@ export const AdvancedHRMSHub: React.FC = () => {
             <div className="flex items-center gap-2">
               <Badge variant="success" className="flex items-center gap-1">
                 <Cpu className="w-3 h-3" />
-                3 Biometric Terminals Online
+                Biometric Terminals Connected
               </Badge>
             </div>
           </div>
@@ -792,22 +593,32 @@ export const AdvancedHRMSHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {punches.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                    <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{p.employeeName}</td>
-                    <td className="p-3">
-                      <Badge variant={p.punchType === 'CHECK_IN' ? 'success' : 'info'}>
-                        {p.punchType}
-                      </Badge>
-                    </td>
-                    <td className="p-3 text-gray-600 dark:text-gray-300 font-mono">{p.time}</td>
-                    <td className="p-3 text-gray-600 dark:text-gray-300">{p.source}</td>
-                    <td className="p-3 text-gray-500">{p.verificationMode}</td>
-                    <td className="p-3">
-                      <span className="text-green-600 font-medium">Verified</span>
+                {punches.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-gray-400">
+                      <Clock className="w-8 h-8 mx-auto mb-2 text-purple-400 opacity-50" />
+                      <p className="font-medium text-gray-700 dark:text-gray-300">No Biometric Punch Logs Today</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Biometric terminals and web check-ins will display employee timestamp records here in real-time.</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  punches.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="p-3 font-semibold text-gray-900 dark:text-gray-100">{p.employeeName}</td>
+                      <td className="p-3">
+                        <Badge variant={p.punchType === 'CHECK_IN' ? 'success' : 'info'}>
+                          {p.punchType}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300 font-mono">{p.time}</td>
+                      <td className="p-3 text-gray-600 dark:text-gray-300">{p.source}</td>
+                      <td className="p-3 text-gray-500">{p.verificationMode}</td>
+                      <td className="p-3">
+                        <span className="text-green-600 font-medium">Verified</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -832,44 +643,52 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {rosters.map(ros => (
-              <div
-                key={ros.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{ros.shiftName}</div>
-                    <div className="text-xs text-blue-600 font-medium">{ros.department}</div>
+          {rosters.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <Calendar className="w-10 h-10 mx-auto mb-2 text-indigo-500 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No shift rosters assigned for current period</p>
+              <p className="text-xs text-gray-400 mt-1">Click &apos;Assign Duty Shift&apos; to schedule clinical coverage across wards and departments.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {rosters.map(ros => (
+                <div
+                  key={ros.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{ros.shiftName}</div>
+                      <div className="text-xs text-blue-600 font-medium">{ros.department}</div>
+                    </div>
+                    <Badge variant="info">{ros.shiftHours}</Badge>
                   </div>
-                  <Badge variant="info">{ros.shiftHours}</Badge>
-                </div>
 
-                <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div>
-                    <span className="font-medium text-gray-500">Assigned To:</span> {ros.employeeName}
+                  <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div>
+                      <span className="font-medium text-gray-500">Assigned To:</span> {ros.employeeName}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Roster Role:</span> {ros.role}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Date:</span> {ros.date}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Roster Role:</span> {ros.role}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Date:</span> {ros.date}
-                  </div>
-                </div>
 
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs text-green-600 font-medium">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Conflict Check Passed
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs text-green-600 font-medium">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Conflict Check Passed
+                    </div>
+                    <Button variant="outline" size="sm" className="text-xs py-0.5">
+                      Duty Swap
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" className="text-xs py-0.5">
-                    Duty Swap
-                  </Button>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -891,49 +710,57 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {leaves.map(lv => (
-              <div
-                key={lv.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{lv.employeeName}</span>
-                    <Badge variant={lv.status === 'APPROVED' ? 'success' : lv.status === 'PENDING' ? 'warning' : 'danger'}>
-                      {lv.status}
-                    </Badge>
+          {leaves.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <FileText className="w-10 h-10 mx-auto mb-2 text-teal-500 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No pending leave requests</p>
+              <p className="text-xs text-gray-400 mt-1">Employee leave applications and supervisor sign-offs will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {leaves.map(lv => (
+                <div
+                  key={lv.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{lv.employeeName}</span>
+                      <Badge variant={lv.status === 'APPROVED' ? 'success' : lv.status === 'PENDING' ? 'warning' : 'danger'}>
+                        {lv.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-blue-600 font-medium">
+                      {lv.leaveType} &bull; {lv.dates} ({lv.days} Days)
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-300 italic">{lv.reason}</p>
                   </div>
-                  <div className="text-xs text-blue-600 font-medium">
-                    {lv.leaveType} &bull; {lv.dates} ({lv.days} Days)
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-300 italic">{lv.reason}</p>
-                </div>
 
-                {lv.status === 'PENDING' && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => handleApproveLeave(lv.id, true)}
-                      className="bg-green-600 hover:bg-green-700 text-xs flex items-center gap-1"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Approve & Deduct
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleApproveLeave(lv.id, false)}
-                      className="text-red-600 hover:bg-red-50 text-xs flex items-center gap-1"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {lv.status === 'PENDING' && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleApproveLeave(lv.id, true)}
+                        className="bg-green-600 hover:bg-green-700 text-xs flex items-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Approve & Deduct
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleApproveLeave(lv.id, false)}
+                        className="text-red-600 hover:bg-red-50 text-xs flex items-center gap-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -998,25 +825,35 @@ export const AdvancedHRMSHub: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {payslips.map(ps => (
-                  <tr key={ps.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                    <td className="p-3">
-                      <div className="font-semibold text-gray-900 dark:text-gray-100">{ps.employeeName}</div>
-                      <div className="text-xs text-gray-400">{ps.employeeNumber}</div>
-                    </td>
-                    <td className="p-3 font-mono">₹{ps.basicEarned.toLocaleString('en-IN')}</td>
-                    <td className="p-3 font-mono">₹{(ps.hraEarned + ps.allowances).toLocaleString('en-IN')}</td>
-                    <td className="p-3 font-mono text-red-600">₹{ps.pfDeduction.toLocaleString('en-IN')}</td>
-                    <td className="p-3 font-mono text-red-600">₹{ps.ptDeduction.toLocaleString('en-IN')}</td>
-                    <td className="p-3 font-mono text-red-600">₹{ps.tdsDeduction.toLocaleString('en-IN')}</td>
-                    <td className="p-3 font-mono font-bold text-green-600">₹{ps.netPayable.toLocaleString('en-IN')}</td>
-                    <td className="p-3">
-                      <Button variant="outline" size="sm" className="text-xs py-0.5">
-                        Download PDF
-                      </Button>
+                {payslips.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-gray-400">
+                      <DollarSign className="w-8 h-8 mx-auto mb-2 text-emerald-400 opacity-50" />
+                      <p className="font-medium text-gray-700 dark:text-gray-300">No Payslips Generated</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Calculated payroll slips for active employees will appear here upon monthly cycle processing.</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  payslips.map(ps => (
+                    <tr key={ps.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                      <td className="p-3">
+                        <div className="font-semibold text-gray-900 dark:text-gray-100">{ps.employeeName}</div>
+                        <div className="text-xs text-gray-400">{ps.employeeNumber}</div>
+                      </td>
+                      <td className="p-3 font-mono">₹{ps.basicEarned.toLocaleString('en-IN')}</td>
+                      <td className="p-3 font-mono">₹{(ps.hraEarned + ps.allowances).toLocaleString('en-IN')}</td>
+                      <td className="p-3 font-mono text-red-600">₹{ps.pfDeduction.toLocaleString('en-IN')}</td>
+                      <td className="p-3 font-mono text-red-600">₹{ps.ptDeduction.toLocaleString('en-IN')}</td>
+                      <td className="p-3 font-mono text-red-600">₹{ps.tdsDeduction.toLocaleString('en-IN')}</td>
+                      <td className="p-3 font-mono font-bold text-green-600">₹{ps.netPayable.toLocaleString('en-IN')}</td>
+                      <td className="p-3">
+                        <Button variant="outline" size="sm" className="text-xs py-0.5">
+                          Download PDF
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1041,43 +878,51 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {credentials.map(c => (
-              <div
-                key={c.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{c.employeeName}</div>
-                    <div className="text-xs text-gray-500">{c.type}</div>
+          {credentials.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <Award className="w-10 h-10 mx-auto mb-2 text-rose-500 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No medical credentials logged yet</p>
+              <p className="text-xs text-gray-400 mt-1">Click &apos;Register Credential&apos; to record NMC/State Medical Council and Nursing registrations.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {credentials.map(c => (
+                <div
+                  key={c.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{c.employeeName}</div>
+                      <div className="text-xs text-gray-500">{c.type}</div>
+                    </div>
+                    <Badge variant={c.status === 'VERIFIED' ? 'success' : 'danger'}>
+                      {c.status === 'EXPIRING_SOON' ? `${c.daysRemaining} Days Left` : c.status}
+                    </Badge>
                   </div>
-                  <Badge variant={c.status === 'VERIFIED' ? 'success' : 'danger'}>
-                    {c.status === 'EXPIRING_SOON' ? `${c.daysRemaining} Days Left` : c.status}
-                  </Badge>
-                </div>
 
-                <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div>
-                    <span className="font-medium text-gray-500">License #:</span> {c.licenseNumber}
+                  <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                    <div>
+                      <span className="font-medium text-gray-500">License #:</span> {c.licenseNumber}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Authority:</span> {c.authority}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-500">Expiry Date:</span> {c.expiryDate}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Authority:</span> {c.authority}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-500">Expiry Date:</span> {c.expiryDate}
-                  </div>
-                </div>
 
-                <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Mandatory for Clinical Practice</span>
-                  <Button variant="outline" size="sm" className="text-xs py-0.5">
-                    Verify Certificate
-                  </Button>
+                  <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Mandatory for Clinical Practice</span>
+                    <Button variant="outline" size="sm" className="text-xs py-0.5">
+                      Verify Certificate
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1099,45 +944,53 @@ export const AdvancedHRMSHub: React.FC = () => {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {separations.map(sep => (
-              <div
-                key={sep.id}
-                className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{sep.employeeName}</span>
-                    <Badge variant={sep.status === 'CLOSED' ? 'success' : 'warning'}>
-                      {sep.status}
-                    </Badge>
+          {separations.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 p-10 rounded-xl border border-gray-200 dark:border-gray-700 text-center shadow-sm">
+              <LogOut className="w-10 h-10 mx-auto mb-2 text-slate-400 opacity-50" />
+              <p className="font-semibold text-gray-800 dark:text-gray-200">No active separation cases</p>
+              <p className="text-xs text-gray-400 mt-1">Resignations, clearances, and identity deactivations will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {separations.map(sep => (
+                <div
+                  key={sep.id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 dark:text-gray-100 text-sm">{sep.employeeName}</span>
+                      <Badge variant={sep.status === 'CLOSED' ? 'success' : 'warning'}>
+                        {sep.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Relieving Date: {sep.relievingDate} &bull; Handover:{' '}
+                      <span className={sep.handoverDone ? 'text-green-600 font-medium' : 'text-amber-600'}>
+                        {sep.handoverDone ? 'Completed' : 'Pending'}
+                      </span>{' '}
+                      &bull; Assets:{' '}
+                      <span className={sep.assetsReturned ? 'text-green-600 font-medium' : 'text-amber-600'}>
+                        {sep.assetsReturned ? 'Returned' : 'Pending'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Relieving Date: {sep.relievingDate} &bull; Handover:{' '}
-                    <span className={sep.handoverDone ? 'text-green-600 font-medium' : 'text-amber-600'}>
-                      {sep.handoverDone ? 'Completed' : 'Pending'}
-                    </span>{' '}
-                    &bull; Assets:{' '}
-                    <span className={sep.assetsReturned ? 'text-green-600 font-medium' : 'text-amber-600'}>
-                      {sep.assetsReturned ? 'Returned' : 'Pending'}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    disabled={sep.accessRevoked}
-                    onClick={() => handleRevokeAccessAndCloseSeparation(sep.id)}
-                    className="bg-red-600 hover:bg-red-700 text-xs flex items-center gap-1.5 text-white"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    {sep.accessRevoked ? 'Access Revoked' : 'Revoke System Access & Close'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={sep.accessRevoked}
+                      onClick={() => handleRevokeAccessAndCloseSeparation(sep.id)}
+                      className="bg-red-600 hover:bg-red-700 text-xs flex items-center gap-1.5 text-white"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      {sep.accessRevoked ? 'Access Revoked' : 'Revoke System Access & Close'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

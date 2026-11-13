@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BedDouble,
   Building2,
@@ -25,6 +25,7 @@ import {
   Users
 } from 'lucide-react';
 import { Button, Input, Badge, useToast, Modal } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface BedItem {
   id: string;
@@ -72,141 +73,40 @@ export const AdvancedWardHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'grid' | 'requests' | 'housekeeping' | 'discharge' | 'visitors'>('grid');
   const [wardFilter, setWardFilter] = useState('ALL');
 
+  const { beds: hospitalBeds } = useHospital();
   // Beds State
-  const [beds, setBeds] = useState<BedItem[]>([
-    {
-      id: 'bed-1',
-      bedNumber: 'ICU-Bed 01',
-      roomNumber: 'ICU-Pod A',
-      wardName: 'Intensive Care Unit (ICU)',
-      wardType: 'ICU',
-      dailyRate: 8500,
-      status: 'occupied',
-      currentPatientName: 'Ramesh Verma',
-      currentUhid: 'APEX-2026-00084',
-      genderRestriction: 'ANY',
-      hasOxygen: true,
-      hasVentilator: true,
-      hasCardiacMonitor: true,
-      isIsolation: false,
-    },
-    {
-      id: 'bed-2',
-      bedNumber: 'ICU-Bed 02',
-      roomNumber: 'ICU-Pod A',
-      wardName: 'Intensive Care Unit (ICU)',
-      wardType: 'ICU',
-      dailyRate: 8500,
-      status: 'available',
-      genderRestriction: 'ANY',
-      hasOxygen: true,
-      hasVentilator: true,
-      hasCardiacMonitor: true,
-      isIsolation: false,
-    },
-    {
-      id: 'bed-3',
-      bedNumber: 'Bed 201-A',
-      roomNumber: 'Room 201',
-      wardName: 'Male Medical Ward',
-      wardType: 'MEDICAL',
-      dailyRate: 1800,
-      status: 'occupied',
-      currentPatientName: 'Vikram Joshi',
-      currentUhid: 'APEX-2026-00051',
-      genderRestriction: 'MALE_ONLY',
-      hasOxygen: true,
-      hasVentilator: false,
-      hasCardiacMonitor: false,
-      isIsolation: false,
-    },
-    {
-      id: 'bed-4',
-      bedNumber: 'Bed 201-B',
-      roomNumber: 'Room 201',
-      wardName: 'Male Medical Ward',
-      wardType: 'MEDICAL',
-      dailyRate: 1800,
-      status: 'cleaning_required',
-      genderRestriction: 'MALE_ONLY',
-      hasOxygen: true,
-      hasVentilator: false,
-      hasCardiacMonitor: false,
-      isIsolation: false,
-    },
-    {
-      id: 'bed-5',
-      bedNumber: 'Deluxe 301',
-      roomNumber: 'Suite 301',
-      wardName: 'Private Deluxe Wing',
-      wardType: 'PRIVATE',
-      dailyRate: 5500,
-      status: 'reserved',
-      currentPatientName: 'Kavita Patel',
-      currentUhid: 'APEX-2026-00087',
-      genderRestriction: 'ANY',
-      hasOxygen: true,
-      hasVentilator: false,
-      hasCardiacMonitor: false,
-      isIsolation: false,
-    },
-    {
-      id: 'bed-6',
-      bedNumber: 'Iso-Bed 401',
-      roomNumber: 'Neg-Pressure 401',
-      wardName: 'Infectious Isolation Ward',
-      wardType: 'ISOLATION',
-      dailyRate: 4200,
-      status: 'available',
-      genderRestriction: 'ANY',
-      hasOxygen: true,
-      hasVentilator: true,
-      hasCardiacMonitor: true,
-      isIsolation: true,
-    },
-  ]);
+  const [beds, setBeds] = useState<BedItem[]>([]);
+
+  useEffect(() => {
+    if (hospitalBeds && hospitalBeds.length > 0) {
+      setBeds(
+        hospitalBeds.map((b) => ({
+          id: b.id,
+          bedNumber: b.bedNumber,
+          roomNumber: b.wardName,
+          wardName: b.wardName,
+          wardType: b.wardName.toUpperCase().includes('ICU') ? 'ICU' : 'MEDICAL',
+          dailyRate: b.dailyRate || 2500,
+          status: b.status.toLowerCase() as any,
+          currentPatientName: b.patient?.name,
+          currentUhid: b.patient?.uhid,
+          genderRestriction: 'ANY',
+          hasOxygen: true,
+          hasVentilator: b.wardName.toUpperCase().includes('ICU'),
+          hasCardiacMonitor: b.wardName.toUpperCase().includes('ICU'),
+          isIsolation: false,
+        }))
+      );
+    } else {
+      setBeds([]);
+    }
+  }, [hospitalBeds]);
 
   // Admission Requests
-  const [requests, setRequests] = useState<AdmissionRequestItem[]>([
-    {
-      id: 'req-1',
-      patientName: 'Sunil Gavaskar',
-      uhid: 'APEX-2026-00032',
-      source: 'EMERGENCY',
-      priority: 'STAT_EMERGENCY',
-      requiredWardType: 'ICU',
-      diagnosis: 'Severe acute pancreatitis with impending respiratory failure',
-      isolationRequired: false,
-      requestedAt: '10 mins ago',
-      status: 'REQUESTED',
-    },
-    {
-      id: 'req-2',
-      patientName: 'Priya Iyer',
-      uhid: 'APEX-2026-00085',
-      source: 'OPD',
-      priority: 'ROUTINE',
-      requiredWardType: 'PRIVATE',
-      diagnosis: 'Elective laparoscopic myomectomy admission',
-      isolationRequired: false,
-      requestedAt: '35 mins ago',
-      status: 'APPROVED',
-    },
-  ]);
+  const [requests, setRequests] = useState<AdmissionRequestItem[]>([]);
 
   // Housekeeping Tasks
-  const [cleaningTasks, setCleaningTasks] = useState<HousekeepingTaskItem[]>([
-    {
-      id: 'cln-1',
-      bedNumber: 'Bed 201-B',
-      roomNumber: 'Room 201',
-      wardName: 'Male Medical Ward',
-      taskType: 'TERMINAL',
-      status: 'PENDING',
-      assignedStaff: 'Housekeeper Prakash Shinde',
-      requestedAt: '15 mins ago (Post-Discharge)',
-    },
-  ]);
+  const [cleaningTasks, setCleaningTasks] = useState<HousekeepingTaskItem[]>([]);
 
   // Computed Metrics
   const totalBeds = beds.length;
@@ -370,69 +270,79 @@ export const AdvancedWardHub: React.FC = () => {
             <span className="text-xs text-slate-500">Live Concurrency Row-Locks Active</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {filteredBeds.map((bed) => (
-              <div
-                key={bed.id}
-                className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-teal-400 transition space-y-3"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-slate-900 text-sm">{bed.bedNumber}</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                        {bed.roomNumber}
-                      </span>
+          {filteredBeds.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-sm">
+              <BedDouble className="w-12 h-12 mx-auto mb-3 text-teal-600 opacity-50" />
+              <h3 className="text-base font-bold text-slate-800">No Inpatient Beds Configured</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Hospital beds can be configured and managed in the Hospital Admin Wards &amp; Beds station. Once added, live bed status and patient allocations will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {filteredBeds.map((bed) => (
+                <div
+                  key={bed.id}
+                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-teal-400 transition space-y-3"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-slate-900 text-sm">{bed.bedNumber}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          {bed.roomNumber}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">{bed.wardName}</div>
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">{bed.wardName}</div>
+                    <Badge
+                      variant={
+                        bed.status === 'available'
+                          ? 'success'
+                          : bed.status === 'occupied'
+                          ? 'neutral'
+                          : bed.status === 'reserved'
+                          ? 'brand'
+                          : 'danger'
+                      }
+                      size="sm"
+                    >
+                      {bed.status.replace(/_/g, ' ')}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant={
-                      bed.status === 'available'
-                        ? 'success'
-                        : bed.status === 'occupied'
-                        ? 'neutral'
-                        : bed.status === 'reserved'
-                        ? 'brand'
-                        : 'danger'
-                    }
-                    size="sm"
-                  >
-                    {bed.status.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
 
-                {bed.status === 'occupied' ? (
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-0.5">
-                    <div className="font-bold text-slate-900">{bed.currentPatientName}</div>
-                    <div className="text-[11px] font-mono text-slate-500">{bed.currentUhid}</div>
-                  </div>
-                ) : bed.status === 'reserved' ? (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-0.5 text-amber-900">
-                    <div className="font-bold">Holding for {bed.currentPatientName}</div>
-                    <div className="text-[10px] text-amber-700">Reservation active for 45 mins</div>
-                  </div>
-                ) : bed.status === 'cleaning_required' ? (
-                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-0.5 text-rose-900">
-                    <div className="font-bold">Terminal Cleaning Required</div>
-                    <div className="text-[10px] text-rose-700">Awaiting sanitization & inspection</div>
-                  </div>
-                ) : (
-                  <div className="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-lg text-xs text-emerald-900 font-medium">
-                    Clean, inspected and ready for immediate intake.
-                  </div>
-                )}
+                  {bed.status === 'occupied' ? (
+                    <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-0.5">
+                      <div className="font-bold text-slate-900">{bed.currentPatientName}</div>
+                      <div className="text-[11px] font-mono text-slate-500">{bed.currentUhid}</div>
+                    </div>
+                  ) : bed.status === 'reserved' ? (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-0.5 text-amber-900">
+                      <div className="font-bold">Holding for {bed.currentPatientName}</div>
+                      <div className="text-[10px] text-amber-700">Reservation active for 45 mins</div>
+                    </div>
+                  ) : bed.status === 'cleaning_required' ? (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs space-y-0.5 text-rose-900">
+                      <div className="font-bold">Terminal Cleaning Required</div>
+                      <div className="text-[10px] text-rose-700">Awaiting sanitization & inspection</div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-lg text-xs text-emerald-900 font-medium">
+                      Clean, inspected and ready for immediate intake.
+                    </div>
+                  )}
 
-                <div className="flex flex-wrap gap-1 text-[10px] font-medium text-slate-600 pt-2 border-t border-slate-100">
-                  {bed.hasOxygen && <span className="px-1.5 py-0.2 bg-slate-100 rounded">O2 Port</span>}
-                  {bed.hasVentilator && <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 font-bold rounded">Ventilator</span>}
-                  {bed.hasCardiacMonitor && <span className="px-1.5 py-0.2 bg-teal-50 text-teal-700 rounded">Cardiac Monitor</span>}
-                  {bed.isIsolation && <span className="px-1.5 py-0.2 bg-rose-50 text-rose-700 font-bold rounded">Negative Pressure</span>}
-                  <span className="ml-auto font-mono text-slate-500">₹{bed.dailyRate}/day</span>
+                  <div className="flex flex-wrap gap-1 text-[10px] font-medium text-slate-600 pt-2 border-t border-slate-100">
+                    {bed.hasOxygen && <span className="px-1.5 py-0.2 bg-slate-100 rounded">O2 Port</span>}
+                    {bed.hasVentilator && <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 font-bold rounded">Ventilator</span>}
+                    {bed.hasCardiacMonitor && <span className="px-1.5 py-0.2 bg-teal-50 text-teal-700 rounded">Cardiac Monitor</span>}
+                    {bed.isIsolation && <span className="px-1.5 py-0.2 bg-rose-50 text-rose-700 font-bold rounded">Negative Pressure</span>}
+                    <span className="ml-auto font-mono text-slate-500">₹{bed.dailyRate}/day</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -460,43 +370,53 @@ export const AdvancedWardHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {requests.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`font-bold px-2 py-0.5 rounded text-[10px] block w-fit mb-1 ${
-                        r.priority === 'STAT_EMERGENCY'
-                          ? 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {r.priority.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-mono">{r.source} · {r.requestedAt}</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <div className="font-bold text-slate-900">{r.patientName}</div>
-                    <div className="text-[11px] font-mono text-slate-400">{r.uhid}</div>
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">{r.diagnosis}</td>
-                  <td className="py-3 px-3 font-medium text-teal-900">{r.requiredWardType}</td>
-                  <td className="py-3 px-3">
-                    {r.isolationRequired ? (
-                      <span className="text-rose-600 font-bold flex items-center">
-                        <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                        Isolation Required
-                      </span>
-                    ) : (
-                      <span className="text-slate-500">Standard</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4 text-right space-x-2">
-                    <Button size="sm" variant="primary">
-                      Allocate Bed
-                    </Button>
+              {requests.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-slate-400">
+                    <UserCheck className="w-8 h-8 mx-auto mb-2 text-teal-600 opacity-50" />
+                    <p className="font-semibold text-slate-700">No Admission Requests Pending</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Admissions requested by OPD or Emergency clinicians will appear here for ward bed assignment.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                requests.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50/60">
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`font-bold px-2 py-0.5 rounded text-[10px] block w-fit mb-1 ${
+                          r.priority === 'STAT_EMERGENCY'
+                            ? 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {r.priority.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">{r.source} · {r.requestedAt}</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-bold text-slate-900">{r.patientName}</div>
+                      <div className="text-[11px] font-mono text-slate-400">{r.uhid}</div>
+                    </td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">{r.diagnosis}</td>
+                    <td className="py-3 px-3 font-medium text-teal-900">{r.requiredWardType}</td>
+                    <td className="py-3 px-3">
+                      {r.isolationRequired ? (
+                        <span className="text-rose-600 font-bold flex items-center">
+                          <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                          Isolation Required
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">Standard</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-right space-x-2">
+                      <Button size="sm" variant="primary">
+                        Allocate Bed
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -526,36 +446,46 @@ export const AdvancedWardHub: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-600">
-              {cleaningTasks.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60">
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-slate-900">{t.bedNumber}</div>
-                    <div className="text-[11px] text-slate-400">{t.roomNumber}</div>
-                  </td>
-                  <td className="py-3 px-3 text-slate-800 font-medium">{t.wardName}</td>
-                  <td className="py-3 px-3">
-                    <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">
-                      {t.taskType} TURNOVER
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-700">{t.assignedStaff}</td>
-                  <td className="py-3 px-3">
-                    <Badge variant="warning" size="sm">
-                      {t.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleApproveInspection(t.id, t.bedNumber)}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                      Approve & Release to Available
-                    </Button>
+              {cleaningTasks.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-slate-400">
+                    <Sparkles className="w-8 h-8 mx-auto mb-2 text-teal-600 opacity-50" />
+                    <p className="font-semibold text-slate-700">All Beds Sanitized & Ready</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Terminal sanitization tasks triggered on patient discharge will appear here for housekeeping inspection.</p>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                cleaningTasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/60">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-slate-900">{t.bedNumber}</div>
+                      <div className="text-[11px] text-slate-400">{t.roomNumber}</div>
+                    </td>
+                    <td className="py-3 px-3 text-slate-800 font-medium">{t.wardName}</td>
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded text-[10px]">
+                        {t.taskType} TURNOVER
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-700">{t.assignedStaff}</td>
+                    <td className="py-3 px-3">
+                      <Badge variant="warning" size="sm">
+                        {t.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => handleApproveInspection(t.id, t.bedNumber)}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        Approve & Release to Available
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

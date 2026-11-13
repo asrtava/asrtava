@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Activity,
@@ -20,6 +20,7 @@ import {
   FileText
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 interface AssignedPatient {
   id: string;
@@ -67,140 +68,66 @@ interface EMAROrder {
 
 export const AdvancedNursingHub: React.FC = () => {
   const { showToast } = useToast();
+  const { beds } = useHospital();
   const [activeTab, setActiveTab] = useState<
     'workload' | 'bedside' | 'vitals' | 'emar' | 'assessments' | 'fluid-wound' | 'handover-incidents'
   >('workload');
 
-  // 1. Patient Workload State
-  const [patients, setPatients] = useState<AssignedPatient[]>([
-    {
-      id: 'adm-01',
-      name: 'Rameshwar Gupta',
-      uhid: 'UHID-2026-9041',
-      ipdNumber: 'IPD-9921',
-      bed: 'ICU-Bed-04',
-      ward: 'Cardiac ICU',
-      acuity: 'CRITICAL',
-      role: 'PRIMARY',
-      diagnosis: 'Acute Coronary Syndrome, Post-PCI Stent Day 1',
-      doctor: 'Dr. Anand Verma (Cardiology)',
-      allergies: ['Penicillin', 'Ibuprofen'],
-      news2Score: 6,
-    },
-    {
-      id: 'adm-02',
-      name: 'Sunita Sharma',
-      uhid: 'UHID-2026-8812',
-      ipdNumber: 'IPD-9844',
-      bed: 'Surg-Bed-12',
-      ward: 'Post-Op Surgical Ward',
-      acuity: 'MODERATE',
-      role: 'PRIMARY',
-      diagnosis: 'Laparoscopic Cholecystectomy Post-Op Day 2',
-      doctor: 'Dr. R. K. Saxena (Gen Surgery)',
-      allergies: ['Sulfa Drugs'],
-      news2Score: 2,
-    },
-    {
-      id: 'adm-03',
-      name: 'Vikas Nambiar',
-      uhid: 'UHID-2026-7731',
-      ipdNumber: 'IPD-9710',
-      bed: 'Med-Bed-08',
-      ward: 'General Medical Ward',
-      acuity: 'HIGH',
-      role: 'SECONDARY',
-      diagnosis: 'Severe Community-Acquired Pneumonia with Hypoxia',
-      doctor: 'Dr. Priya Desai (Pulmonology)',
-      allergies: ['None Reported'],
-      news2Score: 5,
-    },
-  ]);
+  // 1. Patient Workload State - Dynamically derived from HospitalContext occupied beds
+  const [patients, setPatients] = useState<AssignedPatient[]>([]);
+
+  useEffect(() => {
+    const occupied = beds.filter(b => b.status === 'Occupied' && b.patient);
+    if (occupied.length > 0) {
+      setPatients(
+        occupied.map((b, idx) => ({
+          id: b.patient?.id || `adm-${idx + 1}`,
+          name: b.patient?.name || `Patient in ${b.bedNumber}`,
+          uhid: b.patient?.uhid || `UHID-${idx + 1000}`,
+          ipdNumber: b.patient?.admissionNumber || `IPD-${idx + 2000}`,
+          bed: b.bedNumber,
+          ward: b.wardName,
+          acuity: 'MODERATE',
+          role: 'PRIMARY',
+          diagnosis: b.patient?.diagnosis || 'Under Evaluation',
+          doctor: b.patient?.attendingDoctor || 'Attending Physician',
+          allergies: b.patient?.allergies ? [b.patient.allergies] : ['None Reported'],
+          news2Score: 2,
+        }))
+      );
+    } else {
+      setPatients([]);
+    }
+  }, [beds]);
 
   // Selected patient for Bedside Workspace
-  const [selectedPatient, setSelectedPatient] = useState<AssignedPatient>(patients[0]);
+  const [selectedPatient, setSelectedPatient] = useState<AssignedPatient | null>(null);
+
+  useEffect(() => {
+    if (patients.length > 0 && !selectedPatient) {
+      setSelectedPatient(patients[0]);
+    } else if (patients.length === 0) {
+      setSelectedPatient(null);
+    }
+  }, [patients, selectedPatient]);
+
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isBarcodeVerified, setIsBarcodeVerified] = useState(false);
 
   // 2. Vitals State & NEWS2
-  const [vitalsList, setVitalsList] = useState<VitalsObservation[]>([
-    {
-      id: 'v-101',
-      patientName: 'Rameshwar Gupta',
-      bed: 'ICU-Bed-04',
-      sbp: 142,
-      dbp: 88,
-      hr: 98,
-      rr: 22,
-      temp: 37.8,
-      spo2: 95,
-      news2: 6,
-      risk: 'MEDIUM',
-      alertStatus: 'PENDING',
-      timestamp: '10 mins ago',
-    },
-    {
-      id: 'v-102',
-      patientName: 'Sunita Sharma',
-      bed: 'Surg-Bed-12',
-      sbp: 120,
-      dbp: 76,
-      hr: 74,
-      rr: 16,
-      temp: 36.6,
-      spo2: 99,
-      news2: 0,
-      risk: 'LOW',
-      timestamp: '1 hour ago',
-    },
-  ]);
+  const [vitalsList, setVitalsList] = useState<VitalsObservation[]>([]);
 
   // Vitals form
-  const [vSbp, setVSbp] = useState('130');
+  const [vSbp, setVSbp] = useState('120');
   const [vDbp, setVDbp] = useState('80');
-  const [vHr, setVHr] = useState('82');
-  const [vRr, setVRr] = useState('18');
+  const [vHr, setVHr] = useState('72');
+  const [vRr, setVRr] = useState('16');
   const [vTemp, setVTemp] = useState('36.8');
-  const [vSpo2, setVSpo2] = useState('97');
+  const [vSpo2, setVSpo2] = useState('98');
   const [vO2Supp, setVO2Supp] = useState(false);
 
   // 3. eMAR Bedside State
-  const [emarOrders, setEmarOrders] = useState<EMAROrder[]>([
-    {
-      id: 'emar-01',
-      patientName: 'Rameshwar Gupta',
-      bed: 'ICU-Bed-04',
-      drug: 'Regular Insulin 100 IU/mL',
-      dose: '6 Units SubQ',
-      route: 'SUBCUTANEOUS',
-      scheduledTime: '16:00 (Due Now)',
-      isHighAlert: true,
-      status: 'SCHEDULED',
-      preAdminPulse: 98,
-    },
-    {
-      id: 'emar-02',
-      patientName: 'Rameshwar Gupta',
-      bed: 'ICU-Bed-04',
-      drug: 'Clopidogrel (Plavix) 75mg',
-      dose: '75 mg Oral',
-      route: 'ORAL',
-      scheduledTime: '16:00 (Due Now)',
-      isHighAlert: false,
-      status: 'SCHEDULED',
-    },
-    {
-      id: 'emar-03',
-      patientName: 'Sunita Sharma',
-      bed: 'Surg-Bed-12',
-      drug: 'Cefuroxime 750mg IV',
-      dose: '750 mg IV',
-      route: 'INTRAVENOUS',
-      scheduledTime: '18:00 (Upcoming)',
-      isHighAlert: false,
-      status: 'SCHEDULED',
-    },
-  ]);
+  const [emarOrders, setEmarOrders] = useState<EMAROrder[]>([]);
 
   // Dual Cosign Modal
   const [showDualCosignModal, setShowDualCosignModal] = useState(false);
@@ -217,29 +144,30 @@ export const AdvancedNursingHub: React.FC = () => {
   const [bradenFriction, setBradenFriction] = useState('2');
 
   // 5. Fluid & Wound Care State
-  const [oralIntake, setOralIntake] = useState('400');
-  const [ivIntake, setIvIntake] = useState('1000');
-  const [urineOutput, setUrineOutput] = useState('950');
-  const [drainOutput, setDrainOutput] = useState('150');
-  const [fluidNetBalance, setFluidNetBalance] = useState('+300 mL');
+  const [oralIntake, setOralIntake] = useState('0');
+  const [ivIntake, setIvIntake] = useState('0');
+  const [urineOutput, setUrineOutput] = useState('0');
+  const [drainOutput, setDrainOutput] = useState('0');
+  const [fluidNetBalance, setFluidNetBalance] = useState('0 mL');
 
   // Wound Care Form
-  const [woundStaging, setWoundStaging] = useState('STAGE_II');
-  const [woundLength, setWoundLength] = useState('3.5');
-  const [woundWidth, setWoundWidth] = useState('2.0');
-  const [woundDepth, setWoundDepth] = useState('0.4');
-  const [dressingApplied, setDressingApplied] = useState('Hydrocolloid Barrier Dressing');
+  const [woundStaging, setWoundStaging] = useState('STAGE_I');
+  const [woundLength, setWoundLength] = useState('0');
+  const [woundWidth, setWoundWidth] = useState('0');
+  const [woundDepth, setWoundDepth] = useState('0');
+  const [dressingApplied, setDressingApplied] = useState('Standard Protective Dressing');
 
   // 6. SBAR Handover Form
-  const [sbarWard, setSbarWard] = useState('Cardiac ICU');
+  const [sbarWard, setSbarWard] = useState('General Ward');
   const [sbarShift, setSbarShift] = useState('Day to Evening (14:00 - 22:00)');
-  const [sbarSituation, setSbarSituation] = useState('Rameshwar Gupta Day 1 Post-PCI, vitals stable, SpO2 95% on room air.');
-  const [sbarBackground, setSbarBackground] = useState('Hypertensive, Diabetic on oral hypoglycemics, PCI to LAD completed.');
-  const [sbarAssessment, setSbarAssessment] = useState('NEWS2 score 6 due to borderline tachycardia. Pain score 2/10 at groin puncture site.');
-  const [sbarRecommendation, setSbarRecommendation] = useState('Repeat ECG at 18:00; strict fluid balance; hold beta-blocker if pulse < 55.');
+  const [sbarSituation, setSbarSituation] = useState('');
+  const [sbarBackground, setSbarBackground] = useState('');
+  const [sbarAssessment, setSbarAssessment] = useState('');
+  const [sbarRecommendation, setSbarRecommendation] = useState('');
 
   // Handlers
   const handleVerifyBarcode = () => {
+    if (!selectedPatient) return;
     if (barcodeInput.trim().toUpperCase() === selectedPatient.uhid) {
       setIsBarcodeVerified(true);
       showToast({
@@ -258,6 +186,10 @@ export const AdvancedNursingHub: React.FC = () => {
 
   const handleRecordVitals = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedPatient) {
+      showToast({ type: 'warning', title: 'No Patient Selected', message: 'Select an admitted patient first.' });
+      return;
+    }
     const sbp = Number(vSbp);
     const dbp = Number(vDbp);
     const hr = Number(vHr);
@@ -401,7 +333,9 @@ export const AdvancedNursingHub: React.FC = () => {
             </div>
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg px-4 py-2 text-center">
               <span className="text-xs text-teal-200 block">Workload Acuity</span>
-              <span className="text-xl font-bold text-amber-300">High (Score 10)</span>
+              <span className="text-xl font-bold text-amber-300">
+                {patients.length === 0 ? 'Normal (Score 0)' : `Acuity Score ${patients.reduce((s, p) => s + (p.news2Score || 0), 0)}`}
+              </span>
             </div>
           </div>
         </div>
@@ -486,103 +420,125 @@ export const AdvancedNursingHub: React.FC = () => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold text-slate-900">Shift Patient Allocations</h2>
-            <Badge variant="info">Primary Nurse: Staff RN Priya Nair (Emp #N-884)</Badge>
+            <Badge variant="info">Primary Nurse: On-Duty Inpatient Nurse</Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {patients.map((pat) => (
-              <div
-                key={pat.id}
-                onClick={() => setSelectedPatient(pat)}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  selectedPatient.id === pat.id
-                    ? 'border-teal-600 bg-teal-50/50 shadow-md ring-2 ring-teal-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">
-                    {pat.bed}
-                  </span>
-                  <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded ${
-                      pat.acuity === 'CRITICAL'
-                        ? 'bg-red-100 text-red-800'
-                        : pat.acuity === 'HIGH'
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    Acuity: {pat.acuity}
-                  </span>
+          {patients.length === 0 ? (
+            <div className="bg-white p-10 rounded-xl border border-slate-200 text-center shadow-sm">
+              <Users className="w-10 h-10 mx-auto mb-2 text-teal-600 opacity-50" />
+              <h3 className="font-bold text-slate-800 text-sm">No Inpatients Currently Admitted</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Patients admitted from Reception, Emergency, or Wards into hospital beds will automatically appear here for clinical nursing care.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {patients.map((pat) => (
+                <div
+                  key={pat.id}
+                  onClick={() => setSelectedPatient(pat)}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    selectedPatient?.id === pat.id
+                      ? 'border-teal-600 bg-teal-50/50 shadow-md ring-2 ring-teal-500/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800">
+                      {pat.bed}
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        pat.acuity === 'CRITICAL'
+                          ? 'bg-red-100 text-red-800'
+                          : pat.acuity === 'HIGH'
+                          ? 'bg-orange-100 text-orange-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      Acuity: {pat.acuity}
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base">{pat.name}</h3>
+                  <p className="text-xs text-slate-500 mb-2">{pat.uhid} | {pat.ipdNumber}</p>
+                  <p className="text-xs text-slate-700 line-clamp-2 mb-3"><strong>Dx:</strong> {pat.diagnosis}</p>
+                  <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-100">
+                    <span>NEWS2: <strong className={pat.news2Score >= 5 ? 'text-red-600 font-bold' : 'text-slate-800'}>{pat.news2Score}</strong></span>
+                    <span className="text-teal-700 font-medium">Role: {pat.role}</span>
+                  </div>
                 </div>
-                <h3 className="font-bold text-slate-900 text-base">{pat.name}</h3>
-                <p className="text-xs text-slate-500 mb-2">{pat.uhid} | {pat.ipdNumber}</p>
-                <p className="text-xs text-slate-700 line-clamp-2 mb-3"><strong>Dx:</strong> {pat.diagnosis}</p>
-                <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-100">
-                  <span>NEWS2: <strong className={pat.news2Score >= 5 ? 'text-red-600 font-bold' : 'text-slate-800'}>{pat.news2Score}</strong></span>
-                  <span className="text-teal-700 font-medium">Role: {pat.role}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Tab 2: Bedside Patient Workspace */}
       {activeTab === 'bedside' && (
         <div className="space-y-6">
-          {/* Positive Identification Gate */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <UserCheck className="w-5 h-5 text-teal-600" />
-              <h2 className="text-base font-bold text-slate-900">Bedside Wristband Positive Identification</h2>
+          {!selectedPatient ? (
+            <div className="bg-white p-10 rounded-xl border border-slate-200 text-center shadow-sm">
+              <UserCheck className="w-10 h-10 mx-auto mb-2 text-teal-600 opacity-50" />
+              <h3 className="font-bold text-slate-800 text-sm">No Inpatient Selected for Bedside Care</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Select an admitted inpatient from the Workload tab to initiate positive barcode verification and bedside charting.
+              </p>
             </div>
-            <p className="text-xs text-slate-600 mb-4">
-              To prevent wrong-patient administration, scan the patient 2D barcode wristband before administering medications or logging assessments.
-            </p>
-            <div className="flex gap-3 max-w-md">
-              <Input
-                placeholder="Scan or type patient UHID (e.g. UHID-2026-9041)"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-              />
-              <Button onClick={handleVerifyBarcode} variant="primary">
-                Confirm ID
-              </Button>
-            </div>
-            {isBarcodeVerified && (
-              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-xs text-emerald-800">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Positive match confirmed: <strong>{selectedPatient.name}</strong> ({selectedPatient.uhid}) verified.</span>
+          ) : (
+            <>
+              {/* Positive Identification Gate */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <UserCheck className="w-5 h-5 text-teal-600" />
+                  <h2 className="text-base font-bold text-slate-900">Bedside Wristband Positive Identification</h2>
+                </div>
+                <p className="text-xs text-slate-600 mb-4">
+                  To prevent wrong-patient administration, scan the patient 2D barcode wristband before administering medications or logging assessments.
+                </p>
+                <div className="flex gap-3 max-w-md">
+                  <Input
+                    placeholder={`Scan or type patient UHID (e.g. ${selectedPatient.uhid})`}
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                  />
+                  <Button onClick={handleVerifyBarcode} variant="primary">
+                    Confirm ID
+                  </Button>
+                </div>
+                {isBarcodeVerified && (
+                  <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-xs text-emerald-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Positive match confirmed: <strong>{selectedPatient.name}</strong> ({selectedPatient.uhid}) verified.</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Consolidated Patient Clinical Banner */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <span className="text-xs text-slate-500 uppercase tracking-wider block">Patient Demographics</span>
-              <p className="font-bold text-slate-900 text-lg">{selectedPatient.name}</p>
-              <p className="text-xs text-slate-600">Male, 62 Years | {selectedPatient.uhid}</p>
-              <p className="text-xs text-slate-600">Bed: <strong>{selectedPatient.bed}</strong> ({selectedPatient.ward})</p>
-            </div>
-            <div>
-              <span className="text-xs text-slate-500 uppercase tracking-wider block">Attending Physician & Diagnosis</span>
-              <p className="text-sm font-semibold text-slate-800">{selectedPatient.doctor}</p>
-              <p className="text-xs text-slate-600 mt-1">{selectedPatient.diagnosis}</p>
-            </div>
-            <div>
-              <span className="text-xs text-slate-500 uppercase tracking-wider block">Documented Allergies</span>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {selectedPatient.allergies.map((all, i) => (
-                  <span key={i} className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">
-                    {all}
-                  </span>
-                ))}
+              {/* Consolidated Patient Clinical Banner */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider block">Patient Demographics</span>
+                  <p className="font-bold text-slate-900 text-lg">{selectedPatient.name}</p>
+                  <p className="text-xs text-slate-600">{selectedPatient.uhid} &bull; {selectedPatient.ipdNumber}</p>
+                  <p className="text-xs text-slate-600">Bed: <strong>{selectedPatient.bed}</strong> ({selectedPatient.ward})</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider block">Attending Physician & Diagnosis</span>
+                  <p className="text-sm font-semibold text-slate-800">{selectedPatient.doctor}</p>
+                  <p className="text-xs text-slate-600 mt-1">{selectedPatient.diagnosis}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 uppercase tracking-wider block">Documented Allergies</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {selectedPatient.allergies.map((all, i) => (
+                      <span key={i} className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">
+                        {all}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -592,53 +548,57 @@ export const AdvancedNursingHub: React.FC = () => {
           {/* Vitals Form */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm lg:col-span-1">
             <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-teal-600" /> Record Vitals ({selectedPatient.name})
+              <Activity className="w-5 h-5 text-teal-600" /> Record Vitals ({selectedPatient?.name || 'No Patient Selected'})
             </h2>
-            <form onSubmit={handleRecordVitals} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Systolic BP</label>
-                  <Input value={vSbp} onChange={(e) => setVSbp(e.target.value)} placeholder="120" />
+            {!selectedPatient ? (
+              <p className="text-xs text-slate-400">Select an admitted inpatient from the Workload tab first.</p>
+            ) : (
+              <form onSubmit={handleRecordVitals} className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Systolic BP</label>
+                    <Input value={vSbp} onChange={(e) => setVSbp(e.target.value)} placeholder="120" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Diastolic BP</label>
+                    <Input value={vDbp} onChange={(e) => setVDbp(e.target.value)} placeholder="80" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Diastolic BP</label>
-                  <Input value={vDbp} onChange={(e) => setVDbp(e.target.value)} placeholder="80" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Heart Rate (bpm)</label>
+                    <Input value={vHr} onChange={(e) => setVHr(e.target.value)} placeholder="72" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Resp Rate (/min)</label>
+                    <Input value={vRr} onChange={(e) => setVRr(e.target.value)} placeholder="16" />
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Heart Rate (bpm)</label>
-                  <Input value={vHr} onChange={(e) => setVHr(e.target.value)} placeholder="72" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">Temp (°C)</label>
+                    <Input value={vTemp} onChange={(e) => setVTemp(e.target.value)} placeholder="37.0" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700">SpO2 (%)</label>
+                    <Input value={vSpo2} onChange={(e) => setVSpo2(e.target.value)} placeholder="98" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Resp Rate (/min)</label>
-                  <Input value={vRr} onChange={(e) => setVRr(e.target.value)} placeholder="16" />
+                <div className="flex items-center gap-2 pt-2">
+                  <input
+                    type="checkbox"
+                    id="o2supp"
+                    checked={vO2Supp}
+                    onChange={(e) => setVO2Supp(e.target.checked)}
+                    className="rounded text-teal-600"
+                  />
+                  <label htmlFor="o2supp" className="text-xs text-slate-700">Patient on Supplemental O2</label>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">Temp (°C)</label>
-                  <Input value={vTemp} onChange={(e) => setVTemp(e.target.value)} placeholder="37.0" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-700">SpO2 (%)</label>
-                  <Input value={vSpo2} onChange={(e) => setVSpo2(e.target.value)} placeholder="98" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="o2supp"
-                  checked={vO2Supp}
-                  onChange={(e) => setVO2Supp(e.target.checked)}
-                  className="rounded text-teal-600"
-                />
-                <label htmlFor="o2supp" className="text-xs text-slate-700">Patient on Supplemental O2</label>
-              </div>
-              <Button type="submit" variant="primary" className="w-full mt-4">
-                Calculate NEWS2 & File
-              </Button>
-            </form>
+                <Button type="submit" variant="primary" className="w-full mt-4">
+                  Calculate NEWS2 & File
+                </Button>
+              </form>
+            )}
           </div>
 
           {/* Vitals History Table */}
@@ -657,28 +617,38 @@ export const AdvancedNursingHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {vitalsList.map((v) => (
-                    <tr key={v.id} className="hover:bg-slate-50/80">
-                      <td className="py-3 px-3 font-semibold text-slate-900">{v.patientName} ({v.bed})</td>
-                      <td className="py-3 px-3">{v.sbp}/{v.dbp}</td>
-                      <td className="py-3 px-3">{v.hr} bpm | {v.rr}/min</td>
-                      <td className="py-3 px-3">{v.temp}°C | {v.spo2}%</td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`font-bold px-2 py-0.5 rounded ${
-                            v.risk === 'HIGH'
-                              ? 'bg-red-100 text-red-800'
-                              : v.risk === 'MEDIUM'
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          Score {v.news2} ({v.risk})
-                        </span>
+                  {vitalsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                        <Activity className="w-8 h-8 mx-auto mb-2 text-teal-600 opacity-40" />
+                        <p className="font-semibold text-slate-700">No Vitals Observations Logged</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Recorded patient vitals and computed NEWS2 scores will appear here in chronological order.</p>
                       </td>
-                      <td className="py-3 px-3 text-slate-500">{v.timestamp}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    vitalsList.map((v) => (
+                      <tr key={v.id} className="hover:bg-slate-50/80">
+                        <td className="py-3 px-3 font-semibold text-slate-900">{v.patientName} ({v.bed})</td>
+                        <td className="py-3 px-3">{v.sbp}/{v.dbp}</td>
+                        <td className="py-3 px-3">{v.hr} bpm | {v.rr}/min</td>
+                        <td className="py-3 px-3">{v.temp}°C | {v.spo2}%</td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded ${
+                              v.risk === 'HIGH'
+                                ? 'bg-red-100 text-red-800'
+                                : v.risk === 'MEDIUM'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            Score {v.news2} ({v.risk})
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-500">{v.timestamp}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -694,44 +664,54 @@ export const AdvancedNursingHub: React.FC = () => {
             <Badge variant="warning">5-Rights Verification Mandated</Badge>
           </div>
 
-          <div className="space-y-3">
-            {emarOrders.map((ord) => (
-              <div
-                key={ord.id}
-                className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
-                      {ord.bed} — {ord.patientName}
-                    </span>
-                    {ord.isHighAlert && (
-                      <span className="text-xs font-bold text-red-800 bg-red-100 px-2 py-0.5 rounded flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> HIGH-ALERT (DUAL COSIGN)
+          {emarOrders.length === 0 ? (
+            <div className="bg-white p-10 rounded-xl border border-slate-200 text-center shadow-sm">
+              <Pill className="w-10 h-10 mx-auto mb-2 text-teal-600 opacity-50" />
+              <h3 className="font-bold text-slate-800 text-sm">No Pending eMAR Medication Doses</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Inpatient prescription orders verified by the Hospital Pharmacy will appear here for scheduled nurse administration with 5-Rights validation.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {emarOrders.map((ord) => (
+                <div
+                  key={ord.id}
+                  className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
+                        {ord.bed} — {ord.patientName}
                       </span>
+                      {ord.isHighAlert && (
+                        <span className="text-xs font-bold text-red-800 bg-red-100 px-2 py-0.5 rounded flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> HIGH-ALERT (DUAL COSIGN)
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-base">{ord.drug}</h3>
+                    <p className="text-xs text-slate-600">Prescribed Dose: <strong>{ord.dose}</strong> | Route: <strong>{ord.route}</strong></p>
+                    <p className="text-xs text-slate-500">Scheduled: {ord.scheduledTime}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {ord.status === 'ADMINISTERED' ? (
+                      <Badge variant="success">Administered & Signed</Badge>
+                    ) : (
+                      <Button
+                        onClick={() => handleOpenCosignModal(ord)}
+                        variant={ord.isHighAlert ? 'danger' : 'primary'}
+                        size="sm"
+                      >
+                        {ord.isHighAlert ? 'Dual-Cosign & Administer' : 'Confirm 5-Rights & Administer'}
+                      </Button>
                     )}
                   </div>
-                  <h3 className="font-bold text-slate-900 text-base">{ord.drug}</h3>
-                  <p className="text-xs text-slate-600">Prescribed Dose: <strong>{ord.dose}</strong> | Route: <strong>{ord.route}</strong></p>
-                  <p className="text-xs text-slate-500">Scheduled: {ord.scheduledTime}</p>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {ord.status === 'ADMINISTERED' ? (
-                    <Badge variant="success">Administered & Signed</Badge>
-                  ) : (
-                    <Button
-                      onClick={() => handleOpenCosignModal(ord)}
-                      variant={ord.isHighAlert ? 'danger' : 'primary'}
-                      size="sm"
-                    >
-                      {ord.isHighAlert ? 'Dual-Cosign & Administer' : 'Confirm 5-Rights & Administer'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -769,11 +749,11 @@ export const AdvancedNursingHub: React.FC = () => {
           {/* Active Care Plan */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <h2 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-teal-600" /> Individualized Care Plan ({selectedPatient.name})
+              <ClipboardList className="w-5 h-5 text-teal-600" /> Individualized Care Plan ({selectedPatient?.name || 'Inpatient'})
             </h2>
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs space-y-2 mb-4">
               <p><strong>Nursing Diagnosis:</strong> Risk for Impaired Skin Integrity r/t restricted bed mobility.</p>
-              <p><strong>Measurable Goal:</strong> Patient skin will remain intact with no Stage I/II pressure injury during ICU admission.</p>
+              <p><strong>Measurable Goal:</strong> Patient skin will remain intact with no Stage I/II pressure injury during admission.</p>
               <p><strong>Interventions:</strong> Q2H repositioning turning clock; moisture barrier cream on sacrum; heel offloading boots.</p>
             </div>
             <Button variant="secondary" className="w-full">Update Care Objectives</Button>

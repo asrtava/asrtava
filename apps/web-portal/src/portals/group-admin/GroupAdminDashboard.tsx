@@ -23,10 +23,12 @@ import {
 } from 'lucide-react';
 import { Button, Badge, Modal, Input, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
+import { useHospital } from '../../context/HospitalContext';
 
 export const GroupAdminDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
+  const { patients, beds, staff, appointments, invoices, inventory } = useHospital();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'hierarchy' | 'transfers' | 'stock' | 'finance' | 'doctors' | 'licensing'>('overview');
 
@@ -44,13 +46,27 @@ export const GroupAdminDashboard: React.FC = () => {
   const [isExpansionModalOpen, setIsExpansionModalOpen] = useState(false);
   const [requestedLocations, setRequestedLocations] = useState('2');
   const [requestedBeds, setRequestedBeds] = useState('250');
-  const [expansionJustification, setExpansionJustification] = useState('Expansion for upcoming cardiac wing in Pune and daycare center in Chennai.');
+  const [expansionJustification, setExpansionJustification] = useState('Expansion for upcoming cardiac wing and daycare center.');
 
-  const hospitals = [
-    { id: 'hosp-delhi-saket', name: 'Apex Super Speciality Hospital, Saket', region: 'North', city: 'New Delhi', beds: 450, staff: 210, opdToday: 142, revToday: '₹ 4,85,000', status: 'Optimal' },
-    { id: 'hosp-blr-indira', name: 'Apex Hospital, Indiranagar', region: 'South', city: 'Bengaluru', beds: 320, staff: 160, opdToday: 98, revToday: '₹ 3,40,000', status: 'Optimal' },
-    { id: 'hosp-hyd-banjara', name: 'Apex Care Clinic & Daycare', region: 'South', city: 'Hyderabad', beds: 50, staff: 80, opdToday: 45, revToday: '₹ 1,10,000', status: 'High Volume' }
-  ];
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [stockTransfers, setStockTransfers] = useState<any[]>([]);
+
+  const totalRevenue = invoices.reduce((acc, inv) => acc + ((inv as any).amount || inv.total || 0), 0);
+  const doctors = staff.filter(s => s.role?.toLowerCase().includes('doc') || s.role?.toLowerCase().includes('physician') || s.role?.toLowerCase().includes('surgeon'));
+
+  const facilities = beds.length > 0 || staff.length > 0 ? [
+    {
+      id: 'hosp-main-campus',
+      name: 'Apex Super Speciality Hospital (Main Campus)',
+      region: 'Central',
+      city: 'New Delhi',
+      beds: beds.length,
+      staff: staff.length,
+      opdToday: appointments.length,
+      revToday: `₹ ${totalRevenue.toLocaleString('en-IN')}`,
+      status: 'Optimal'
+    }
+  ] : [];
 
   const handleRequestExpansion = () => {
     setIsExpansionModalOpen(false);
@@ -94,23 +110,23 @@ export const GroupAdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Hospitals & Branches</span>
-          <div className="text-2xl font-bold text-indigo-950 mt-1">3 Hospitals · 6 Branches</div>
-          <span className="text-[11px] text-indigo-600 font-medium">Northern & Southern Regions</span>
+          <div className="text-2xl font-bold text-indigo-950 mt-1">{facilities.length} Facility Online</div>
+          <span className="text-[11px] text-indigo-600 font-medium">{beds.length} Total Monitored Beds</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Consolidated Today's Revenue</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ 9,35,000</div>
-          <span className="text-[11px] text-emerald-600 font-medium">All 3 Facilities Combined</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ {totalRevenue.toLocaleString('en-IN')}</div>
+          <span className="text-[11px] text-emerald-600 font-medium">{invoices.length} Invoices Aggregated</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-blue-600 font-medium">Master Patients (EMPI)</span>
-          <div className="text-2xl font-bold text-blue-600 mt-1">48,200 Individuals</div>
+          <div className="text-2xl font-bold text-blue-600 mt-1">{patients.length.toLocaleString('en-IN')} Individuals</div>
           <span className="text-[11px] text-slate-400">Zero-Duplication Cross-Hospital Index</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-purple-600 font-medium">Total Multi-Site Staff</span>
-          <div className="text-2xl font-bold text-purple-600 mt-1">450 Medical Staff</div>
-          <span className="text-[11px] text-purple-600">38 Visiting Multi-Branch Doctors</span>
+          <div className="text-2xl font-bold text-purple-600 mt-1">{staff.length} Medical Staff</div>
+          <span className="text-[11px] text-purple-600">{doctors.length} Visiting Multi-Branch Doctors</span>
         </div>
       </div>
 
@@ -150,7 +166,7 @@ export const GroupAdminDashboard: React.FC = () => {
                 <h3 className="text-sm font-bold text-slate-900">Hospital Facilities & Operational Performance</h3>
                 <p className="text-xs text-slate-500">Live metrics across hospitals under Apex Healthcare Holdings.</p>
               </div>
-              <span className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded">3 Facilities Online</span>
+              <span className="text-xs font-mono text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded">{facilities.length} Facilities Online</span>
             </div>
 
             <div className="overflow-x-auto">
@@ -167,21 +183,29 @@ export const GroupAdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {hospitals.map((hosp) => (
-                    <tr key={hosp.id} className="hover:bg-slate-50">
-                      <td className="py-3 px-3 font-semibold text-slate-900">{hosp.name}</td>
-                      <td className="py-3 px-3 text-slate-600">{hosp.city} ({hosp.region})</td>
-                      <td className="py-3 px-3 text-slate-800">{hosp.beds} Beds</td>
-                      <td className="py-3 px-3 text-slate-800">{hosp.staff} Staff</td>
-                      <td className="py-3 px-3 text-blue-700 font-semibold">{hosp.opdToday} Consults</td>
-                      <td className="py-3 px-3 text-emerald-700 font-semibold">{hosp.revToday}</td>
-                      <td className="py-3 px-3">
-                        <Badge variant="success" size="sm">
-                          {hosp.status}
-                        </Badge>
+                  {facilities.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                        No hospital facilities registered in group hierarchy.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    facilities.map((hosp) => (
+                      <tr key={hosp.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-3 font-semibold text-slate-900">{hosp.name}</td>
+                        <td className="py-3 px-3 text-slate-600">{hosp.city} ({hosp.region})</td>
+                        <td className="py-3 px-3 text-slate-800">{hosp.beds} Beds</td>
+                        <td className="py-3 px-3 text-slate-800">{hosp.staff} Staff</td>
+                        <td className="py-3 px-3 text-blue-700 font-semibold">{hosp.opdToday} Consults</td>
+                        <td className="py-3 px-3 text-emerald-700 font-semibold">{hosp.revToday}</td>
+                        <td className="py-3 px-3">
+                          <Badge variant="success" size="sm">
+                            {hosp.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -205,19 +229,10 @@ export const GroupAdminDashboard: React.FC = () => {
               </div>
               <div className="pl-6 pt-2 space-y-2">
                 <div className="border-l-2 border-indigo-200 pl-3">
-                  <div className="font-semibold text-slate-800">&bull; [REGION] Northern Regional Directorate</div>
+                  <div className="font-semibold text-slate-800">&bull; [REGION] Central Directorate</div>
                   <div className="pl-4 pt-1 space-y-1 text-slate-600">
-                    <div>&bull; [HOSPITAL] Apex Super Speciality Hospital, Saket</div>
-                    <div className="pl-4 text-slate-500">&bull; [BRANCH] Apex Saket Outpatient Daycare Branch</div>
-                    <div className="pl-8 text-slate-400">&bull; [DEPARTMENT] Cardiology &bull; [UNIT] Cath Lab #1</div>
-                  </div>
-                </div>
-
-                <div className="border-l-2 border-indigo-200 pl-3">
-                  <div className="font-semibold text-slate-800">&bull; [REGION] Southern Regional Directorate</div>
-                  <div className="pl-4 pt-1 space-y-1 text-slate-600">
-                    <div>&bull; [HOSPITAL] Apex Hospital, Indiranagar</div>
-                    <div className="pl-4 text-slate-500">&bull; [CLINIC] Apex Whitefield Diagnostic & Consultation Clinic</div>
+                    <div>&bull; [HOSPITAL] Apex Super Speciality Hospital (Main Campus)</div>
+                    <div className="pl-4 text-slate-500">&bull; [DEPARTMENTS] {beds.length} Inpatient Units · {staff.length} Active Personnel</div>
                   </div>
                 </div>
               </div>
@@ -225,7 +240,6 @@ export const GroupAdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
-
       {/* Tab 3: Cross-Hospital Transfers */}
       {activeTab === 'transfers' && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
@@ -237,23 +251,32 @@ export const GroupAdminDashboard: React.FC = () => {
             <span className="text-xs font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">ACLS Ambulance Tracking Live</span>
           </div>
 
-          <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-200 flex items-start justify-between text-xs">
-            <div className="space-y-1">
-              <div className="font-bold text-indigo-950 flex items-center space-x-2">
-                <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded font-bold uppercase text-[10px]">EMERGENCY</span>
-                <span>Transfer #TRF-2026-8812 &bull; Patient: Ramesh Gupta (EMPI-2026-9021)</span>
-              </div>
-              <div className="text-slate-600">
-                Route: <strong>Apex Hospital, Indiranagar</strong> &rarr; <strong>Apex Super Speciality, Saket</strong>
-              </div>
-              <div className="text-slate-500 text-[11px]">
-                Reason: Acute STEMI requiring surgical revascularization &bull; Initiated by: Dr. Ananya Roy
-              </div>
+          {transfers.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl text-xs">
+              <ArrowRightLeft className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              No active inter-hospital clinical transfers at this time. All emergency transfers dispatched from Reception or ER will appear here.
             </div>
-            <Badge variant="warning" size="sm">
-              In Transit
-            </Badge>
-          </div>
+          ) : (
+            transfers.map((trf) => (
+              <div key={trf.id} className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-200 flex items-start justify-between text-xs">
+                <div className="space-y-1">
+                  <div className="font-bold text-indigo-950 flex items-center space-x-2">
+                    <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded font-bold uppercase text-[10px]">EMERGENCY</span>
+                    <span>Transfer #{trf.id} &bull; Patient: {trf.patientName}</span>
+                  </div>
+                  <div className="text-slate-600">
+                    Route: <strong>{trf.origin}</strong> &rarr; <strong>{trf.destination}</strong>
+                  </div>
+                  <div className="text-slate-500 text-[11px]">
+                    Reason: {trf.reason} &bull; Initiated by: {trf.doctor}
+                  </div>
+                </div>
+                <Badge variant="warning" size="sm">
+                  {trf.status}
+                </Badge>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -265,15 +288,24 @@ export const GroupAdminDashboard: React.FC = () => {
             <p className="text-xs text-slate-500">Central warehouse replenishment, cold-chain shipments, and traceable lot receipts.</p>
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
-            <div>
-              <div className="font-semibold text-slate-900">STK-TRF-2026-1049 &bull; Adrenaline 1mg/mL Injection (200 Vials)</div>
-              <div className="text-slate-500 text-[11px]">Source: Delhi Central Pharmacy &rarr; Destination: Bengaluru Hospital (Batch: BAT-ADR-2026-X1)</div>
+          {stockTransfers.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl text-xs">
+              <Truck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              No inter-branch inventory stock transfers in transit.
             </div>
-            <Badge variant="success" size="sm">
-              Received & Stocked
-            </Badge>
-          </div>
+          ) : (
+            stockTransfers.map((stk) => (
+              <div key={stk.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+                <div>
+                  <div className="font-semibold text-slate-900">{stk.id} &bull; {stk.item} ({stk.quantity})</div>
+                  <div className="text-slate-500 text-[11px]">Source: {stk.source} &rarr; Destination: {stk.destination}</div>
+                </div>
+                <Badge variant="success" size="sm">
+                  {stk.status}
+                </Badge>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -288,15 +320,15 @@ export const GroupAdminDashboard: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-slate-500">Group Gross Billed Revenue</span>
-              <div className="text-xl font-bold text-slate-900 mt-1">₹ 1,48,50,000</div>
+              <div className="text-xl font-bold text-slate-900 mt-1">₹ {totalRevenue.toLocaleString('en-IN')}</div>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-slate-500">Inter-Branch Reimbursements</span>
-              <div className="text-xl font-bold text-blue-700 mt-1">₹ 2,45,000</div>
+              <div className="text-xl font-bold text-blue-700 mt-1">₹ 0</div>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <span className="text-slate-500">Settled Inter-Facility Trans</span>
-              <div className="text-xl font-bold text-emerald-700 mt-1">12 Transactions</div>
+              <span className="text-slate-500">Settled Invoices</span>
+              <div className="text-xl font-bold text-emerald-700 mt-1">{invoices.length} Transactions</div>
             </div>
           </div>
         </div>
@@ -311,16 +343,25 @@ export const GroupAdminDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
-              <div>
-                <div className="font-semibold text-slate-900">Dr. Ananya Roy (Cardiology)</div>
-                <div className="text-slate-500 text-[11px]">Monday: 09:00 - 13:00 at Delhi Saket Hospital (OPD-102)</div>
-                <div className="text-slate-500 text-[11px]">Tuesday: 10:00 - 14:00 at Bengaluru Whitefield Clinic (OPD-04)</div>
+            {doctors.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                No doctors registered on the active staff roster. Add doctors via HRMS to configure schedules.
               </div>
-              <Badge variant="success" size="sm">
-                Collision Free
-              </Badge>
-            </div>
+            ) : (
+              doctors.map((doc) => (
+                <div key={doc.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold text-slate-900">{doc.name} ({doc.department || doc.role})</div>
+                    <div className="text-slate-500 text-[11px]">Primary Location: Apex Super Speciality Hospital (Main Campus)</div>
+                    <div className="text-slate-500 text-[11px]">Assigned Shift: Active Duty · Consultation Room Available</div>
+                  </div>
+                  <Badge variant="success" size="sm">
+                    Collision Free
+                  </Badge>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -336,13 +377,13 @@ export const GroupAdminDashboard: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
               <span className="text-indigo-900 font-semibold">Authorized Locations</span>
-              <div className="text-xl font-bold text-indigo-950 mt-1">3 of 3 Consumed</div>
+              <div className="text-xl font-bold text-indigo-950 mt-1">{facilities.length} of 5 Authorized</div>
               <span className="text-[11px] text-indigo-700">Perpetual License Scope</span>
             </div>
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <span className="text-slate-500 font-semibold">Total Bed Tier Capacity</span>
-              <div className="text-xl font-bold text-slate-900 mt-1">820 / 1,000 Beds</div>
-              <span className="text-[11px] text-slate-400">82% Quota Consumed</span>
+              <div className="text-xl font-bold text-slate-900 mt-1">{beds.length} / 500 Beds</div>
+              <span className="text-[11px] text-slate-400">{beds.length > 0 ? Math.round((beds.length / 500) * 100) : 0}% Quota Consumed</span>
             </div>
             <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
               <span className="text-emerald-900 font-semibold">Perpetual Status</span>

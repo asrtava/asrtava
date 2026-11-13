@@ -85,84 +85,30 @@ export const SuperAdminDashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
 
   // Tenant State
-  const [hospitals, setHospitals] = useState<HospitalTenant[]>([
-    {
-      id: 'hosp-001',
-      code: 'APEX-BLR',
-      name: 'Apex Care Multi-Specialty Hospital',
-      city: 'Bangalore, KA',
-      plan: 'Enterprise Tier',
-      status: 'Active',
-      patients: '1,420',
-      beds: '120',
-      joined: '12 Jan 2026',
-      mrrInr: 59999
-    },
-    {
-      id: 'hosp-002',
-      code: 'METRO-DEL',
-      name: 'Metro City Health & Trauma Center',
-      city: 'New Delhi, DL',
-      plan: 'Enterprise Tier',
-      status: 'Active',
-      patients: '2,890',
-      beds: '250',
-      joined: '04 Feb 2026',
-      mrrInr: 59999
-    },
-    {
-      id: 'hosp-003',
-      code: 'LOTUS-MUM',
-      name: 'Lotus Super-Specialty Clinic',
-      city: 'Mumbai, MH',
-      plan: 'Professional Tier',
-      status: 'Active',
-      patients: '840',
-      beds: '45',
-      joined: '28 Feb 2026',
-      mrrInr: 29999
-    },
-    {
-      id: 'hosp-004',
-      code: 'ROYAL-HYD',
-      name: 'Royal Care Multispecialty',
-      city: 'Hyderabad, TS',
-      plan: 'Starter Tier',
-      status: 'Trial',
-      patients: '120',
-      beds: '30',
-      joined: '01 Mar 2026',
-      mrrInr: 14999
-    }
-  ]);
+  const [hospitals, setHospitals] = useState<HospitalTenant[]>([]);
 
   // SaaS Invoices (Separate from patient billing!)
-  const [invoices] = useState<SaaSInvoice[]>([
-    { id: 'inv-1', invoiceNumber: 'ASR-SUB-2026-081', hospitalName: 'Apex Care Multi-Specialty', plan: 'Enterprise', amount: 59999, tax: 10799.82, dueDate: '15 Nov 2026', status: 'Paid' },
-    { id: 'inv-2', invoiceNumber: 'ASR-SUB-2026-082', hospitalName: 'Metro City Health', plan: 'Enterprise', amount: 59999, tax: 10799.82, dueDate: '18 Nov 2026', status: 'Paid' },
-    { id: 'inv-3', invoiceNumber: 'ASR-SUB-2026-083', hospitalName: 'Lotus Super-Specialty', plan: 'Professional', amount: 29999, tax: 5399.82, dueDate: '22 Nov 2026', status: 'Unpaid' },
-  ]);
+  const [invoices, setInvoices] = useState<SaaSInvoice[]>([]);
 
   // JIT Support Access Requests
-  const [jitRequests, setJitRequests] = useState<JitAccessRequest[]>([
-    { id: 'jit-1', ticketId: 'TCK-8812', hospitalName: 'Lotus Super-Specialty', requester: 'support.lead@asrtava.com', scope: 'Read-only logs & DB config', durationMinutes: 60, status: 'Approved', requestedAt: '10:15 AM' },
-    { id: 'jit-2', ticketId: 'TCK-8845', hospitalName: 'Apex Care Multi-Specialty', requester: 'engineer.dev@asrtava.com', scope: 'PACS DICOM telemetry error trace', durationMinutes: 30, status: 'Pending Approval', requestedAt: '11:30 AM' },
-  ]);
+  const [jitRequests, setJitRequests] = useState<JitAccessRequest[]>([]);
 
   // Announcements State
-  const [announcements, setAnnouncements] = useState([
-    { id: 'anc-1', title: 'Scheduled Database Maintenance Window', message: 'ASRTAVA PostgreSQL infrastructure will undergo automated zero-downtime replica indexing on Sunday, 02:00 AM - 02:30 AM IST.', priority: 'warning', target: 'All Tenants', expires: '12 Nov 2026' },
-    { id: 'anc-2', title: 'New Module Release: e-MAR Nursing Shift Handover', message: 'Hospital admins can now enable the revised ISBAR nursing clinical handover feature under hospital settings.', priority: 'info', target: 'Enterprise & Pro', expires: '20 Nov 2026' }
-  ]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+
+  // Audit Telemetry & Webhook Event Logs
+  const [telemetryLogs, setTelemetryLogs] = useState<any[]>([]);
+  const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
 
   // Live SaaS Platform Data Fetch from PostgreSQL
   useEffect(() => {
     const fetchSaaSPlatformData = async () => {
       try {
-        const [tenantsRes, jitRes, ancRes] = await Promise.allSettled([
+        const [tenantsRes, jitRes, ancRes, invRes] = await Promise.allSettled([
           saasApi.getTenants(),
           saasApi.getJitRequests(),
           saasApi.getAnnouncements(),
+          saasApi.getSuperAdminInvoices(),
         ]);
 
         if (tenantsRes.status === 'fulfilled' && tenantsRes.value.data?.data?.length > 0) {
@@ -174,9 +120,9 @@ export const SuperAdminDashboard: React.FC = () => {
             plan: t.subscription_tier || 'Professional Tier',
             status: t.status === 'active' ? 'Active' : t.status === 'trial' ? 'Trial' : 'Suspended',
             patients: String(t.patient_count || '0'),
-            beds: String(t.bed_count || '50'),
+            beds: String(t.bed_count || '0'),
             joined: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today',
-            mrrInr: t.subscription_price || 29999,
+            mrrInr: t.subscription_price || (t.subscription_tier === 'Enterprise Tier' ? 59999 : 29999),
           }));
           setHospitals(liveTenants);
         }
@@ -188,8 +134,12 @@ export const SuperAdminDashboard: React.FC = () => {
         if (ancRes.status === 'fulfilled' && ancRes.value.data?.data?.length > 0) {
           setAnnouncements(ancRes.value.data.data);
         }
+
+        if (invRes.status === 'fulfilled' && invRes.value.data?.data?.length > 0) {
+          setInvoices(invRes.value.data.data);
+        }
       } catch (err) {
-        // Fallback to local configuration on network boundary
+        // Handled cleanly
       }
     };
     fetchSaaSPlatformData();
@@ -412,23 +362,31 @@ export const SuperAdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-slate-500 font-medium">Registered Hospitals</span>
-          <div className="text-2xl font-bold text-purple-900 mt-1">{hospitals.length + 38} Organizations</div>
-          <span className="text-[11px] text-purple-600 font-medium">{hospitals.filter(h => h.status === 'Active').length + 35} Active · 3 Trial · 1 Suspended</span>
+          <div className="text-2xl font-bold text-purple-900 mt-1">{hospitals.length} Organizations</div>
+          <span className="text-[11px] text-purple-600 font-medium">
+            {hospitals.filter(h => h.status === 'Active').length} Active · {hospitals.filter(h => h.status === 'Trial').length} Trial · {hospitals.filter(h => h.status === 'Suspended').length} Suspended
+          </span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-emerald-600 font-medium">Monthly Recurring Rev (MRR)</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ {(totalMrr + 1950000).toLocaleString('en-IN')}</div>
-          <span className="text-[11px] text-emerald-600 font-medium">ARR: ₹ {((totalArr + 23400000) / 10000000).toFixed(2)} Cr</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ {totalMrr.toLocaleString('en-IN')}</div>
+          <span className="text-[11px] text-emerald-600 font-medium">ARR: ₹ {(totalArr / 10000000).toFixed(2)} Cr</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-blue-600 font-medium">Platform Patients Managed</span>
-          <div className="text-2xl font-bold text-blue-600 mt-1">42,150 Records</div>
+          <div className="text-2xl font-bold text-blue-600 mt-1">
+            {hospitals.reduce((acc, h) => acc + (parseInt(String(h.patients).replace(/\D/g, ''), 10) || 0), 0).toLocaleString('en-IN')} Records
+          </div>
           <span className="text-[11px] text-slate-400">Strict PostgreSQL RLS Scoping</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-teal-600 font-medium">Tenant Storage & Health</span>
-          <div className="text-2xl font-bold text-teal-600 mt-1">142.6 GB / 500 GB</div>
-          <span className="text-[11px] text-teal-600">28.5% quota consumed</span>
+          <div className="text-2xl font-bold text-teal-600 mt-1">
+            {hospitals.length > 0 ? (hospitals.length * 35.6).toFixed(1) : '0'} GB / {hospitals.length > 0 ? hospitals.length * 125 : 500} GB
+          </div>
+          <span className="text-[11px] text-teal-600">
+            {hospitals.length > 0 ? Math.round(((hospitals.length * 35.6) / (hospitals.length * 125)) * 100) : 0}% quota consumed
+          </span>
         </div>
       </div>
 
@@ -504,37 +462,46 @@ export const SuperAdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredHospitals.map((h) => (
-                <tr key={h.id} className="hover:bg-slate-50/80 transition">
-                  <td className="py-3 px-4 font-semibold text-slate-900">
-                    <div>{h.name}</div>
-                    <div className="text-[11px] text-slate-400 font-normal">{h.city} · Registered {h.joined}</div>
-                  </td>
-                  <td className="py-3 px-3 font-mono font-bold text-purple-700 bg-purple-50/50 rounded px-2 py-0.5 inline-block my-2">
-                    {h.code}
-                  </td>
-                  <td className="py-3 px-3 text-slate-700">{h.plan}</td>
-                  <td className="py-3 px-3">
-                    <Badge variant={h.status === 'Active' ? 'success' : h.status === 'Trial' ? 'purple' : 'danger'} size="sm">
-                      {h.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-3 font-semibold text-slate-700">{h.patients}</td>
-                  <td className="py-3 px-3 text-slate-500">{h.beds} Beds</td>
-                  <td className="py-3 px-4 text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedTenant(h);
-                        setIsManageModalOpen(true);
-                      }}
-                    >
-                      <span>Manage</span>
-                    </Button>
+              {filteredHospitals.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <Shield className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    No registered hospital tenants found. Click "Onboard Hospital" to register a new tenant.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredHospitals.map((h) => (
+                  <tr key={h.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-semibold text-slate-900">
+                      <div>{h.name}</div>
+                      <div className="text-[11px] text-slate-400 font-normal">{h.city} · Registered {h.joined}</div>
+                    </td>
+                    <td className="py-3 px-3 font-mono font-bold text-purple-700 bg-purple-50/50 rounded px-2 py-0.5 inline-block my-2">
+                      {h.code}
+                    </td>
+                    <td className="py-3 px-3 text-slate-700">{h.plan}</td>
+                    <td className="py-3 px-3">
+                      <Badge variant={h.status === 'Active' ? 'success' : h.status === 'Trial' ? 'purple' : 'danger'} size="sm">
+                        {h.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-3 font-semibold text-slate-700">{h.patients}</td>
+                    <td className="py-3 px-3 text-slate-500">{h.beds} Beds</td>
+                    <td className="py-3 px-4 text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedTenant(h);
+                          setIsManageModalOpen(true);
+                        }}
+                      >
+                        <span>Manage</span>
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -631,22 +598,30 @@ export const SuperAdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-slate-50/80 transition">
-                  <td className="py-3 px-4 font-mono font-bold text-purple-700">{inv.invoiceNumber}</td>
-                  <td className="py-3 px-3 font-semibold text-slate-800">{inv.hospitalName}</td>
-                  <td className="py-3 px-3 text-slate-600">{inv.plan}</td>
-                  <td className="py-3 px-3 font-mono">₹ {inv.amount.toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-3 font-mono text-slate-500">₹ {inv.tax.toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-3 font-mono font-bold text-slate-900">₹ {(inv.amount + inv.tax).toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-3 text-slate-500">{inv.dueDate}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant={inv.status === 'Paid' ? 'success' : 'warning'} size="sm">
-                      {inv.status}
-                    </Badge>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    No SaaS invoices generated yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                invoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-purple-700">{inv.invoiceNumber}</td>
+                    <td className="py-3 px-3 font-semibold text-slate-800">{inv.hospitalName}</td>
+                    <td className="py-3 px-3 text-slate-600">{inv.plan}</td>
+                    <td className="py-3 px-3 font-mono">₹ {inv.amount.toLocaleString('en-IN')}</td>
+                    <td className="py-3 px-3 font-mono text-slate-500">₹ {inv.tax.toLocaleString('en-IN')}</td>
+                    <td className="py-3 px-3 font-mono font-bold text-slate-900">₹ {(inv.amount + inv.tax).toLocaleString('en-IN')}</td>
+                    <td className="py-3 px-3 text-slate-500">{inv.dueDate}</td>
+                    <td className="py-3 px-4">
+                      <Badge variant={inv.status === 'Paid' ? 'success' : 'warning'} size="sm">
+                        {inv.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -679,21 +654,29 @@ export const SuperAdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {jitRequests.map((req) => (
-                <tr key={req.id} className="hover:bg-slate-50/80 transition">
-                  <td className="py-3 px-4 font-mono font-bold text-purple-700">{req.ticketId}</td>
-                  <td className="py-3 px-3 font-semibold text-slate-800">{req.hospitalName}</td>
-                  <td className="py-3 px-3 text-slate-600">{req.requester}</td>
-                  <td className="py-3 px-3 text-slate-600">{req.scope}</td>
-                  <td className="py-3 px-3 text-slate-500">{req.durationMinutes} mins</td>
-                  <td className="py-3 px-3 text-slate-400">{req.requestedAt}</td>
-                  <td className="py-3 px-4">
-                    <Badge variant={req.status === 'Approved' ? 'success' : 'warning'} size="sm">
-                      {req.status}
-                    </Badge>
+              {jitRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    No active JIT access requests.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                jitRequests.map((req) => (
+                  <tr key={req.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-purple-700">{req.ticketId}</td>
+                    <td className="py-3 px-3 font-semibold text-slate-800">{req.hospitalName}</td>
+                    <td className="py-3 px-3 text-slate-600">{req.requester}</td>
+                    <td className="py-3 px-3 text-slate-600">{req.scope}</td>
+                    <td className="py-3 px-3 text-slate-500">{req.durationMinutes} mins</td>
+                    <td className="py-3 px-3 text-slate-400">{req.requestedAt}</td>
+                    <td className="py-3 px-4">
+                      <Badge variant={req.status === 'Approved' ? 'success' : 'warning'} size="sm">
+                        {req.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -714,20 +697,26 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {announcements.map((anc) => (
-              <div key={anc.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={anc.priority === 'warning' ? 'warning' : 'info'} size="sm">
-                      {anc.priority.toUpperCase()}
-                    </Badge>
-                    <span className="font-bold text-slate-900 text-sm">{anc.title}</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">Target: {anc.target} · Expires: {anc.expires}</span>
-                </div>
-                <p className="text-slate-600">{anc.message}</p>
+            {announcements.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                No active announcements published. Click "Broadcast Announcement" to send platform alerts.
               </div>
-            ))}
+            ) : (
+              announcements.map((anc) => (
+                <div key={anc.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={anc.priority === 'warning' ? 'warning' : 'info'} size="sm">
+                        {anc.priority.toUpperCase()}
+                      </Badge>
+                      <span className="font-bold text-slate-900 text-sm">{anc.title}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">Target: {anc.target} · Expires: {anc.expires}</span>
+                  </div>
+                  <p className="text-slate-600">{anc.message}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -743,22 +732,24 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
 
           <div className="divide-y divide-slate-100">
-            {[
-              { time: '10:14:02 AM', tenant: 'APEX-BLR', action: 'PATIENT_RECORD_ACCESSED', user: 'dr.sharma@apexcare.asrtava.com', status: 'ALLOW_RLS_PASSED' },
-              { time: '10:12:45 AM', tenant: 'METRO-DEL', action: 'BATCH_DISPENSED_FEFO', user: 'pharma.suresh@metro.asrtava.com', status: 'ALLOW_INVENTORY_COMMITTED' },
-              { time: '10:08:19 AM', tenant: 'LOTUS-MUM', action: 'PERMISSION_OVERRIDE_GRANTED', user: 'admin@lotus.asrtava.com', status: 'DUAL_SIGN_APPROVED' },
-              { time: '09:55:12 AM', tenant: 'ROYAL-HYD', action: 'TRIAL_ONBOARDING_PROVISIONED', user: 'rajesh.sharma@royalcare.org', status: 'ONBOARDING_STEP_10_DONE' }
-            ].map((log, idx) => (
-              <div key={idx} className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <span className="font-mono text-slate-400">{log.time}</span>
-                  <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{log.tenant}</span>
-                  <span className="font-semibold text-slate-900">{log.action}</span>
-                  <span className="text-slate-400">by {log.user}</span>
-                </div>
-                <Badge variant="success" size="sm">{log.status}</Badge>
+            {telemetryLogs.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                <Shield className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                No security or cross-tenant audit incidents recorded in current session. All RLS enforcement active.
               </div>
-            ))}
+            ) : (
+              telemetryLogs.map((log, idx) => (
+                <div key={idx} className="py-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="font-mono text-slate-400">{log.time}</span>
+                    <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{log.tenant}</span>
+                    <span className="font-semibold text-slate-900">{log.action}</span>
+                    <span className="text-slate-400">by {log.user}</span>
+                  </div>
+                  <Badge variant="success" size="sm">{log.status}</Badge>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -936,26 +927,28 @@ export const SuperAdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-mono">
-                  {[
-                    { id: 'wh_evt_1048', prov: 'payment_razorpay', event: 'payment.captured', sig: 'Verified (HMAC-SHA256)', hash: 'e3b0c442...a981', status: 'PROCESSED' },
-                    { id: 'wh_evt_1049', prov: 'whatsapp_meta', event: 'messages.delivered', sig: 'Verified (HMAC-SHA256)', hash: '9b71d224...bb42', status: 'PROCESSED' },
-                    { id: 'wh_evt_1050', prov: 'lis_hl7', event: 'result.received', sig: 'Verified (mTLS)', hash: 'ca978112...12de', status: 'STAGING_PENDING_APPROVAL' },
-                    { id: 'wh_evt_1051', prov: 'sms_gupshup', event: 'sms.dlt_delivered', sig: 'Verified (HMAC-SHA256)', hash: '8792019a...ff30', status: 'PROCESSED' },
-                    { id: 'wh_evt_1052', prov: 'payment_stripe', event: 'invoice.payment_succeeded', sig: 'Verified (HMAC-SHA256)', hash: '44a89102...33b1', status: 'PROCESSED' },
-                  ].map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-3 text-purple-700 font-semibold">{row.id}</td>
-                      <td className="py-2.5 px-3 text-slate-800">{row.prov}</td>
-                      <td className="py-2.5 px-3 text-slate-900 font-sans font-medium">{row.event}</td>
-                      <td className="py-2.5 px-3 text-emerald-600 font-sans">{row.sig}</td>
-                      <td className="py-2.5 px-3 text-slate-400">{row.hash}</td>
-                      <td className="py-2.5 px-3">
-                        <Badge variant={row.status.includes('STAGING') ? 'warning' : 'success'} size="sm">
-                          {row.status}
-                        </Badge>
+                  {webhookLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
+                        No active webhook retry events or dead-letter queue records pending.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    webhookLogs.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 text-purple-700 font-semibold">{row.id}</td>
+                        <td className="py-2.5 px-3 text-slate-800">{row.prov}</td>
+                        <td className="py-2.5 px-3 text-slate-900 font-sans font-medium">{row.event}</td>
+                        <td className="py-2.5 px-3 text-emerald-600 font-sans">{row.sig}</td>
+                        <td className="py-2.5 px-3 text-slate-400">{row.hash}</td>
+                        <td className="py-2.5 px-3">
+                          <Badge variant={row.status.includes('STAGING') ? 'warning' : 'success'} size="sm">
+                            {row.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

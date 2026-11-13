@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Pill,
   ShieldAlert,
@@ -22,9 +22,11 @@ import {
   Check
 } from 'lucide-react';
 import { Button, Input, Badge, Modal, useToast } from '../../components/ui';
+import { useHospital } from '../../context/HospitalContext';
 
 export const AdvancedPharmacyHub: React.FC = () => {
   const { showToast } = useToast();
+  const { prescriptions, inventory, invoices } = useHospital();
   const [activeTab, setActiveTab] = useState<
     'verification' | 'fefo-stock' | 'inpatient-emar' | 'cold-chain' | 'recalls' | 'narcotics' | 'procurement'
   >('verification');
@@ -37,17 +39,17 @@ export const AdvancedPharmacyHub: React.FC = () => {
 
   // eMAR Dose Admin Modal State
   const [isEmarModalOpen, setIsEmarModalOpen] = useState(false);
-  const [emarPatient, setEmarPatient] = useState('Ramesh Patel (IPD-Ward-3A)');
+  const [emarPatient, setEmarPatient] = useState('Inpatient (Ward 3A)');
   const [emarDrug, setEmarDrug] = useState('Huminsulin Regular 100 IU/mL');
   const [emarDose, setEmarDose] = useState('6 Units Subcutaneous');
-  const [emarCosigner, setEmarCosigner] = useState('nurse-anita-charge');
+  const [emarCosigner, setEmarCosigner] = useState('nurse-charge');
   const [emarPulse, setEmarPulse] = useState(78);
   const [emarBP, setEmarBP] = useState('120/80');
 
   // Recall Modal State
   const [isRecallModalOpen, setIsRecallModalOpen] = useState(false);
-  const [recallLot, setRecallLot] = useState('AMX-2026-B01');
-  const [recallReason, setRecallReason] = useState('Potential particulate contamination reported by CDSCO');
+  const [recallLot, setRecallLot] = useState('');
+  const [recallReason, setRecallReason] = useState('');
   const [recallClass, setRecallClass] = useState<'CLASS_I_LIFE_THREATENING' | 'CLASS_II_TEMPORARY_HEALTH_HAZARD'>('CLASS_I_LIFE_THREATENING');
 
   // Cold Chain Excursion Modal State
@@ -59,112 +61,80 @@ export const AdvancedPharmacyHub: React.FC = () => {
   const [isNarcoticModalOpen, setIsNarcoticModalOpen] = useState(false);
   const [narcoticDrug, setNarcoticDrug] = useState('Morphine Sulfate 10mg/mL Ampoule');
   const [narcoticQty, setNarcoticQty] = useState(-5);
-  const [narcoticWitness, setNarcoticWitness] = useState('witness-meera-rn');
+  const [narcoticWitness, setNarcoticWitness] = useState('nurse-charge');
 
-  // Sample Pharmacist Verification Queue Data
-  const verificationQueueItems = [
-    {
-      id: 'pvq-001',
-      prescriptionNumber: 'RX-2026-884102',
-      patient: 'Ananya Deshmukh',
-      uhid: 'UHID-2026-00441',
-      doctor: 'Dr. R. Sharma (Cardiology)',
-      drugs: [
-        { name: 'Warfarin Sodium 5mg', dose: '1 tab OD', qty: 30 },
-        { name: 'Aspirin 75mg Gastro-Resistant', dose: '1 tab OD', qty: 30 },
-      ],
-      safetyAlert: {
-        type: 'DRUG_DRUG_INTERACTION',
-        severity: 'MAJOR_WARNING',
-        message: 'Warfarin + Aspirin: High risk of gastrointestinal hemorrhage and bleeding.',
-      },
-      status: 'PENDING_REVIEW',
-    },
-    {
-      id: 'pvq-002',
-      prescriptionNumber: 'RX-2026-884105',
-      patient: 'Vikram Malhotra',
-      uhid: 'UHID-2026-00892',
-      doctor: 'Dr. K. Nair (Internal Medicine)',
-      drugs: [
-        { name: 'Amoxicillin 500mg', dose: '1 cap TDS', qty: 15 },
-      ],
-      safetyAlert: null,
-      status: 'VERIFIED_APPROVED',
-    },
-    {
-      id: 'pvq-003',
-      prescriptionNumber: 'RX-2026-884110',
-      patient: 'Sunita Mehra',
-      uhid: 'UHID-2026-00319',
-      doctor: 'Dr. S. Roy (Pediatrics)',
-      drugs: [
-        { name: 'Crocin 650mg Advance', dose: '1 tab SOS', qty: 10 },
-        { name: 'Paracetamol 500mg Tablet', dose: '1 tab TDS', qty: 10 },
-      ],
-      safetyAlert: {
-        type: 'DUPLICATE_THERAPY',
-        severity: 'MAJOR_WARNING',
-        message: 'Duplicate Paracetamol active ingredient prescribed. Risk of hepatotoxicity.',
-      },
-      status: 'PENDING_REVIEW',
-    },
-  ];
+  // Dynamic Pharmacist Verification Queue Data - synchronized with HospitalContext.prescriptions
+  const [verificationQueueItems, setVerificationQueueItems] = useState<any[]>([]);
 
-  // Sample FEFO Batches Data
-  const fefoBatches = [
-    {
-      batch: 'AMX-2026-B01',
-      drug: 'Amoxicillin 500mg Capsule',
-      expiry: '2026-12-15',
-      daysLeft: 36,
-      stock: 100,
-      cost: 4.5,
-      mrp: 10.0,
-      bin: 'BIN-ANTIBIOTIC-01',
-      status: 'NEAR_EXPIRY',
-    },
-    {
-      batch: 'AMX-2026-B02',
-      drug: 'Amoxicillin 500mg Capsule',
-      expiry: '2027-05-30',
-      daysLeft: 202,
-      stock: 200,
-      cost: 4.5,
-      mrp: 10.0,
-      bin: 'BIN-ANTIBIOTIC-01',
-      status: 'AVAILABLE',
-    },
-    {
-      batch: 'INS-COLD-01',
-      drug: 'Huminsulin Regular 100 IU/mL',
-      expiry: '2027-01-01',
-      daysLeft: 53,
-      stock: 40,
-      cost: 150.0,
-      mrp: 250.0,
-      bin: 'FRIDGE-VACC-01',
-      status: 'QUARANTINED_TEMP_EXCURSION',
-    },
-    {
-      batch: 'EXP-LOT-999',
-      drug: 'Cefixime 200mg Dispersible',
-      expiry: '2025-01-01',
-      daysLeft: -678,
-      stock: 50,
-      cost: 8.0,
-      mrp: 18.0,
-      bin: 'QUARANTINE-VAULT',
-      status: 'QUARANTINED_EXPIRED',
-    },
-  ];
+  useEffect(() => {
+    if (prescriptions && prescriptions.length > 0) {
+      setVerificationQueueItems(
+        prescriptions.map((p, idx) => ({
+          id: p.id || `pvq-${idx + 1}`,
+          prescriptionNumber: p.rxNumber || `RX-2026-${String(p.id).replace(/\D/g, '').slice(-6).padStart(6, '0')}`,
+          patient: p.patientName || 'Inpatient',
+          uhid: p.uhid || (p.patientId ? `UHID-2026-${String(p.patientId).slice(-5)}` : `UHID-2026-00${idx + 10}`),
+          doctor: p.doctorName || 'Attending Physician',
+          drugs: p.items && p.items.length > 0
+            ? p.items.map(m => ({ name: m.drugName, dose: m.dosage || '1 tab OD', qty: m.qty || 10 }))
+            : (p as any).medications
+            ? (p as any).medications.map((m: any) => ({ name: m.name, dose: m.dosage || '1 tab OD', qty: m.days ? m.days * 2 : 10 }))
+            : [{ name: (p as any).medicationName || 'Prescribed Drug', dose: (p as any).dosage || '1 tab OD', qty: 10 }],
+          safetyAlert: null,
+          status: p.status === 'Dispensed' ? 'VERIFIED_APPROVED' : 'PENDING_REVIEW',
+        }))
+      );
+    } else {
+      setVerificationQueueItems([]);
+    }
+  }, [prescriptions]);
+
+  // Dynamic FEFO Batches Data - synchronized with HospitalContext.inventory
+  const [fefoBatches, setFefoBatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (inventory && inventory.length > 0) {
+      setFefoBatches(
+        inventory.map((item, idx) => {
+          const batchCode = item.batch || (item as any).batchNumber || `BAT-${idx + 101}`;
+          const expiryDate = item.expiry || (item as any).expiryDate || '2027-12-31';
+          return {
+            batch: batchCode,
+            drug: item.name,
+            expiry: expiryDate,
+            daysLeft: expiryDate ? Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 365,
+            stock: item.stock || 0,
+            cost: item.unitPrice ? item.unitPrice * 0.7 : 10,
+            mrp: item.unitPrice || 15,
+            bin: (item as any).location || 'BIN-PHARM-01',
+            status: (item.stock || 0) <= (item.reorderLevel || 10) ? 'NEAR_EXPIRY' : 'AVAILABLE',
+          };
+        })
+      );
+    } else {
+      setFefoBatches([]);
+    }
+  }, [inventory]);
+
+  // Recalls & Quarantines State
+  const [recalls, setRecalls] = useState<any[]>([]);
+
+  // Narcotic Perpetual Register
+  const [narcoticLogs, setNarcoticLogs] = useState<any[]>([]);
 
   // Sample Cold Chain Units
-  const coldChainUnits = [
+  const [coldChainUnits] = useState([
     { code: 'FRIDGE-MAIN-01', name: 'Main Pharmacy Biologicals Refrigerator', temp: 4.2, min: 2.0, max: 8.0, status: 'NORMAL' },
-    { code: 'FRIDGE-VACC-01', name: 'Central Vaccine & Cold Storage Vault', temp: 11.5, min: 2.0, max: 8.0, status: 'EXCURSION_ALARM' },
+    { code: 'FRIDGE-VACC-01', name: 'Central Vaccine & Cold Storage Vault', temp: 5.1, min: 2.0, max: 8.0, status: 'NORMAL' },
     { code: 'FREEZER-PLASMA-01', name: 'Blood Bank Fresh Frozen Plasma Freezer', temp: -22.4, min: -25.0, max: -18.0, status: 'NORMAL' },
-  ];
+  ]);
+
+  // Dynamic Revenue
+  const pharmacyRevenue = invoices
+    ? invoices
+        .filter(inv => inv.category === 'Pharmacy' || ((inv as any).items && (inv as any).items.some((it: any) => it.type === 'Pharmacy' || it.department === 'Pharmacy')))
+        .reduce((sum, inv) => sum + ((inv as any).paidAmount || inv.paid || inv.total || 0), 0)
+    : 0;
 
   const handleVerifySubmit = () => {
     if (!selectedRx) return;
@@ -203,12 +173,26 @@ export const AdvancedPharmacyHub: React.FC = () => {
   };
 
   const handleRecallSubmit = () => {
+    if (!recallLot.trim()) return;
+    const newRecall = {
+      id: `rcl-${Date.now()}`,
+      code: `RCL-MANUF-2026-${Math.floor(100 + Math.random() * 900)}`,
+      lot: recallLot,
+      reason: recallReason || 'Manufacturer voluntary batch quarantine',
+      recallClass: recallClass,
+      date: new Date().toLocaleDateString(),
+      quarantinedStock: 0,
+      tracedPatients: 0,
+    };
+    setRecalls([newRecall, ...recalls]);
     showToast({
       type: 'warning',
       title: 'Manufacturer Product Recall Registered',
       message: `Batch ${recallLot} quarantined hospital-wide. Recall Class: ${recallClass}. Patient trace dispatched.`,
     });
     setIsRecallModalOpen(false);
+    setRecallLot('');
+    setRecallReason('');
   };
 
   const handleTempExcursion = () => {
@@ -221,6 +205,17 @@ export const AdvancedPharmacyHub: React.FC = () => {
   };
 
   const handleNarcoticSubmit = () => {
+    const newLog = {
+      id: `narc-${Date.now()}`,
+      timestamp: new Date().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+      drug: narcoticDrug,
+      txType: narcoticQty > 0 ? 'VAULT_RECEIPT' : 'WARD_DISPENSE',
+      qty: narcoticQty,
+      balance: Math.max(0, 50 + narcoticQty),
+      custodian: 'custodian-primary',
+      witness: narcoticWitness,
+    };
+    setNarcoticLogs([newLog, ...narcoticLogs]);
     showToast({
       type: 'success',
       title: 'Narcotic Vault Dual-Custody Transaction Logged',
@@ -238,8 +233,12 @@ export const AdvancedPharmacyHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Pending Verification</span>
             <ShieldAlert className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-bold text-amber-700">7 Prescriptions</div>
-          <div className="text-xs text-slate-500 mt-2 font-medium">2 Major DDI Alerts Flagged</div>
+          <div className="text-2xl font-bold text-amber-700">
+            {verificationQueueItems.filter(r => r.status === 'PENDING_REVIEW').length} Prescriptions
+          </div>
+          <div className="text-xs text-slate-500 mt-2 font-medium">
+            {verificationQueueItems.filter(r => r.safetyAlert).length} DDI Alerts Flagged
+          </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -247,7 +246,7 @@ export const AdvancedPharmacyHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">FEFO Stock Batches</span>
             <Layers className="w-4 h-4 text-teal-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-800">1,480 Batches</div>
+          <div className="text-2xl font-bold text-slate-800">{fefoBatches.length} Batches</div>
           <div className="text-xs text-emerald-600 mt-2 font-medium">100% FEFO Auto-Allocation</div>
         </div>
 
@@ -256,7 +255,9 @@ export const AdvancedPharmacyHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Near Expiry (&lt; 60 Days)</span>
             <Clock className="w-4 h-4 text-rose-600" />
           </div>
-          <div className="text-2xl font-bold text-rose-700">4 Lots</div>
+          <div className="text-2xl font-bold text-rose-700">
+            {fefoBatches.filter(b => b.daysLeft > 0 && b.daysLeft <= 60).length} Lots
+          </div>
           <div className="text-xs text-rose-600 mt-2 font-medium">Automatic FEFO Priority Active</div>
         </div>
 
@@ -265,8 +266,10 @@ export const AdvancedPharmacyHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Cold-Chain Status</span>
             <Thermometer className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-bold text-blue-700">2 / 3 Normal</div>
-          <div className="text-xs text-rose-600 mt-2 font-medium">1 Excursion Alarm (Quarantined)</div>
+          <div className="text-2xl font-bold text-blue-700">
+            {coldChainUnits.filter(u => u.status === 'NORMAL').length} / {coldChainUnits.length} Normal
+          </div>
+          <div className="text-xs text-emerald-600 mt-2 font-medium">Sensors Active</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -274,7 +277,7 @@ export const AdvancedPharmacyHub: React.FC = () => {
             <span className="text-xs font-semibold uppercase tracking-wider">Daily Pharmacy Revenue</span>
             <TrendingUp className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="text-2xl font-bold text-purple-800">₹1,85,400</div>
+          <div className="text-2xl font-bold text-purple-800">₹{pharmacyRevenue.toLocaleString('en-IN')}</div>
           <div className="text-xs text-slate-500 mt-2 font-medium">HSN 3004 (5% GST) Ledgered</div>
         </div>
       </div>
@@ -397,68 +400,76 @@ export const AdvancedPharmacyHub: React.FC = () => {
                   Every doctor eRx undergoes clinical pharmacist verification for dosage, allergies, and drug-drug interactions before physical dispensing.
                 </p>
               </div>
-              <Badge variant="warning">3 Awaiting Clinical Verification</Badge>
+              <Badge variant="warning">
+                {verificationQueueItems.filter(r => r.status === 'PENDING_REVIEW').length} Awaiting Clinical Verification
+              </Badge>
             </div>
 
             <div className="space-y-3">
-              {verificationQueueItems.map((rx) => (
-                <div key={rx.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-slate-800">{rx.prescriptionNumber}</span>
-                        <Badge variant={rx.status === 'VERIFIED_APPROVED' ? 'success' : 'warning'}>
-                          {rx.status}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-slate-600 mt-1">
-                        Patient: <span className="font-semibold text-slate-800">{rx.patient}</span> ({rx.uhid}) • Prescribed by: {rx.doctor}
-                      </div>
-                    </div>
-                    <div>
-                      {rx.status === 'PENDING_REVIEW' ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedRx(rx);
-                            setIsVerifyModalOpen(true);
-                          }}
-                        >
-                          <UserCheck className="w-3.5 h-3.5 mr-1" />
-                          Review & Verify eRx
-                        </Button>
-                      ) : (
-                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Approved for Dispense
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Safety Alert Warning Banner */}
-                  {rx.safetyAlert && (
-                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold uppercase tracking-wider">{rx.safetyAlert.type}: </span>
-                        <span>{rx.safetyAlert.message}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Prescribed Items */}
-                  <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-1">
-                    <div className="font-semibold text-slate-700 mb-1">Prescribed Medications:</div>
-                    {rx.drugs.map((d, i) => (
-                      <div key={i} className="flex justify-between text-slate-700">
-                        <span>• <span className="font-medium text-slate-900">{d.name}</span> ({d.dose})</span>
-                        <span className="font-mono text-slate-500">Qty: {d.qty}</span>
-                      </div>
-                    ))}
-                  </div>
+              {verificationQueueItems.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+                  No prescriptions currently awaiting pharmacist verification. New doctor e-prescriptions will queue here for clinical interaction check and dispensing sign-off.
                 </div>
-              ))}
+              ) : (
+                verificationQueueItems.map((rx) => (
+                  <div key={rx.id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800">{rx.prescriptionNumber}</span>
+                          <Badge variant={rx.status === 'VERIFIED_APPROVED' ? 'success' : 'warning'}>
+                            {rx.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          Patient: <span className="font-semibold text-slate-800">{rx.patient}</span> ({rx.uhid}) • Prescribed by: {rx.doctor}
+                        </div>
+                      </div>
+                      <div>
+                        {rx.status === 'PENDING_REVIEW' ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedRx(rx);
+                              setIsVerifyModalOpen(true);
+                            }}
+                          >
+                            <UserCheck className="w-3.5 h-3.5 mr-1" />
+                            Review & Verify eRx
+                          </Button>
+                        ) : (
+                          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Approved for Dispense
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Safety Alert Warning Banner */}
+                    {rx.safetyAlert && (
+                      <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold uppercase tracking-wider">{rx.safetyAlert.type}: </span>
+                          <span>{rx.safetyAlert.message}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Prescribed Items */}
+                    <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-1">
+                      <div className="font-semibold text-slate-700 mb-1">Prescribed Medications:</div>
+                      {rx.drugs && rx.drugs.map((d: any, i: number) => (
+                        <div key={i} className="flex justify-between text-slate-700">
+                          <span>• <span className="font-medium text-slate-900">{d.name}</span> ({d.dose})</span>
+                          <span className="font-mono text-slate-500">Qty: {d.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -489,41 +500,49 @@ export const AdvancedPharmacyHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {fefoBatches.map((b) => (
-                    <tr key={b.batch} className="hover:bg-slate-50 transition">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-800">{b.batch}</td>
-                      <td className="px-4 py-3 font-medium text-slate-800">{b.drug}</td>
-                      <td className="px-4 py-3 font-mono">{b.expiry}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                            b.daysLeft < 0
-                              ? 'bg-rose-100 text-rose-800'
-                              : b.daysLeft < 60
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {b.daysLeft < 0 ? `Expired (${Math.abs(b.daysLeft)}d ago)` : `${b.daysLeft} days`}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold">{b.stock}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600">{b.bin}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge
-                          variant={
-                            b.status === 'AVAILABLE'
-                              ? 'success'
-                              : b.status === 'NEAR_EXPIRY'
-                              ? 'warning'
-                              : 'danger'
-                          }
-                        >
-                          {b.status}
-                        </Badge>
+                  {fefoBatches.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500">
+                        No pharmaceutical batches currently in inventory. Stock received via GRNs or catalog additions will populate here.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    fefoBatches.map((b) => (
+                      <tr key={b.batch} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3 font-mono font-bold text-slate-800">{b.batch}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{b.drug}</td>
+                        <td className="px-4 py-3 font-mono">{b.expiry}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                              b.daysLeft < 0
+                                ? 'bg-rose-100 text-rose-800'
+                                : b.daysLeft < 60
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {b.daysLeft < 0 ? `Expired (${Math.abs(b.daysLeft)}d ago)` : `${b.daysLeft} days`}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-bold">{b.stock}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{b.bin}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge
+                            variant={
+                              b.status === 'AVAILABLE'
+                                ? 'success'
+                                : b.status === 'NEAR_EXPIRY'
+                                ? 'warning'
+                                : 'danger'
+                            }
+                          >
+                            {b.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -540,26 +559,11 @@ export const AdvancedPharmacyHub: React.FC = () => {
                   Ward nursing medication passes with 5-Rights verification, vital sign checks, and mandatory dual-nurse cosign for High-Alert/Narcotics.
                 </p>
               </div>
-              <Badge variant="brand">Ward ICU / CCU Schedule</Badge>
+              <Badge variant="brand">Ward Schedule</Badge>
             </div>
 
-            <div className="border border-slate-200 rounded-lg p-4 bg-white space-y-2 text-xs">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                <div>
-                  <span className="font-bold text-slate-900">Ramesh Patel (UHID-2026-00045)</span>
-                  <span className="text-slate-500 ml-2">Bed: ICU-Bed-04</span>
-                </div>
-                <Badge variant="success">Administered</Badge>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-slate-600 pt-1">
-                <div>Medication: <span className="font-semibold text-slate-800">Huminsulin Regular 100 IU/mL</span></div>
-                <div>Dose: <span className="font-semibold text-slate-800">6 Units Subcutaneous</span></div>
-                <div>Administered By: <span className="font-semibold text-slate-800">Nurse Priya (RN)</span></div>
-                <div>Dual Cosigned By: <span className="font-semibold text-slate-800">Nurse Anita (Charge RN)</span></div>
-              </div>
-              <div className="pt-2 text-[11px] text-slate-500">
-                Pre-dose Vitals: Pulse 78 bpm, BP 120/80 mmHg. Blood glucose 184 mg/dL verified before injection.
-              </div>
+            <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+              No inpatient eMAR medication doses administered yet today. Doses scheduled for ward inpatients will log dual nurse cosigns and vitals verification here.
             </div>
           </div>
         )}
@@ -618,25 +622,27 @@ export const AdvancedPharmacyHub: React.FC = () => {
               </p>
             </div>
 
-            <div className="border border-rose-200 rounded-xl p-4 bg-rose-50/50 space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Badge variant="danger">CLASS_I_LIFE_THREATENING</Badge>
-                  <span className="font-mono font-bold text-sm text-slate-800">RCL-GSK-2026-009</span>
+            {recalls.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-xl border border-dashed border-slate-300">
+                No active manufacturer product recalls or CDSCO lot quarantines. Click "Issue Product Recall" above to quarantine suspicious batches and audit dispensed patients.
+              </div>
+            ) : (
+              recalls.map((r) => (
+                <div key={r.id} className="border border-rose-200 rounded-xl p-4 bg-rose-50/50 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="danger">{r.recallClass}</Badge>
+                      <span className="font-mono font-bold text-sm text-slate-800">{r.code}</span>
+                    </div>
+                    <span className="text-xs text-slate-500 font-mono">{r.date}</span>
+                  </div>
+                  <div className="text-xs text-slate-800 font-medium">
+                    Recalled Batch: <span className="font-mono font-bold text-rose-800">{r.lot}</span>
+                  </div>
+                  <div className="text-xs text-slate-700">Reason: {r.reason}</div>
                 </div>
-                <span className="text-xs text-slate-500 font-mono">09 Nov 2026</span>
-              </div>
-              <div className="text-xs text-slate-800 font-medium">
-                Drug: <span className="font-bold">Amoxil 500mg Capsule</span> • Recalled Batch: <span className="font-mono font-bold text-rose-800">AMX-2026-B01</span>
-              </div>
-              <div className="text-xs text-slate-700">
-                Reason: Manufacturer notification: Potential particulate contamination during vial sealing process.
-              </div>
-              <div className="pt-2 border-t border-rose-200 flex justify-between text-xs text-rose-900 font-semibold">
-                <span>Quarantined Stock: 40 units frozen</span>
-                <span>Past Dispensed Patients: 1 patient traced & flagged</span>
-              </div>
-            </div>
+              ))
+            )}
           </div>
         )}
 
@@ -667,24 +673,27 @@ export const AdvancedPharmacyHub: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-mono">
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 text-slate-500">09-11-2026 14:30</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">Morphine Sulfate 10mg/mL Ampoule</td>
-                    <td className="px-4 py-3">WARD_DISPENSE</td>
-                    <td className="px-4 py-3 text-right text-rose-700 font-bold">-5</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-900">45</td>
-                    <td className="px-4 py-3 text-slate-700">custodian-rajesh</td>
-                    <td className="px-4 py-3 text-slate-700">witness-meera</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 text-slate-500">09-11-2026 08:00</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">Fentanyl Citrate 50 mcg/mL</td>
-                    <td className="px-4 py-3">VAULT_RECEIPT</td>
-                    <td className="px-4 py-3 text-right text-emerald-700 font-bold">+20</td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-900">30</td>
-                    <td className="px-4 py-3 text-slate-700">custodian-rajesh</td>
-                    <td className="px-4 py-3 text-slate-700">witness-priya</td>
-                  </tr>
+                  {narcoticLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-500 font-sans">
+                        No Schedule X narcotic vault transactions logged. Dual-custody perpetual inventory logs for controlled substances will appear here.
+                      </td>
+                    </tr>
+                  ) : (
+                    narcoticLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50 transition">
+                        <td className="px-4 py-3 text-slate-500">{log.timestamp}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-800">{log.drug}</td>
+                        <td className="px-4 py-3">{log.txType}</td>
+                        <td className={`px-4 py-3 text-right font-bold ${log.qty > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {log.qty > 0 ? `+${log.qty}` : log.qty}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900">{log.balance}</td>
+                        <td className="px-4 py-3 text-slate-700">{log.custodian}</td>
+                        <td className="px-4 py-3 text-slate-700">{log.witness}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
