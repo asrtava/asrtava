@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest, authMiddleware } from '../../middleware/auth.middleware';
-import { requirePermission } from '../../middleware/permission.middleware';
 import { FederatedCoordinationService } from './federated-coordination.service';
 
 const router = Router();
@@ -32,7 +31,7 @@ router.get('/participating-hospitals', async (req: AuthenticatedRequest, res: Re
  */
 router.post('/bed-availability/publish', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
@@ -79,7 +78,7 @@ router.get('/bed-availability', async (req: AuthenticatedRequest, res: Response)
  */
 router.post('/coordination-requests', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
@@ -92,7 +91,7 @@ router.post('/coordination-requests', async (req: AuthenticatedRequest, res: Res
       requestingHospitalId: hospitalId,
       receivingHospitalId,
       requestingUserId: req.user!.id,
-      requestingUserRole: req.user!.role,
+      requestingUserRole: (req.user as any)?.role || req.user?.roles?.[0] || 'staff',
       urgencyLevel: urgencyLevel || 'urgent',
       purposeStatement,
       clinicalSummary,
@@ -112,7 +111,7 @@ router.post('/coordination-requests', async (req: AuthenticatedRequest, res: Res
  */
 router.post('/organ-transplant/initiate-case', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
@@ -150,7 +149,7 @@ router.post('/organ-transplant/initiate-case', async (req: AuthenticatedRequest,
       nottoRegistryReference,
       nonCommercialAffidavitHash,
       actingUserId: req.user!.id,
-      actingUserRole: req.user!.role,
+      actingUserRole: (req.user as any)?.role || req.user?.roles?.[0] || 'staff',
     });
 
     res.status(201).json({
@@ -169,7 +168,7 @@ router.post('/organ-transplant/initiate-case', async (req: AuthenticatedRequest,
  */
 router.post('/emergency-transfer/initiate', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
@@ -205,7 +204,7 @@ router.post('/emergency-transfer/initiate', async (req: AuthenticatedRequest, re
       paramedicInCharge,
       paramedicContactPhone,
       actingUserId: req.user!.id,
-      actingUserRole: req.user!.role,
+      actingUserRole: (req.user as any)?.role || req.user?.roles?.[0] || 'staff',
     });
 
     res.status(201).json({
@@ -224,7 +223,7 @@ router.post('/emergency-transfer/initiate', async (req: AuthenticatedRequest, re
  */
 router.post('/case-share/issue-token', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
@@ -241,7 +240,7 @@ router.post('/case-share/issue-token', async (req: AuthenticatedRequest, res: Re
       resourceTitle,
       ttlHours: Number(ttlHours) || 8,
       actingUserId: req.user!.id,
-      actingUserRole: req.user!.role,
+      actingUserRole: (req.user as any)?.role || req.user?.roles?.[0] || 'staff',
     });
 
     res.status(201).json({ success: true, message: 'Ephemeral case-share token issued.', data: share });
@@ -256,18 +255,18 @@ router.post('/case-share/issue-token', async (req: AuthenticatedRequest, res: Re
  */
 router.get('/case-share/access/:token', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;
     }
 
-    const { token } = req.params;
+    const token = String(req.params.token);
     const share = FederatedCoordinationService.accessSharedResource({
       token,
       requestingHospitalId: hospitalId,
       requestingUserId: req.user!.id,
-      requestingUserRole: req.user!.role,
+      requestingUserRole: (req.user as any)?.role || req.user?.roles?.[0] || 'staff',
     });
 
     res.json({ success: true, message: 'Authorized case share retrieved.', data: share });
@@ -282,7 +281,7 @@ router.get('/case-share/access/:token', async (req: AuthenticatedRequest, res: R
  */
 router.get('/audit-trail', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const hospitalId = req.user?.hospital_id;
+    const hospitalId = req.hospitalId || req.user?.hospitalId || (req.user as any)?.hospital_id;
     if (!hospitalId) {
       res.status(403).json({ success: false, message: 'Missing tenant context.' });
       return;

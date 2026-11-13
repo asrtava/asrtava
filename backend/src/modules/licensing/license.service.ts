@@ -169,6 +169,8 @@ export interface ClinicalContinuityContext {
   operation?: 'read' | 'write' | 'admin' | 'emergency';
   isExistingRecord?: boolean;
   hasActiveEncounter?: boolean;
+  scheduleId?: string;
+  isSurgicalSessionActive?: boolean;
   clinicalOverrideReason?: string;
   clinicianId?: string;
 }
@@ -496,7 +498,16 @@ export class LicenseService {
       };
     }
 
-    // 4. Documented Emergency Clinical Safety Override
+    // 4. P0-02 Surgical Continuity Protection: Active intraoperative session or PACU recovery cannot be interrupted
+    if (context?.isSurgicalSessionActive && context?.operation !== 'admin') {
+      return {
+        allowed: true,
+        isClinicalContinuity: true,
+        reason: 'Surgical continuity safeguard: Active intraoperative procedure or PACU recovery cannot be interrupted by commercial licensing events.'
+      };
+    }
+
+    // 5. Documented Emergency Clinical Safety Override
     if (context?.clinicalOverrideReason) {
       return {
         allowed: true,

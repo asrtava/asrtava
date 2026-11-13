@@ -48,6 +48,7 @@ export interface EMARAdminInput {
   patientId: string;
   prescriptionItemId?: string;
   drugId?: string;
+  drugName?: string;
   batchId?: string;
   scheduledTime: string;
   actualAdminTime?: string;
@@ -59,6 +60,9 @@ export interface EMARAdminInput {
   routeUsed: string;
   siteOfAdministration?: string;
   isHighAlertOrNarcotic?: boolean;
+  knownAllergies?: string[];
+  isContinuityFailsafe?: boolean;
+  failSafeReason?: string;
   preAdminPulse?: number;
   preAdminBpSystolic?: number;
 }
@@ -347,6 +351,27 @@ export class NursingAdvancedService {
   // =========================================================================
   public async administerMedicationEMAR(input: EMARAdminInput): Promise<any> {
     const id = `emar-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // Duplicate administration check
+    if (input.prescriptionItemId && input.administrationStatus === 'ADMINISTERED') {
+      for (const rec of this.emarRecords.values()) {
+        if (rec.prescriptionItemId === input.prescriptionItemId && rec.administrationStatus === 'ADMINISTERED') {
+          if (rec.scheduledTime === input.scheduledTime) {
+            throw new Error(`DUPLICATE_ADMINISTRATION_PREVENTED: Dose for prescription ${input.prescriptionItemId} at ${rec.scheduledTime} was already administered.`);
+          }
+        }
+      }
+    }
+
+    // Known allergy screening
+    if (input.knownAllergies && input.knownAllergies.length > 0 && input.drugName) {
+      const drugLower = input.drugName.toLowerCase();
+      for (const allergy of input.knownAllergies) {
+        if (drugLower.includes(allergy.toLowerCase())) {
+          throw new Error(`ALLERGY_CONTRAINDICATION_BLOCKED: Patient has documented severe allergy to [${allergy}]. Administration blocked to prevent anaphylaxis.`);
+        }
+      }
+    }
 
     // High-alert or narcotic medication validation
     if (input.isHighAlertOrNarcotic && input.administrationStatus === 'ADMINISTERED') {

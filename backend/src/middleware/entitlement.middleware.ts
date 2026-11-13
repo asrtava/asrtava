@@ -2,6 +2,9 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from './auth.middleware';
 import { db } from '../database';
 import { LicenseService } from '../modules/licensing/license.service';
+import { requireLicensedModule, validateServerEncounterContext } from './licensing.middleware';
+
+export { requireLicensedModule, validateServerEncounterContext };
 
 /**
  * Plan Feature Matrix (Fallback defaults if not queried from DB)
@@ -106,8 +109,27 @@ export function requirePlanFeature(featureCode: string) {
         return;
       }
 
-      // 1. Check Perpetual Software License Entitlements first
-      const perpetualEntitlement = LicenseService.checkModuleEntitlement(hospitalId, featureCode);
+      // 1. Resolve server-side encounter context if present
+      const encounterId = (req.params?.admissionId || req.params?.encounterId || req.params?.scheduleId ||
+        req.body?.admissionId || req.body?.encounterId || req.body?.scheduleId ||
+        req.query?.admissionId || req.query?.encounterId) as string | undefined;
+      const patientId = (req.params?.patientId || req.body?.patientId || req.query?.patientId) as string | undefined;
+
+      let validatedEncounter = { isValid: false, isActive: false };
+      if (encounterId || patientId) {
+        validatedEncounter = await validateServerEncounterContext({ hospitalId, encounterId, patientId });
+      }
+
+      const isReadOp = req.method === 'GET' || req.method === 'HEAD';
+      const continuityContext = {
+        operation: isReadOp ? ('read' as const) : ('write' as const),
+        isExistingRecord: isReadOp && !!(encounterId || patientId),
+        hasActiveEncounter: validatedEncounter.isActive,
+        clinicalOverrideReason: (req.headers['x-clinical-emergency-reason'] as string) || (req.body?.clinicalOverrideReason as string)
+      };
+
+      // 2. Check Perpetual Software License Entitlements first
+      const perpetualEntitlement = LicenseService.checkModuleEntitlement(hospitalId, featureCode, continuityContext);
       if (perpetualEntitlement.license) {
         if (perpetualEntitlement.allowed) {
           return next();
@@ -125,7 +147,7 @@ export function requirePlanFeature(featureCode: string) {
       }
 
       // Fail-Safe Clinical Continuity Check (even without active license)
-      if (perpetualEntitlement.isFailSafeBypass) {
+      if (perpetualEntitlement.isFailSafeBypass || perpetualEntitlement.isClinicalContinuity || perpetualEntitlement.isClinicalOverride) {
         return next();
       }
 
