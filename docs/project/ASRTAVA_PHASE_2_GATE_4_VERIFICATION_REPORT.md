@@ -239,3 +239,4 @@ Before live clinical patient registration begins at the pilot hospital, the foll
 2. **Physical Network Commissioning**: Installation of dedicated Edge Node appliances and configuration of local VLAN routing for OT/ICU equipment.
 3. **ABDM Production Whitelisting**: Exchange of sandbox client credentials for the NHA production gateway certificate.
 4. **Staff Supervised Dry-Run**: Completion of a 4-hour mock dry-run with dummy patients in the physical outpatient and emergency departments.
+
