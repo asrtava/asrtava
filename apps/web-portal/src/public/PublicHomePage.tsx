@@ -360,10 +360,6 @@ export const PublicHomePage: React.FC<PublicHomePageProps> = ({ onNavigate }) =>
               <a href="#features" className="hover:text-white transition">Workspaces</a>
               <a href="#benefits" className="hover:text-white transition">Kernel RLS</a>
               <a href="#contact" className="hover:text-white transition">24x7 NOC</a>
-              <span className="text-slate-600">|</span>
-              <button onClick={() => onNavigate('/super-admin/login')} className="hover:text-purple-400 transition font-semibold">
-                Super Admin Login
-              </button>
             </div>
           </div>
 

@@ -202,17 +202,6 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
       description: 'Hospital customers participating in configuration, data migration, training & go-live.',
       roles: ['Hospital Owner', 'IT Lead', 'Medical Director', 'Project Coordinator']
-    },
-    {
-      id: 'admin',
-      name: 'ASRTAVA Administration',
-      subdomain: 'admin.asrtava.com',
-      path: '/super-admin/login',
-      icon: <Shield className="w-5 h-5 text-purple-400" />,
-      badge: 'ASRTAVA Internal',
-      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-      description: 'Authorized ASRTAVA personnel managing customer orgs, perpetual licenses & platform operations.',
-      roles: ['License Engine', 'Tri-Model Registry', 'JIT Support', 'Platform Telemetry']
     }
   ];
 
@@ -347,7 +336,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
                       </span>
                     </div>
                     <span className="text-[10px] bg-slate-800 font-mono font-bold text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                      4 Portals
+                      3 Public Portals
                     </span>
                   </div>
 

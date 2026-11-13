@@ -154,7 +154,7 @@ export const SuperAdminLogin: React.FC<{ onSwitchPortal?: (path: string) => void
         <div className="mt-6 pt-5 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-400">
           <span>Need a different portal?</span>
           <button
-            onClick={() => onSwitchPortal && onSwitchPortal('/staff/login')}
+            onClick={() => onSwitchPortal && onSwitchPortal('/login/staff')}
             className="text-purple-400 hover:text-purple-300 font-semibold"
           >
             Staff & Hospital Login →
