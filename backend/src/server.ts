@@ -45,6 +45,7 @@ import { procurementAdvancedRouter } from './modules/inventory/procurement-advan
 import { telemedicineAdvancedRouter } from './modules/telemedicine/telemedicine-advanced.routes';
 import { qualityAdvancedRouter } from './modules/quality/quality-advanced.routes';
 import { advancedAnalyticsRouter } from './modules/analytics/analytics-advanced.routes';
+import federatedNetworkRouter from './modules/federated-network/federated-network.routes';
 
 const app = express();
 
@@ -197,6 +198,7 @@ app.use('/api/v1/procurement/advanced', procurementAdvancedRouter);
 app.use('/api/v1/telemedicine', telemedicineAdvancedRouter);
 app.use('/api/v1/quality', qualityAdvancedRouter);
 app.use('/api/v1/analytics/advanced', advancedAnalyticsRouter);
+app.use('/api/v1/federated-network', federatedNetworkRouter);
 
 // Centralized Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {

@@ -16,7 +16,14 @@ import {
   Check,
   RotateCcw,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Heart,
+  Droplets,
+  Bed,
+  Share2,
+  Shield,
+  Key,
+  Users
 } from 'lucide-react';
 import { Button, Badge, useToast } from '../../components/ui';
 import { useHospital } from '../../context/HospitalContext';
@@ -24,7 +31,88 @@ import { useHospital } from '../../context/HospitalContext';
 export const InteroperabilityManagementHub: React.FC = () => {
   const { showToast } = useToast();
   const { patients, appointments, prescriptions, labOrders, radiologyOrders, invoices } = useHospital();
-  const [activeSubTab, setActiveSubTab] = useState<'hl7' | 'fhir' | 'dicom' | 'devices' | 'terminology' | 'insurance' | 'dlq'>('hl7');
+  const [activeSubTab, setActiveSubTab] = useState<'hl7' | 'fhir' | 'dicom' | 'devices' | 'terminology' | 'insurance' | 'dlq' | 'federated_network'>('hl7');
+
+  // Federated Network State
+  const [fedRequests, setFedRequests] = useState([
+    {
+      id: 'REQ-FED-2026-0042',
+      type: 'organ_donor_coordination',
+      typeDisplay: 'Organ Donor Coordination (NOTTO/SOTTO)',
+      target: 'KIMS Hospitals & State Organ Registry',
+      urgency: 'stat_critical',
+      status: 'IN_PROGRESS',
+      organs: ['Kidney Left', 'Kidney Right', 'Liver'],
+      donorType: 'Deceased Brain Stem Death',
+      apneaCertified: true,
+      form8Signed: true,
+      time: '18 mins ago',
+      sottoRef: 'SOTTO-TG-2026-CASE-0089',
+    },
+    {
+      id: 'REQ-FED-2026-0039',
+      type: 'emergency_patient_transfer',
+      typeDisplay: 'Emergency Polytrauma Transfer',
+      target: 'Apollo Jubilee Hills (Level 1 Trauma)',
+      urgency: 'stat_critical',
+      status: 'ACCEPTED',
+      diagnosis: 'Severe TBI, acute right epidural hematoma',
+      ambulance: 'ALS-108-HYD-04',
+      eta: '12 mins',
+      time: '34 mins ago',
+    },
+    {
+      id: 'REQ-FED-2026-0031',
+      type: 'blood_component_request',
+      typeDisplay: 'Blood Bank Component Allocation',
+      target: 'Care Hospital Blood Bank',
+      urgency: 'urgent',
+      status: 'COMPLETED',
+      component: 'Packed Red Blood Cells (O-Negative, 4 Units)',
+      time: '2 hours ago',
+    },
+  ]);
+
+  const [activeBedReports, setActiveBedReports] = useState([
+    {
+      hospital: 'Apollo Main Hospital Jubilee Hills',
+      city: 'Hyderabad',
+      networkCode: 'NET-APOLLO-HYD-01',
+      generalWard: 14,
+      icuBeds: 3,
+      ventilators: 2,
+      resusBays: 1,
+      otEmergency: 1,
+      lastUpdated: '10 mins ago',
+      status: 'Active (Verified)',
+    },
+    {
+      hospital: 'KIMS Hospitals Secunderabad',
+      city: 'Hyderabad',
+      networkCode: 'NET-KIMS-SEC-01',
+      generalWard: 8,
+      icuBeds: 2,
+      ventilators: 1,
+      resusBays: 2,
+      otEmergency: 0,
+      lastUpdated: '22 mins ago',
+      status: 'Active (Verified)',
+    },
+    {
+      hospital: 'Care Hospitals Banjara Hills',
+      city: 'Hyderabad',
+      networkCode: 'NET-CARE-HYD-02',
+      generalWard: 12,
+      icuBeds: 4,
+      ventilators: 3,
+      resusBays: 1,
+      otEmergency: 1,
+      lastUpdated: '35 mins ago',
+      status: 'Active (Verified)',
+    },
+  ]);
+
+  const [generatedShareToken, setGeneratedShareToken] = useState<string | null>(null);
 
   const fhirResources = useMemo(() => [
     { res: 'Patient', count: `${patients.length.toLocaleString()} Records`, desc: 'Demographics, UHID, ABHA address & contacts' },
@@ -199,6 +287,7 @@ export const InteroperabilityManagementHub: React.FC = () => {
           { id: 'terminology', label: '5. Terminology (LOINC / SNOMED)' },
           { id: 'insurance', label: '6. Insurance & NHCX Claims' },
           { id: 'dlq', label: `7. Dead-Letter Queue (${dlqJobs.filter((j) => j.status === 'pending').length})` },
+          { id: 'federated_network', label: '8. Federated Hospital Network (NOTTO & Transfers)' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -533,6 +622,230 @@ export const InteroperabilityManagementHub: React.FC = () => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 8: FEDERATED INTER-HOSPITAL COORDINATION NETWORK */}
+      {activeSubTab === 'federated_network' && (
+        <div className="space-y-6 text-xs">
+          {/* Statutory NOTTO / THOA Regulatory Banner */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-900 via-sky-950 to-slate-900 border border-teal-500/40 text-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2 text-teal-300 font-bold text-xs uppercase tracking-wider">
+                <Shield className="w-4 h-4 text-teal-400" />
+                <span>Federated Inter-Hospital Coordination Network · Strict Tenant Isolation</span>
+              </div>
+              <p className="text-slate-200 text-xs max-w-3xl">
+                Independent private hospital environment with controlled healthcare interoperability. Zero cross-hospital database browsing permitted. Complies with India's <strong>Transplantation of Human Organs Act (THOA) 1994</strong>, NOTTO/SOTTO registry guidelines, and DPDP Act 2023.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className="px-2.5 py-1 rounded bg-teal-800/80 border border-teal-400/40 text-teal-100 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-300" />
+                NOTTO Registered
+              </span>
+              <span className="px-2.5 py-1 rounded bg-teal-800/80 border border-teal-400/40 text-teal-100 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-teal-300" />
+                Zero Commercialization
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
+                <Heart className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <div className="text-slate-500 text-[11px]">Active Organ Cases</div>
+                <div className="text-lg font-bold text-slate-900">1 Case (SOTTO Notified)</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center font-bold">
+                <Activity className="w-5 h-5 text-sky-600" />
+              </div>
+              <div>
+                <div className="text-slate-500 text-[11px]">Emergency Transfers</div>
+                <div className="text-lg font-bold text-slate-900">1 In-Transit (ETA 12m)</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                <Bed className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <div className="text-slate-500 text-[11px]">Network ICU Vacancy</div>
+                <div className="text-lg font-bold text-slate-900">9 Beds Available (3 Hosps)</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                <Droplets className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <div className="text-slate-500 text-[11px]">Blood Bank Network</div>
+                <div className="text-lg font-bold text-slate-900">DCG-Licensed Exchanges</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 1: Active Inter-Hospital Coordination Requests */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Active Inter-Hospital Coordination Requests</h3>
+                <p className="text-slate-500 text-[11px]">Strict purpose-specific cases. Receiving hospital sees only the authorized minimum case dataset.</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const token = `asrt_share_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
+                  setGeneratedShareToken(token);
+                  showToast({
+                    type: 'success',
+                    title: 'Ephemeral Case Share Token Issued',
+                    message: `Token valid for 8 hours for destination review: ${token.substring(0, 16)}...`,
+                  });
+                }}
+              >
+                <Key className="w-3.5 h-3.5 mr-1 text-teal-700" />
+                <span>Issue Case Share Token</span>
+              </Button>
+            </div>
+
+            {generatedShareToken && (
+              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-center justify-between text-xs">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-teal-900">Single-Case Bearer Token (Expires in 8 Hours):</span>
+                  <p className="font-mono text-teal-800 text-[11px] select-all">{generatedShareToken}</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setGeneratedShareToken(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {fedRequests.map((req) => (
+                <div key={req.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition space-y-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono font-bold text-slate-900 text-xs">{req.id}</span>
+                      <Badge variant={req.urgency === 'stat_critical' ? 'danger' : 'warning'} size="sm">
+                        {req.urgency === 'stat_critical' ? 'STAT Critical' : 'Urgent'}
+                      </Badge>
+                      <strong className="text-slate-800 text-xs">{req.typeDisplay}</strong>
+                    </div>
+                    <Badge variant={req.status === 'COMPLETED' ? 'success' : req.status === 'IN_PROGRESS' ? 'info' : 'warning'} size="sm">
+                      {req.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-600">
+                    <div><span className="text-slate-400">Target:</span> {req.target}</div>
+                    <div><span className="text-slate-400">Timestamp:</span> {req.time}</div>
+                    {req.sottoRef && <div><span className="text-slate-400">SOTTO Registry:</span> <span className="font-mono font-semibold text-teal-800">{req.sottoRef}</span></div>}
+                    {req.ambulance && <div><span className="text-slate-400">Ambulance:</span> <span className="font-mono">{req.ambulance} (ETA {req.eta})</span></div>}
+                    {req.organs && <div><span className="text-slate-400">Organs Pledged:</span> {req.organs.join(', ')}</div>}
+                    {req.diagnosis && <div><span className="text-slate-400">Clinical Triage:</span> {req.diagnosis}</div>}
+                  </div>
+
+                  {req.type === 'organ_donor_coordination' && (
+                    <div className="mt-2 pt-2 border-t border-slate-200/60 flex flex-wrap gap-2 text-[10px]">
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                        ✓ Brain Death Apnea Test 1 & 2 Completed (&ge; 6h Interval)
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                        ✓ Form 8 Statutory Consent Signed
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 font-medium">
+                        ✓ Allocation Authority: NOTTO/SOTTO
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium">
+                        🚦 Green Corridor: Traffic Police Alerted
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 2: Regional Bed & ICU Capacity Broadcast (Voluntary Availability Matrix) */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Regional Bed & Critical-Care Availability Matrix</h3>
+                <p className="text-slate-500 text-[11px]">Voluntary timestamped reporting by participating network hospitals. Stale reports automatically expire.</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  showToast({
+                    type: 'success',
+                    title: 'Bed Capacity Published',
+                    message: 'Your hospital bed and ICU capacity broadcast updated with 120-minute validity TTL.',
+                  });
+                }}
+              >
+                <RefreshCw className="w-3.5 h-3.5 mr-1 text-teal-700" />
+                <span>Publish Local Capacity</span>
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 font-semibold text-[11px]">
+                    <th className="py-2.5 px-3">Participating Hospital</th>
+                    <th className="py-2.5 px-3">Network Code</th>
+                    <th className="py-2.5 px-3">General Ward</th>
+                    <th className="py-2.5 px-3">ICU Beds</th>
+                    <th className="py-2.5 px-3">Ventilators</th>
+                    <th className="py-2.5 px-3">Emergency Resus</th>
+                    <th className="py-2.5 px-3">Last Verified</th>
+                    <th className="py-2.5 px-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {activeBedReports.map((report, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-3 font-semibold text-slate-900">{report.hospital}</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{report.networkCode}</td>
+                      <td className="py-3 px-3 font-bold text-slate-800">{report.generalWard} vacant</td>
+                      <td className="py-3 px-3 font-bold text-teal-700">{report.icuBeds} vacant</td>
+                      <td className="py-3 px-3 font-bold text-sky-700">{report.ventilators} ready</td>
+                      <td className="py-3 px-3 font-bold text-rose-700">{report.resusBays} bay</td>
+                      <td className="py-3 px-3 text-slate-500 text-[11px]">{report.lastUpdated}</td>
+                      <td className="py-3 px-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            showToast({
+                              type: 'info',
+                              title: 'Transfer Request Initiated',
+                              message: `Sending case-specific inquiry to ${report.hospital} bed coordination desk.`,
+                            });
+                          }}
+                        >
+                          <Send className="w-3 h-3 mr-1 text-teal-700" />
+                          <span>Request Transfer</span>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
