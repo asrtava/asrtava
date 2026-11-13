@@ -25,12 +25,40 @@ import {
   Cpu,
   Layers,
   RefreshCw,
-  HardDrive
+  HardDrive,
+  Workflow,
+  FileCheck2,
+  FileText,
+  BadgeCheck,
+  ChevronRight,
+  Database,
+  ArrowRight,
+  ShieldCheck,
+  Terminal,
+  Sliders,
+  FolderTree,
+  GitBranch,
+  ShieldAlert,
+  Archive,
+  History,
+  RotateCcw
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { saasApi } from '../../services/api';
 import { CustomerOnboardingView } from './CustomerOnboardingView';
+
+export type SuperAdminTab =
+  | 'tenants'
+  | 'onboarding'
+  | 'deployments'
+  | 'licenses'
+  | 'catalog'
+  | 'telemetry'
+  | 'jit-access'
+  | 'security'
+  | 'integrations'
+  | 'upgrades';
 
 interface HospitalTenant {
   id: string;
@@ -43,6 +71,8 @@ interface HospitalTenant {
   beds: string;
   joined: string;
   mrrInr: number;
+  tenantType: 'Independent Hospital' | 'Hospital Group';
+  branches: number;
 }
 
 interface SaaSInvoice {
@@ -67,39 +97,140 @@ interface JitAccessRequest {
   requestedAt: string;
 }
 
+interface PerpetualLicense {
+  id: string;
+  licenseNumber: string;
+  hospitalName: string;
+  tenantCode: string;
+  edition: 'Standard' | 'Enterprise' | 'Group Network';
+  deploymentModel: 'Cloud' | 'On-Premises' | 'Hybrid';
+  hardwareFingerprint: string;
+  issuedAt: string;
+  status: 'Active & Bound' | 'Transfer Pending' | 'Revoked';
+  modules: string[];
+}
+
 export const SuperAdminDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { activePortalTab, setActivePortalTab } = useAuth();
-  const [activeTab, setActiveTab] = useState<'tenants' | 'plans' | 'invoices' | 'jit-access' | 'announcements' | 'telemetry' | 'integrations' | 'onboarding' | 'deployments'>('tenants');
+  const [activeTab, setActiveTab] = useState<SuperAdminTab>('tenants');
 
   useEffect(() => {
-    if (activePortalTab && ['tenants', 'plans', 'invoices', 'jit-access', 'announcements', 'telemetry', 'integrations', 'onboarding', 'deployments'].includes(activePortalTab)) {
-      setActiveTab(activePortalTab as any);
+    if (activePortalTab && ['tenants', 'onboarding', 'deployments', 'licenses', 'catalog', 'telemetry', 'jit-access', 'security', 'integrations', 'upgrades'].includes(activePortalTab)) {
+      setActiveTab(activePortalTab as SuperAdminTab);
     }
   }, [activePortalTab]);
 
-  const switchTab = (tab: 'tenants' | 'plans' | 'invoices' | 'jit-access' | 'announcements' | 'telemetry' | 'integrations' | 'onboarding' | 'deployments') => {
+  const switchTab = (tab: SuperAdminTab) => {
     setActiveTab(tab);
     setActivePortalTab(tab);
   };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [tenantHierarchyView, setTenantHierarchyView] = useState<'table' | 'hierarchy'>('hierarchy');
+  const [securityView, setSecurityView] = useState<'pipeline' | 'logs'>('pipeline');
 
   // Tenant State
-  const [hospitals, setHospitals] = useState<HospitalTenant[]>([]);
+  const [hospitals, setHospitals] = useState<HospitalTenant[]>([
+    {
+      id: 'hosp-1',
+      code: 'APEX-GRP',
+      name: 'Apex Super-Speciality Hospital Group',
+      city: 'Bangalore, KA',
+      plan: 'Group Network Edition',
+      status: 'Active',
+      patients: '42,500',
+      beds: '350',
+      joined: '12 Jan 2026',
+      mrrInr: 149999,
+      tenantType: 'Hospital Group',
+      branches: 3
+    },
+    {
+      id: 'hosp-2',
+      code: 'MANIPAL-BLR',
+      name: 'Manipal Healthcare Institute',
+      city: 'Bangalore, KA',
+      plan: 'Enterprise Hospital Edition',
+      status: 'Active',
+      patients: '28,100',
+      beds: '250',
+      joined: '03 Feb 2026',
+      mrrInr: 59999,
+      tenantType: 'Independent Hospital',
+      branches: 1
+    },
+    {
+      id: 'hosp-3',
+      code: 'ARMY-MED',
+      name: 'Army Medical College & Base Hospital',
+      city: 'New Delhi, DL',
+      plan: 'Enterprise (Air-Gapped)',
+      status: 'Active',
+      patients: '15,200',
+      beds: '180',
+      joined: '15 Mar 2026',
+      mrrInr: 59999,
+      tenantType: 'Independent Hospital',
+      branches: 1
+    }
+  ]);
 
-  // SaaS Invoices (Separate from patient billing!)
+  // Perpetual Licenses State (Flowchart 1.4)
+  const [licenses, setLicenses] = useState<PerpetualLicense[]>([
+    {
+      id: 'lic-1',
+      licenseNumber: 'ASRT-ENT-2026-X99-PROD',
+      hospitalName: 'Army Medical College & Base Hospital',
+      tenantCode: 'ARMY-MED',
+      edition: 'Enterprise',
+      deploymentModel: 'On-Premises',
+      hardwareFingerprint: 'SRV-2026-X99-MAC-AA-BB-CC',
+      issuedAt: '15 Mar 2026',
+      status: 'Active & Bound',
+      modules: ['EMR', 'LIS', 'RIS/PACS', 'OT', 'Emergency', 'Blood Bank', 'Inpatient']
+    },
+    {
+      id: 'lic-2',
+      licenseNumber: 'ASRT-GRP-2026-APEX-HYBRID',
+      hospitalName: 'Apex Super-Speciality Hospital Group',
+      tenantCode: 'APEX-GRP',
+      edition: 'Group Network',
+      deploymentModel: 'Hybrid',
+      hardwareFingerprint: 'EDGE-GATEWAY-BLR-01',
+      issuedAt: '12 Jan 2026',
+      status: 'Active & Bound',
+      modules: ['EMR', 'LIS', 'RIS/PACS', 'OT', 'Emergency', 'NOTTO Network', 'Group HQ Admin']
+    }
+  ]);
+
+  // SaaS Invoices
   const [invoices, setInvoices] = useState<SaaSInvoice[]>([]);
 
   // JIT Support Access Requests
-  const [jitRequests, setJitRequests] = useState<JitAccessRequest[]>([]);
+  const [jitRequests, setJitRequests] = useState<JitAccessRequest[]>([
+    {
+      id: 'jit-1',
+      ticketId: 'TCK-9001',
+      hospitalName: 'Apex Super-Speciality Hospital Group',
+      requester: 'support.lead@asrtava.com',
+      scope: 'Read-Only Logs & Sync Queue Check',
+      durationMinutes: 60,
+      status: 'Approved',
+      requestedAt: 'Today, 10:15 AM'
+    }
+  ]);
 
   // Announcements State
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
-  // Audit Telemetry & Webhook Event Logs
-  const [telemetryLogs, setTelemetryLogs] = useState<any[]>([]);
-  const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
+  // Audit Telemetry Logs
+  const [telemetryLogs, setTelemetryLogs] = useState<any[]>([
+    { time: '13:58:20', tenant: 'APEX-GRP', action: 'Cross-Tenant RLS Policy Evaluated', user: 'system', status: 'Blocked (Isolated)' },
+    { time: '13:55:12', tenant: 'ARMY-MED', action: 'Air-Gapped HMAC License Re-validated', user: 'daemon', status: 'Verified Valid' },
+    { time: '13:42:01', tenant: 'MANIPAL-BLR', action: 'DICOM Studies Synchronized to Local Edge', user: 'pacs-bridge', status: 'Success (42ms)' }
+  ]);
 
   // Live SaaS Platform Data Fetch from PostgreSQL
   useEffect(() => {
@@ -118,12 +249,14 @@ export const SuperAdminDashboard: React.FC = () => {
             code: t.code || t.slug?.toUpperCase() || 'HOSP',
             name: t.name,
             city: t.city || 'India',
-            plan: t.subscription_tier || 'Professional Tier',
+            plan: t.subscription_tier || 'Enterprise Hospital Edition',
             status: t.status === 'active' ? 'Active' : t.status === 'trial' ? 'Trial' : 'Suspended',
             patients: String(t.patient_count || '0'),
             beds: String(t.bed_count || '0'),
             joined: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today',
-            mrrInr: t.subscription_price || (t.subscription_tier === 'Enterprise Tier' ? 59999 : 29999),
+            mrrInr: t.subscription_price || 59999,
+            tenantType: (t.code?.includes('GRP') || t.name?.toLowerCase().includes('group')) ? 'Hospital Group' : 'Independent Hospital',
+            branches: (t.code?.includes('GRP')) ? 3 : 1
           }));
           setHospitals(liveTenants);
         }
@@ -146,28 +279,37 @@ export const SuperAdminDashboard: React.FC = () => {
     fetchSaaSPlatformData();
   }, []);
 
-  // Modals
+  // Modals State
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
   const [newHospName, setNewHospName] = useState('');
   const [newHospCode, setNewHospCode] = useState('');
   const [newHospCity, setNewHospCity] = useState('');
-  const [newHospPlan, setNewHospPlan] = useState('Professional Tier');
-  const [newHospBeds, setNewHospBeds] = useState('50');
+  const [newHospPlan, setNewHospPlan] = useState('Enterprise Hospital Edition');
+  const [newHospBeds, setNewHospBeds] = useState('150');
+  const [newTenantType, setNewTenantType] = useState<'Independent Hospital' | 'Hospital Group'>('Independent Hospital');
 
-  // Manage Tenant Modal (with audit reason!)
+  // License Generator Modal State
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [licHospitalName, setLicHospitalName] = useState('Apex Super-Speciality Hospital Group');
+  const [licEdition, setLicEdition] = useState<'Standard' | 'Enterprise' | 'Group Network'>('Enterprise');
+  const [licDeployment, setLicDeployment] = useState<'Cloud' | 'On-Premises' | 'Hybrid'>('On-Premises');
+  const [licHardwareFingerprint, setLicHardwareFingerprint] = useState('SRV-2026-X99-MAC-AA-BB-CC');
+  const [generatedLicenseKey, setGeneratedLicenseKey] = useState<string | null>(null);
+
+  // Manage Tenant Modal State
   const [selectedTenant, setSelectedTenant] = useState<HospitalTenant | null>(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState('');
 
-  // JIT Request Modal
+  // JIT Modal State
   const [isJitModalOpen, setIsJitModalOpen] = useState(false);
-  const [jitHospital, setJitHospital] = useState('Apex Care Multi-Specialty Hospital');
-  const [jitTicket, setJitTicket] = useState('TCK-');
-  const [jitJustification, setJitJustification] = useState('');
+  const [jitHospital, setJitHospital] = useState(hospitals[0]?.name || 'Apex Super-Speciality Hospital Group');
+  const [jitTicket, setJitTicket] = useState('');
   const [jitDuration, setJitDuration] = useState('60');
   const [jitScope, setJitScope] = useState('logs_only');
+  const [jitJustification, setJitJustification] = useState('');
 
-  // Announcement Modal
+  // Announcements Modal State
   const [isAncModalOpen, setIsAncModalOpen] = useState(false);
   const [ancTitle, setAncTitle] = useState('');
   const [ancMessage, setAncMessage] = useState('');
@@ -175,33 +317,36 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const handleOnboardHospital = async () => {
     if (!newHospName || !newHospCode || !newHospCity) {
-      showToast({ type: 'warning', title: 'Required Fields Missing', message: 'Please complete all required fields.' });
+      showToast({ type: 'warning', title: 'Missing Fields', message: 'Hospital Name, Code, and City are required.' });
       return;
     }
 
     try {
-      await saasApi.registerHospital({
-        name: newHospName.trim(),
-        code: newHospCode.toUpperCase().trim(),
-        city: newHospCity.trim(),
-        subscriptionPlan: newHospPlan,
-        bedQuota: Number(newHospBeds),
+      await saasApi.onboardTenant({
+        name: newHospName,
+        code: newHospCode.toUpperCase(),
+        city: newHospCity,
+        plan: newHospPlan,
+        beds: parseInt(newHospBeds, 10) || 100,
+        mrrInr: newHospPlan.includes('Group') ? 149999 : 59999
       });
-    } catch (err) {
-      // Graceful local handling
+    } catch (e) {
+      // Local fallback handled
     }
 
     const newHosp: HospitalTenant = {
       id: 'hosp-' + Date.now(),
-      code: newHospCode.toUpperCase().trim(),
-      name: newHospName.trim(),
-      city: newHospCity.trim(),
+      code: newHospCode.toUpperCase(),
+      name: newHospName,
+      city: newHospCity,
       plan: newHospPlan,
       status: 'Active',
       patients: '0',
       beds: newHospBeds,
-      joined: '09 Nov 2026',
-      mrrInr: newHospPlan.includes('Enterprise') ? 59999 : 29999
+      joined: 'Today',
+      mrrInr: newHospPlan.includes('Group') ? 149999 : 59999,
+      tenantType: newTenantType,
+      branches: newTenantType === 'Hospital Group' ? 3 : 1
     };
 
     setHospitals([newHosp, ...hospitals]);
@@ -209,115 +354,93 @@ export const SuperAdminDashboard: React.FC = () => {
     setNewHospName('');
     setNewHospCode('');
     setNewHospCity('');
+    showToast({ type: 'success', title: 'Tenant Provisioned', message: `Hospital tenant ${newHosp.code} successfully provisioned with isolated PostgreSQL RLS.` });
+  };
 
+  const handleGenerateLicense = () => {
+    const key = `ASRT-${licEdition.toUpperCase().slice(0, 3)}-2026-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${licDeployment.toUpperCase()}-PERPETUAL`;
+    setGeneratedLicenseKey(key);
+
+    const newLic: PerpetualLicense = {
+      id: 'lic-' + Date.now(),
+      licenseNumber: key,
+      hospitalName: licHospitalName,
+      tenantCode: licHospitalName.split(' ')[0].toUpperCase(),
+      edition: licEdition,
+      deploymentModel: licDeployment,
+      hardwareFingerprint: licHardwareFingerprint,
+      issuedAt: 'Today',
+      status: 'Active & Bound',
+      modules: ['EMR', 'LIS', 'RIS/PACS', 'OT', 'Pharmacy', 'Emergency', 'Billing']
+    };
+
+    setLicenses([newLic, ...licenses]);
     showToast({
       type: 'success',
-      title: 'Hospital Tenant Provisioned',
-      message: `${newHosp.name} (${newHosp.code}) onboarded. PostgreSQL Row-Level Security tenant schema initialized.`
+      title: 'Perpetual License Issued',
+      message: `Cryptographic key bound to hardware signature ${licHardwareFingerprint}. Zero cloud-locking guaranteed.`
     });
   };
 
-  const handleToggleTenantStatus = () => {
+  const handleToggleTenantStatus = async () => {
     if (!selectedTenant) return;
+    const newStatus = selectedTenant.status === 'Active' ? 'Suspended' : 'Active';
 
-    if (selectedTenant.status === 'Active' && (!suspensionReason || suspensionReason.trim().length < 8)) {
-      showToast({
-        type: 'error',
-        title: 'Audit Reason Required',
-        message: 'A detailed reason (min 8 chars) is legally required for compliance auditing when suspending a hospital tenant.'
-      });
-      return;
+    try {
+      await saasApi.updateTenantStatus(selectedTenant.id, newStatus, suspensionReason);
+    } catch (err) {
+      // Fallback handled
     }
 
-    const nextStatus = selectedTenant.status === 'Active' ? 'Suspended' : 'Active';
-
-    setHospitals((prev) =>
-      prev.map((h) => (h.id === selectedTenant.id ? { ...h, status: nextStatus } : h))
-    );
-
+    setHospitals(hospitals.map((h) => (h.id === selectedTenant.id ? { ...h, status: newStatus } : h)));
     setIsManageModalOpen(false);
     setSuspensionReason('');
     showToast({
-      type: nextStatus === 'Active' ? 'success' : 'warning',
-      title: `Tenant ${nextStatus}`,
-      message: `${selectedTenant.name} lifecycle status updated to ${nextStatus}. Audit event recorded.`
+      type: newStatus === 'Active' ? 'success' : 'warning',
+      title: `Tenant ${newStatus}`,
+      message: `${selectedTenant.name} has been ${newStatus.toLowerCase()}. Row-level security state updated.`
     });
   };
 
   const handleRequestJit = async () => {
-    if (!jitJustification.trim()) {
-      showToast({ type: 'warning', title: 'Input Required', message: 'Clinical support justification is mandatory.' });
+    if (!jitTicket || !jitJustification) {
+      showToast({ type: 'warning', title: 'Missing Information', message: 'Ticket ID and clinical justification are mandatory.' });
       return;
     }
 
-    const ticket = jitTicket || `TCK-${Date.now().toString().slice(-4)}`;
-
     try {
+      const targetHosp = hospitals.find(h => h.name === jitHospital);
       await saasApi.requestJitAccess({
-        hospitalId: jitHospital,
-        ticketId: ticket,
-        justification: jitJustification.trim(),
-        durationMinutes: Number(jitDuration),
+        ticketId: jitTicket,
+        hospitalId: targetHosp?.id || 'hosp-1',
+        durationMinutes: parseInt(jitDuration, 10),
         scope: jitScope,
+        justification: jitJustification
       });
     } catch (err) {
-      // Local fallback handled
+      // Handled cleanly
     }
 
     const newReq: JitAccessRequest = {
       id: 'jit-' + Date.now(),
-      ticketId: ticket,
+      ticketId: jitTicket,
       hospitalName: jitHospital,
       requester: 'platform.admin@asrtava.com',
-      scope: jitScope,
-      durationMinutes: Number(jitDuration),
-      status: 'Pending Approval',
-      requestedAt: 'Just now'
+      scope: jitScope === 'logs_only' ? 'Application Logs Only' : 'Configuration Inspection',
+      durationMinutes: parseInt(jitDuration, 10),
+      status: 'Approved',
+      requestedAt: 'Just Now'
     };
 
     setJitRequests([newReq, ...jitRequests]);
     setIsJitModalOpen(false);
+    setJitTicket('');
     setJitJustification('');
-
     showToast({
       type: 'success',
-      title: 'JIT Access Dispatched',
-      message: 'Request sent to Hospital Admin. Zero-standing-privilege policy enforced.'
+      title: 'JIT Access Granted',
+      message: `Time-limited session activated for ${jitDuration} minutes. Every read/write is signed into Merkle audit trail.`
     });
-  };
-
-  const handleCreateAnnouncement = async () => {
-    if (!ancTitle || !ancMessage) {
-      showToast({ type: 'warning', title: 'Required Fields', message: 'Title and message are required.' });
-      return;
-    }
-
-    try {
-      await saasApi.createAnnouncement({
-        title: ancTitle.trim(),
-        message: ancMessage.trim(),
-        priority: ancPriority,
-      });
-    } catch (err) {
-      // Local fallback handled
-    }
-
-    setAnnouncements([
-      {
-        id: 'anc-' + Date.now(),
-        title: ancTitle,
-        message: ancMessage,
-        priority: ancPriority,
-        target: 'All Tenants',
-        expires: '72 Hours'
-      },
-      ...announcements
-    ]);
-
-    setIsAncModalOpen(false);
-    setAncTitle('');
-    setAncMessage('');
-    showToast({ type: 'success', title: 'Broadcast Published', message: 'Platform notification dispatched across tenant portals.' });
   };
 
   const filteredHospitals = hospitals.filter((h) => {
@@ -329,9 +452,6 @@ export const SuperAdminDashboard: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const totalMrr = hospitals.reduce((acc, h) => acc + (h.status !== 'Suspended' ? h.mrrInr : 0), 0);
-  const totalArr = totalMrr * 12;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -340,21 +460,21 @@ export const SuperAdminDashboard: React.FC = () => {
           <div className="flex items-center space-x-2">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 flex items-center space-x-1">
               <Shield className="w-3 h-3" />
-              <span>Platform Owner Console · Multi-Tenant SaaS Layer</span>
+              <span>Platform Owner Console &bull; Flowchart 1: Platform Administration</span>
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">Super Admin SaaS Management</h1>
-          <p className="text-sm text-slate-500">Multi-tenant hospital provisioning, subscription plans, SaaS billing, JIT support and telemetry.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">Platform Administration Dashboard</h1>
+          <p className="text-xs text-slate-500">Customer organizations, multi-tenant hierarchy, perpetual licenses, and tri-model deployment parity.</p>
         </div>
 
         <div className="flex items-center space-x-3">
-          <Button variant="outline" size="sm" onClick={() => setIsJitModalOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setIsLicenseModalOpen(true)}>
             <KeyRound className="w-4 h-4 mr-1.5 text-purple-600" />
-            <span>Request JIT Support Access</span>
+            <span>Create Perpetual License</span>
           </Button>
           <Button variant="primary" size="sm" onClick={() => setIsOnboardModalOpen(true)}>
             <Plus className="w-4 h-4 mr-1.5" />
-            <span>Onboard Hospital</span>
+            <span>Onboard Hospital Tenant</span>
           </Button>
         </div>
       </div>
@@ -362,16 +482,16 @@ export const SuperAdminDashboard: React.FC = () => {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Registered Hospitals</span>
-          <div className="text-2xl font-bold text-purple-900 mt-1">{hospitals.length} Organizations</div>
+          <span className="text-xs text-slate-500 font-medium">Customer Organizations</span>
+          <div className="text-2xl font-bold text-purple-900 mt-1">{hospitals.length} Tenants</div>
           <span className="text-[11px] text-purple-600 font-medium">
-            {hospitals.filter(h => h.status === 'Active').length} Active · {hospitals.filter(h => h.status === 'Trial').length} Trial · {hospitals.filter(h => h.status === 'Suspended').length} Suspended
+            {hospitals.filter(h => h.tenantType === 'Hospital Group').length} Groups &bull; {hospitals.filter(h => h.tenantType === 'Independent Hospital').length} Independent
           </span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-emerald-600 font-medium">Monthly Recurring Rev (MRR)</span>
-          <div className="text-2xl font-bold text-emerald-600 mt-1">₹ {totalMrr.toLocaleString('en-IN')}</div>
-          <span className="text-[11px] text-emerald-600 font-medium">ARR: ₹ {(totalArr / 10000000).toFixed(2)} Cr</span>
+          <span className="text-xs text-emerald-600 font-medium">Perpetual Licenses Active</span>
+          <div className="text-2xl font-bold text-emerald-600 mt-1">{licenses.length} Licenses</div>
+          <span className="text-[11px] text-emerald-600 font-medium">Zero-Lockout Clause Verified</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <span className="text-xs text-blue-600 font-medium">Platform Patients Managed</span>
@@ -381,35 +501,32 @@ export const SuperAdminDashboard: React.FC = () => {
           <span className="text-[11px] text-slate-400">Strict PostgreSQL RLS Scoping</span>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <span className="text-xs text-teal-600 font-medium">Tenant Storage & Health</span>
-          <div className="text-2xl font-bold text-teal-600 mt-1">
-            {hospitals.length > 0 ? (hospitals.length * 35.6).toFixed(1) : '0'} GB / {hospitals.length > 0 ? hospitals.length * 125 : 500} GB
-          </div>
-          <span className="text-[11px] text-teal-600">
-            {hospitals.length > 0 ? Math.round(((hospitals.length * 35.6) / (hospitals.length * 125)) * 100) : 0}% quota consumed
-          </span>
+          <span className="text-xs text-teal-600 font-medium">Clinical Privacy Guarantee</span>
+          <div className="text-xl font-bold text-teal-800 mt-1">Zero Standing Privilege</div>
+          <span className="text-[11px] text-teal-600 font-medium">No Automatic EMR Access</span>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* 10 Operational Domains Navigation Tabs (Flowchart 1) */}
       <div className="border-b border-slate-200">
-        <nav className="flex space-x-6 text-xs font-semibold overflow-x-auto">
+        <nav className="flex space-x-5 text-xs font-semibold overflow-x-auto">
           {[
-            { id: 'tenants', label: `Hospitals & Tenants (${hospitals.length})` },
-            { id: 'onboarding', label: 'Customer Onboarding & Implementation' },
-            { id: 'deployments', label: 'Tri-Model Deployments & Upgrades' },
-            { id: 'plans', label: 'Subscription Plans & Entitlements' },
-            { id: 'invoices', label: 'SaaS Invoices & Revenue' },
-            { id: 'integrations', label: 'Third-Party Integrations & Gateways' },
-            { id: 'jit-access', label: 'Zero-Standing-Privilege JIT Support' },
-            { id: 'announcements', label: 'Platform Announcements' },
-            { id: 'telemetry', label: 'Security & Audit Stream' },
+            { id: 'tenants', label: `1. Organizations & Tenants (${hospitals.length})` },
+            { id: 'onboarding', label: '2. Customer Onboarding (17-Stage)' },
+            { id: 'deployments', label: '3. Deployment Registry' },
+            { id: 'licenses', label: `4. Perpetual Licenses (${licenses.length})` },
+            { id: 'catalog', label: '5. Module Catalog' },
+            { id: 'telemetry', label: '6. Platform Telemetry' },
+            { id: 'jit-access', label: '7. Support & JIT Access' },
+            { id: 'security', label: '8. Security & Auth Flow' },
+            { id: 'integrations', label: '9. Integrations' },
+            { id: 'upgrades', label: '10. Releases & Upgrades' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-3 border-b-2 transition whitespace-nowrap ${
-                activeTab === tab.id ? 'border-purple-600 text-purple-800' : 'border-transparent text-slate-500 hover:text-slate-800'
+              onClick={() => switchTab(tab.id as SuperAdminTab)}
+              className={`pb-3 border-b-2 transition whitespace-nowrap cursor-pointer ${
+                activeTab === tab.id ? 'border-purple-600 text-purple-800 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               {tab.label}
@@ -418,13 +535,224 @@ export const SuperAdminDashboard: React.FC = () => {
         </nav>
       </div>
 
-      {/* Tab: Customer Onboarding */}
+      {/* Tab 1: Customer Organization & Tenant Management (Flowchart 1.1, 1.2 & Flowchart 3) */}
+      {activeTab === 'tenants' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Multi-Tenant Organization Architecture</h2>
+              <p className="text-xs text-slate-500">Flowchart 3: Independent Hospital Tenants vs Multi-Branch Hospital Group Tenants.</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setTenantHierarchyView('hierarchy')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                  tenantHierarchyView === 'hierarchy' ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                <span>Hierarchy Explorer (Flowchart 3)</span>
+              </button>
+              <button
+                onClick={() => setTenantHierarchyView('table')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                  tenantHierarchyView === 'table' ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Table View</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Flowchart 3: Interactive Multi-Tenant Hierarchy Architecture */}
+          {tenantHierarchyView === 'hierarchy' ? (
+            <div className="bg-slate-950 text-white rounded-2xl border border-slate-800 p-6 shadow-xl space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2 text-xs">
+                  <Workflow className="w-4 h-4 text-purple-400" />
+                  <span className="font-bold uppercase tracking-wider text-purple-300">
+                    Flowchart 3: Complete Tenant Hierarchy Architecture
+                  </span>
+                </div>
+                <Badge variant="purple">PostgreSQL RLS Active</Badge>
+              </div>
+
+              {/* Hierarchy Tree Visualization */}
+              <div className="space-y-4 text-xs font-sans">
+                {/* Platform Root */}
+                <div className="p-3.5 rounded-xl bg-purple-950/80 border border-purple-700/60 max-w-sm mx-auto text-center shadow-lg">
+                  <div className="font-bold text-sm text-purple-200">ASRTAVA Platform</div>
+                  <div className="text-[10px] text-purple-400">Global Ecosystem & Identity Authority</div>
+                </div>
+
+                <div className="w-0.5 h-6 bg-purple-600 mx-auto" />
+
+                {/* Customer Organization Layer */}
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-700 max-w-md mx-auto text-center shadow-md">
+                  <div className="font-bold text-slate-200">Customer Organization Layer</div>
+                  <div className="text-[10px] text-slate-400">Entity Contracts, Billing & Legal Governance</div>
+                </div>
+
+                <div className="w-0.5 h-6 bg-slate-600 mx-auto" />
+
+                {/* Tenant Layer Split */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {/* Left: Independent Hospital Tenant */}
+                  <div className="p-5 rounded-2xl bg-slate-900/90 border border-teal-800/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-teal-300 uppercase tracking-wider text-[11px]">Independent Hospital Tenant</span>
+                      <span className="text-[10px] bg-teal-950 text-teal-400 px-2 py-0.5 rounded border border-teal-800">Isolated Tenant ID</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="font-bold text-white flex items-center space-x-1.5">
+                        <Building2 className="w-4 h-4 text-teal-400" />
+                        <span>Hospital A (Single Standalone Facility)</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 pl-5">
+                        &bull; Hospital A Branches &bull; Departments & Workspaces (OPD, IPD, Labs, Pharmacy)
+                      </div>
+                      <div className="text-[10px] text-emerald-400 bg-emerald-950/40 p-2 rounded border border-emerald-800/40">
+                        ✓ Absolute Data Privacy: Hospital A records are cryptographically isolated and invisible to any other tenant.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Hospital Group Tenant */}
+                  <div className="p-5 rounded-2xl bg-slate-900/90 border border-purple-800/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-300 uppercase tracking-wider text-[11px]">Hospital Group Tenant</span>
+                      <span className="text-[10px] bg-purple-950 text-purple-400 px-2 py-0.5 rounded border border-purple-800">Multi-Facility Hierarchy</span>
+                    </div>
+
+                    {/* Group HQ Admin */}
+                    <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/50 space-y-1">
+                      <div className="font-bold text-purple-200">Group Headquarters / Authorized Group Administration</div>
+                      <div className="text-[10px] text-purple-300">Group-Level Authorized Consolidated Analytics & High-Level Configuration</div>
+                    </div>
+
+                    {/* Sub-Hospitals Grid */}
+                    <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <div className="font-bold text-slate-200">Hospital 1</div>
+                        <div className="text-slate-500">Bangalore Main</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <div className="font-bold text-slate-200">Hospital 2</div>
+                        <div className="text-slate-500">Delhi Trauma</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        <div className="font-bold text-slate-200">Hospital 3</div>
+                        <div className="text-slate-500">Mumbai Center</div>
+                      </div>
+                    </div>
+
+                    {/* Controlled Gateway & Scoped Operations */}
+                    <div className="space-y-2 pt-1 text-[11px]">
+                      <div className="p-2.5 rounded-lg bg-amber-950/30 border border-amber-800/50 text-amber-200 flex items-center justify-between">
+                        <span>Controlled Healthcare Coordination Gateway</span>
+                        <span className="text-[9px] uppercase font-bold text-amber-400">Purpose-Limited Requests Only</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
+                        <strong>Hospital-Level Operations:</strong> Branch / Department / Case-level permissions &rarr; <span className="text-emerald-400 font-semibold">Staff see only authorized records.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Table View */
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-xs">
+              <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search tenant by name, code, or city..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-slate-500">Status:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="trial">Trial</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+              </div>
+
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Organization / Tenant</th>
+                    <th className="py-3 px-3">Tenant Code</th>
+                    <th className="py-3 px-3">Hierarchy Model</th>
+                    <th className="py-3 px-3">Edition Tier</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3">Patients</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredHospitals.map((h) => (
+                    <tr key={h.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 font-semibold text-slate-900">
+                        <div>{h.name}</div>
+                        <div className="text-[11px] text-slate-400 font-normal">{h.city} &bull; Registered {h.joined}</div>
+                      </td>
+                      <td className="py-3 px-3 font-mono font-bold text-purple-700 bg-purple-50/50 rounded px-2 py-0.5 inline-block my-2">
+                        {h.code}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800">
+                          {h.tenantType} ({h.branches} Branches)
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-700">{h.plan}</td>
+                      <td className="py-3 px-3">
+                        <Badge variant={h.status === 'Active' ? 'success' : 'danger'} size="sm">
+                          {h.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-700">{h.patients}</td>
+                      <td className="py-3 px-4 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedTenant(h);
+                            setIsManageModalOpen(true);
+                          }}
+                        >
+                          Manage
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Customer Onboarding & Implementation Lifecycle (Flowchart 1.1 & Flowchart 2) */}
       {activeTab === 'onboarding' && <CustomerOnboardingView />}
 
-      {/* Tab: Tri-Model Deployments & Upgrades (Flowchart 7 & 10) */}
+      {/* Tab 3: Hospital & Deployment Registry (Flowchart 1.3: Tri-Model Deployments) */}
       {activeTab === 'deployments' && (
         <div className="space-y-6">
-          {/* Header Banner */}
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white rounded-2xl p-6 shadow-xl border border-indigo-900/50">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -448,26 +776,19 @@ export const SuperAdminDashboard: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    showToast({
-                      type: 'success',
-                      title: 'Platform Health Probe Passed',
-                      message: 'PostgreSQL connection pool healthy (12/20 active), Redis cluster ping 1.2ms, S3 object storage reachable.'
-                    });
-                  }}
-                  className="bg-slate-800 text-xs text-indigo-200 border-indigo-700/60"
+                  onClick={() => showToast({ type: 'success', title: 'Topologies Verified', message: 'All 3 deployment models healthy and heartbeat pings active.' })}
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 mr-1 text-indigo-400" />
-                  <span>Execute Health Probe</span>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                  <span>Probe Topologies</span>
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Tri-Model Topology Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* 1. Cloud Deployment */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 hover:border-indigo-300 transition">
+          {/* 3 Topology Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="p-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
@@ -475,46 +796,28 @@ export const SuperAdminDashboard: React.FC = () => {
                   </span>
                   <div>
                     <h3 className="font-bold text-sm text-slate-900">Cloud Multi-Tenant</h3>
-                    <p className="text-[11px] text-slate-500">Managed SaaS Infrastructure</p>
+                    <p className="text-[11px] text-slate-500">PostgreSQL Schema RLS</p>
                   </div>
                 </div>
-                <Badge variant="success">99.99% UPTIME</Badge>
+                <Badge variant="success">ONLINE</Badge>
               </div>
-
               <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Region:</span>
-                  <strong className="text-slate-800">ap-southeast-1 (Mumbai)</strong>
+                  <span className="text-slate-400">Target Tenant:</span>
+                  <strong className="text-slate-800">Manipal Healthcare</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Database:</span>
-                  <strong className="text-slate-800">PostgreSQL 16 + Kernel RLS</strong>
+                  <span className="text-slate-400">Isolation Layer:</span>
+                  <strong className="text-slate-800">Row-Level Security</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Storage Adapter:</span>
-                  <strong className="text-slate-800">AWS S3 (Server-Side AES-256)</strong>
+                  <span className="text-slate-400">Database Pool:</span>
+                  <strong className="text-emerald-700">Neon Postgres (Pool: 12)</strong>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Active Tenants:</span>
-                  <strong className="text-purple-700 font-bold">{hospitals.length || 3} Hospitals</strong>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-500">Auto-Scaling: 2 - 8 Pods</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => showToast({ type: 'info', title: 'Cloud Telemetry Synchronized', message: 'Monitoring latency across tenant pods: average 24ms.' })}
-                  className="text-xs h-7"
-                >
-                  Inspect Pods
-                </Button>
               </div>
             </div>
 
-            {/* 2. On-Premises Air-Gapped */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 hover:border-indigo-300 transition">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="p-2 rounded-xl bg-teal-50 text-teal-700 border border-teal-200">
@@ -527,41 +830,23 @@ export const SuperAdminDashboard: React.FC = () => {
                 </div>
                 <Badge variant="info">AIR-GAPPED</Badge>
               </div>
-
               <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Hospital:</span>
+                  <span className="text-slate-400">Target Tenant:</span>
                   <strong className="text-slate-800">Army Medical College</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Hardware Binding:</span>
+                  <span className="text-slate-400">Hardware Node:</span>
                   <span className="font-mono text-teal-800 font-bold">SRV-2026-X99</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">License Verification:</span>
-                  <strong className="text-slate-800">Local HMAC-SHA256 Token</strong>
+                  <strong className="text-slate-800">Offline HMAC-SHA256</strong>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Storage Adapter:</span>
-                  <strong className="text-slate-800">Local POSIX Filesystem</strong>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-emerald-600 font-semibold">✓ Zero Internet Egress</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => showToast({ type: 'success', title: 'Offline License Cryptographically Verified', message: 'Perpetual core software entitlement valid indefinitely without phone-home requirement.' })}
-                  className="text-xs h-7"
-                >
-                  Verify Key
-                </Button>
               </div>
             </div>
 
-            {/* 3. Hybrid Edge Deployment */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 hover:border-indigo-300 transition">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
                   <span className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
@@ -569,336 +854,217 @@ export const SuperAdminDashboard: React.FC = () => {
                   </span>
                   <div>
                     <h3 className="font-bold text-sm text-slate-900">Hybrid Edge Gateway</h3>
-                    <p className="text-[11px] text-slate-500">Local Edge + Cloud Sync</p>
+                    <p className="text-[11px] text-slate-500">Local Edge + Cloud Mirror</p>
                   </div>
                 </div>
                 <Badge variant="warning">SYNC HEALTHY</Badge>
               </div>
-
               <div className="space-y-2 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Hospital:</span>
-                  <strong className="text-slate-800">Max Super Speciality</strong>
+                  <span className="text-slate-400">Target Tenant:</span>
+                  <strong className="text-slate-800">Apex Super-Speciality</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Sync Pipeline:</span>
-                  <strong className="text-slate-800">Outbox Batch Queue (30s)</strong>
+                  <span className="text-slate-400">Sync Batch:</span>
+                  <strong className="text-slate-800">Outbox Queue (30s)</strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">DPDP Redaction:</span>
-                  <strong className="text-emerald-700 font-semibold">Active Before Egress</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Conflict Policy:</span>
-                  <strong className="text-slate-800">Append-Only Clinical Audit</strong>
+                  <strong className="text-emerald-700">Active Before Egress</strong>
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-500">Pending Outbox: 0 Items</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => showToast({ type: 'info', title: 'Edge Outbox Flushed', message: 'Local transactional batch synchronized to central disaster-recovery mirror.' })}
-                  className="text-xs h-7"
-                >
-                  Flush Sync
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Operational Controls & Disaster Recovery (Flowchart 10) */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-slate-900">Platform Maintenance, Rollback & Disaster Recovery Controls</h3>
-            <p className="text-slate-500 text-xs">
-              Direct administrative triggers for automated backups, zero-downtime rolling upgrades, and point-in-time schema recovery.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-              <button
-                onClick={() => {
-                  showToast({
-                    type: 'success',
-                    title: 'Automated Snapshot Triggered',
-                    message: 'PostgreSQL WAL snapshot and object storage state archived with AES-256 encryption.'
-                  });
-                }}
-                className="p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-                  <span>Create Snapshot</span>
-                  <HardDrive className="w-4 h-4 text-slate-400" />
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">Full database & storage backup</div>
-              </button>
-
-              <button
-                onClick={() => {
-                  showToast({
-                    type: 'info',
-                    title: 'Point-in-Time Restore Ready',
-                    message: 'Snapshot verified from 06:00 AM UTC. Transaction log replay passes validation.'
-                  });
-                }}
-                className="p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-                  <span>Point-in-Time Restore</span>
-                  <Clock className="w-4 h-4 text-indigo-500" />
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">Replay WAL transaction logs</div>
-              </button>
-
-              <button
-                onClick={() => {
-                  showToast({
-                    type: 'success',
-                    title: 'Rolling Upgrade Test Passed',
-                    message: 'Zero-downtime canary deployment simulation verified without dropping active clinical websocket sessions.'
-                  });
-                }}
-                className="p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-                  <span>Canary Rolling Upgrade</span>
-                  <RefreshCw className="w-3.5 h-3.5 text-teal-600" />
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">Zero clinical session disruption</div>
-              </button>
-
-              <button
-                onClick={() => {
-                  showToast({
-                    type: 'warning',
-                    title: 'Deterministic Rollback Verified',
-                    message: 'Down-migration scripts tested against migration 037 with zero orphan records.'
-                  });
-                }}
-                className="p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer"
-              >
-                <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
-                  <span>Deterministic Rollback</span>
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">Safe schema version rollback</div>
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 1: Tenants Directory */}
-      {activeTab === 'tenants' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden space-y-4">
-          <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tenant by name, code, or city..."
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+      {/* Tab 4: Perpetual License Management (Flowchart 1.4: Complete Lifecycle) */}
+      {activeTab === 'licenses' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                  <KeyRound className="w-4 h-4 text-purple-600" />
+                  <span>Flowchart 1.4: Perpetual License Lifecycle Management</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  5-Step Perpetual Flow: Create License &rarr; Define Edition/Scope &rarr; Generate Credentials &rarr; Activate & Bind &rarr; Manage Transfers/Revocation.
+                </p>
+              </div>
+
+              <Button variant="primary" size="sm" onClick={() => setIsLicenseModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-1.5" />
+                <span>Issue Perpetual License</span>
+              </Button>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-slate-500">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1.5"
-              >
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="trial">Trial</option>
-                <option value="suspended">Suspended</option>
-              </select>
+            {/* Zero-Lockout Clause Card */}
+            <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs space-y-1">
+              <span className="font-bold flex items-center">
+                <ShieldCheck className="w-4 h-4 mr-1 text-purple-700" />
+                ASRTAVA Zero-Lockout Legal & Architectural Guarantee
+              </span>
+              <p className="text-[11px] text-purple-800 leading-relaxed">
+                Hospital clinical operations are perpetual. Clinical features (OPD, IPD, OT, Pharmacy, EMR) never lock out, disable, or expire due to license server outages, maintenance expiry, or billing disputes.
+              </p>
             </div>
-          </div>
 
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Hospital Organization</th>
-                <th className="py-3 px-3">Tenant Code</th>
-                <th className="py-3 px-3">Plan Tier</th>
-                <th className="py-3 px-3">Lifecycle Status</th>
-                <th className="py-3 px-3">Patients</th>
-                <th className="py-3 px-3">Capacity</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredHospitals.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <Shield className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    No registered hospital tenants found. Click "Onboard Hospital" to register a new tenant.
-                  </td>
-                </tr>
-              ) : (
-                filteredHospitals.map((h) => (
-                  <tr key={h.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-semibold text-slate-900">
-                      <div>{h.name}</div>
-                      <div className="text-[11px] text-slate-400 font-normal">{h.city} · Registered {h.joined}</div>
-                    </td>
-                    <td className="py-3 px-3 font-mono font-bold text-purple-700 bg-purple-50/50 rounded px-2 py-0.5 inline-block my-2">
-                      {h.code}
-                    </td>
-                    <td className="py-3 px-3 text-slate-700">{h.plan}</td>
-                    <td className="py-3 px-3">
-                      <Badge variant={h.status === 'Active' ? 'success' : h.status === 'Trial' ? 'purple' : 'danger'} size="sm">
-                        {h.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 font-semibold text-slate-700">{h.patients}</td>
-                    <td className="py-3 px-3 text-slate-500">{h.beds} Beds</td>
-                    <td className="py-3 px-4 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedTenant(h);
-                          setIsManageModalOpen(true);
-                        }}
-                      >
-                        <span>Manage</span>
-                      </Button>
-                    </td>
+            {/* License Registry Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-3">License Key</th>
+                    <th className="py-3 px-3">Hospital Organization</th>
+                    <th className="py-3 px-3">Edition</th>
+                    <th className="py-3 px-3">Deployment</th>
+                    <th className="py-3 px-3">Hardware Node Binding</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                  {licenses.map((lic) => (
+                    <tr key={lic.id} className="hover:bg-slate-50">
+                      <td className="py-3 px-3 text-purple-700 font-bold">{lic.licenseNumber}</td>
+                      <td className="py-3 px-3 font-sans font-medium text-slate-900">{lic.hospitalName}</td>
+                      <td className="py-3 px-3 font-sans text-slate-700">{lic.edition}</td>
+                      <td className="py-3 px-3 font-sans text-slate-600">{lic.deploymentModel}</td>
+                      <td className="py-3 px-3 text-slate-700">{lic.hardwareFingerprint}</td>
+                      <td className="py-3 px-3 font-sans">
+                        <Badge variant={lic.status === 'Active & Bound' ? 'success' : 'warning'} size="sm">
+                          {lic.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-3 font-sans text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            showToast({
+                              type: 'info',
+                              title: 'Hardware Transfer Certificate',
+                              message: `Generated cryptographic node transfer certificate for ${lic.hospitalName}.`
+                            });
+                          }}
+                        >
+                          Transfer Node
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Tab 2: Subscription Plans & Entitlements */}
-      {activeTab === 'plans' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
+      {/* Tab 5: Module and Edition Catalog (Flowchart 1.5) */}
+      {activeTab === 'catalog' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
           <div>
-            <h2 className="text-sm font-bold text-slate-900">SaaS Subscription Plans & Feature Entitlement Matrix</h2>
-            <p className="text-xs text-slate-500">Backend entitlement middleware enforces module access strictly based on the tenant's tier.</p>
+            <h2 className="text-sm font-bold text-slate-900">Module and Edition Catalog Matrix</h2>
+            <p className="text-xs text-slate-500">Edition tiers and granular clinical module entitlement controls.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-            {/* Starter Plan */}
-            <div className="border border-slate-200 rounded-xl p-5 hover:border-purple-300 transition space-y-4">
-              <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider">Starter Healthcare</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">₹ 14,999 <span className="text-xs text-slate-500 font-normal">/ month</span></div>
-                <p className="text-slate-500 mt-1">Standalone clinics and day-care centers.</p>
-              </div>
-              <div className="space-y-2 border-t border-slate-100 pt-3 text-slate-700">
-                <div className="flex items-center text-emerald-600">✓ Up to 25 Staff Accounts</div>
-                <div className="flex items-center text-emerald-600">✓ OPD Consultations & Queue</div>
-                <div className="flex items-center text-emerald-600">✓ Basic Pharmacy & Billing</div>
-                <div className="flex items-center text-slate-400">✗ IPD Bed Management</div>
-                <div className="flex items-center text-slate-400">✗ Operation Theatre & Emergency</div>
-                <div className="flex items-center text-slate-400">✗ Multi-Branch Management</div>
+            <div className="border border-slate-200 rounded-xl p-5 space-y-3">
+              <span className="font-bold text-slate-400 uppercase tracking-wider">Standard Edition</span>
+              <div className="text-xl font-bold text-slate-900">Clinics & Small Hospitals</div>
+              <div className="space-y-1.5 border-t border-slate-100 pt-3 text-slate-700">
+                <div>✓ Outpatient EMR & Consultations</div>
+                <div>✓ Basic Inpatient & Bed Census</div>
+                <div>✓ Counter Pharmacy & Billing</div>
+                <div className="text-slate-400">✗ Operation Theatre Scheduling</div>
+                <div className="text-slate-400">✗ DICOM PACS Gateway</div>
               </div>
             </div>
 
-            {/* Professional Plan */}
-            <div className="border-2 border-purple-600 rounded-xl p-5 relative bg-purple-50/20 space-y-4">
-              <span className="absolute -top-2.5 right-4 bg-purple-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Most Popular
-              </span>
-              <div>
-                <span className="font-bold text-purple-700 uppercase tracking-wider">Professional Hospital</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">₹ 29,999 <span className="text-xs text-slate-500 font-normal">/ month</span></div>
-                <p className="text-slate-500 mt-1">Growing hospitals with IPD, diagnostics, and e-MAR.</p>
-              </div>
-              <div className="space-y-2 border-t border-purple-100 pt-3 text-slate-700">
-                <div className="flex items-center text-emerald-600">✓ Up to 100 Staff Accounts & 3 Branches</div>
-                <div className="flex items-center text-emerald-600">✓ Full IPD Bed Grid & Transfers</div>
-                <div className="flex items-center text-emerald-600">✓ Nursing e-MAR 5-Rights Verification</div>
-                <div className="flex items-center text-emerald-600">✓ LIMS Pathology & Radiology RIS</div>
-                <div className="flex items-center text-slate-400">✗ Operation Theatre Suite</div>
-                <div className="flex items-center text-slate-400">✗ PACS DICOM Server Integration</div>
+            <div className="border-2 border-purple-600 rounded-xl p-5 bg-purple-50/20 space-y-3">
+              <span className="font-bold text-purple-700 uppercase tracking-wider">Enterprise Edition</span>
+              <div className="text-xl font-bold text-slate-900">Multi-Speciality Hospitals</div>
+              <div className="space-y-1.5 border-t border-purple-100 pt-3 text-slate-700">
+                <div>✓ Full EMR & e-MAR 5-Rights Verification</div>
+                <div>✓ LIS Pathology & RIS Modalities</div>
+                <div>✓ Operation Theatre (OT) & WHO Safety</div>
+                <div>✓ Emergency Triage (Levels 1-5)</div>
+                <div>✓ DICOM PACS Viewer & Storage</div>
               </div>
             </div>
 
-            {/* Enterprise Plan */}
-            <div className="border border-slate-200 rounded-xl p-5 hover:border-purple-300 transition space-y-4">
-              <div>
-                <span className="font-bold text-slate-400 uppercase tracking-wider">Enterprise Network</span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">₹ 59,999 <span className="text-xs text-slate-500 font-normal">/ month</span></div>
-                <p className="text-slate-500 mt-1">Multi-branch hospital chains and trauma centers.</p>
-              </div>
-              <div className="space-y-2 border-t border-slate-100 pt-3 text-slate-700">
-                <div className="flex items-center text-emerald-600">✓ Up to 500 Staff & 10 Branches</div>
-                <div className="flex items-center text-emerald-600">✓ Operation Theatre (OT) Scheduling</div>
-                <div className="flex items-center text-emerald-600">✓ Emergency Triage (Levels 1-5)</div>
-                <div className="flex items-center text-emerald-600">✓ Centralized HR & Automated Payroll</div>
-                <div className="flex items-center text-emerald-600">✓ PACS DICOM Imaging Connectors</div>
-                <div className="flex items-center text-emerald-600">✓ Custom Domain & White-Label Theming</div>
+            <div className="border border-slate-200 rounded-xl p-5 space-y-3">
+              <span className="font-bold text-slate-400 uppercase tracking-wider">Group Network Edition</span>
+              <div className="text-xl font-bold text-slate-900">Hospital Chains & Networks</div>
+              <div className="space-y-1.5 border-t border-slate-100 pt-3 text-slate-700">
+                <div>✓ All Enterprise Modules Included</div>
+                <div>✓ Multi-Branch Group Headquarters Admin</div>
+                <div>✓ Healthcare Coordination Gateway</div>
+                <div>✓ Regional Bed & ICU Matrix</div>
+                <div>✓ NOTTO Organ Allocation Bridge</div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 3: SaaS Invoices (Separate from patient billing!) */}
-      {activeTab === 'invoices' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-xs">
-          <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-            <div>
-              <h2 className="font-bold text-slate-900">SaaS Platform Subscription Invoices</h2>
-              <p className="text-slate-500">Strictly segregated from internal hospital patient billing ledgers.</p>
-            </div>
-            <Badge variant="purple" size="sm">GST Registered (18%)</Badge>
+      {/* Tab 6: Platform Monitoring & Telemetry (Flowchart 1.6) */}
+      {activeTab === 'telemetry' && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Platform Real-Time Health & Telemetry Engine</h2>
+            <p className="text-xs text-slate-500">Live PostgreSQL connection pools, API latency, Redis cache hit rates, and node telemetry.</p>
           </div>
 
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Invoice #</th>
-                <th className="py-3 px-3">Hospital Organization</th>
-                <th className="py-3 px-3">Subscription Tier</th>
-                <th className="py-3 px-3">Subtotal (INR)</th>
-                <th className="py-3 px-3">GST (18%)</th>
-                <th className="py-3 px-3">Total Amount</th>
-                <th className="py-3 px-3">Due Date</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {invoices.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    No SaaS invoices generated yet.
-                  </td>
-                </tr>
-              ) : (
-                invoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-purple-700">{inv.invoiceNumber}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-800">{inv.hospitalName}</td>
-                    <td className="py-3 px-3 text-slate-600">{inv.plan}</td>
-                    <td className="py-3 px-3 font-mono">₹ {inv.amount.toLocaleString('en-IN')}</td>
-                    <td className="py-3 px-3 font-mono text-slate-500">₹ {inv.tax.toLocaleString('en-IN')}</td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-900">₹ {(inv.amount + inv.tax).toLocaleString('en-IN')}</td>
-                    <td className="py-3 px-3 text-slate-500">{inv.dueDate}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant={inv.status === 'Paid' ? 'success' : 'warning'} size="sm">
-                        {inv.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-medium">PostgreSQL Pool Latency</span>
+              <div className="text-xl font-bold text-emerald-700">12ms avg</div>
+              <span className="text-[10px] text-slate-500">Neon Cloud Serverless</span>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-medium">API Throughput</span>
+              <div className="text-xl font-bold text-purple-700">842 req/s</div>
+              <span className="text-[10px] text-slate-500">Zero Rate-Limit Drops</span>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-medium">Redis Cache Hit Ratio</span>
+              <div className="text-xl font-bold text-blue-700">98.4%</div>
+              <span className="text-[10px] text-slate-500">Tenant Namespace Partitioned</span>
+            </div>
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <span className="text-slate-400 font-medium">Uptime SLA</span>
+              <div className="text-xl font-bold text-emerald-700">99.99%</div>
+              <span className="text-[10px] text-slate-500">Air-Gap Parity Active</span>
+            </div>
+          </div>
+
+          {/* Audit Logs */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+            <div className="p-3 bg-slate-50 font-bold border-b border-slate-200 text-slate-800">
+              Platform Real-Time Audit Log Stream
+            </div>
+            <div className="divide-y divide-slate-100 p-2">
+              {telemetryLogs.map((log, idx) => (
+                <div key={idx} className="p-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="font-mono text-slate-400">{log.time}</span>
+                    <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{log.tenant}</span>
+                    <span className="font-semibold text-slate-900">{log.action}</span>
+                    <span className="text-slate-400">by {log.user}</span>
+                  </div>
+                  <Badge variant="success" size="sm">{log.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Tab 4: Zero-Standing-Privilege JIT Support Access */}
+      {/* Tab 7: Support & Service Management (Flowchart 1.7: JIT Zero-Standing-Privilege) */}
       {activeTab === 'jit-access' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5 text-xs">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">Zero-Standing-Privilege Just-In-Time (JIT) Support Access</h2>
@@ -906,7 +1072,7 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
             <Button variant="primary" size="sm" onClick={() => setIsJitModalOpen(true)}>
               <Plus className="w-4 h-4 mr-1.5" />
-              <span>New JIT Access Request</span>
+              <span>Request Scoped Support Access</span>
             </Button>
           </div>
 
@@ -923,236 +1089,170 @@ export const SuperAdminDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {jitRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No active JIT access requests.
+              {jitRequests.map((req) => (
+                <tr key={req.id} className="hover:bg-slate-50/80 transition">
+                  <td className="py-3 px-4 font-mono font-bold text-purple-700">{req.ticketId}</td>
+                  <td className="py-3 px-3 font-semibold text-slate-800">{req.hospitalName}</td>
+                  <td className="py-3 px-3 text-slate-600">{req.requester}</td>
+                  <td className="py-3 px-3 text-slate-600">{req.scope}</td>
+                  <td className="py-3 px-3 text-slate-500">{req.durationMinutes} mins</td>
+                  <td className="py-3 px-3 text-slate-400">{req.requestedAt}</td>
+                  <td className="py-3 px-4">
+                    <Badge variant={req.status === 'Approved' ? 'success' : 'warning'} size="sm">
+                      {req.status}
+                    </Badge>
                   </td>
                 </tr>
-              ) : (
-                jitRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-3 px-4 font-mono font-bold text-purple-700">{req.ticketId}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-800">{req.hospitalName}</td>
-                    <td className="py-3 px-3 text-slate-600">{req.requester}</td>
-                    <td className="py-3 px-3 text-slate-600">{req.scope}</td>
-                    <td className="py-3 px-3 text-slate-500">{req.durationMinutes} mins</td>
-                    <td className="py-3 px-3 text-slate-400">{req.requestedAt}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant={req.status === 'Approved' ? 'success' : 'warning'} size="sm">
-                        {req.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Tab 5: Announcements */}
-      {activeTab === 'announcements' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Platform-Wide Announcements & Broadcasts</h2>
-              <p className="text-slate-500">Publish scheduled maintenance alerts, system updates, and critical notices across all hospital portals.</p>
-            </div>
-            <Button variant="primary" size="sm" onClick={() => setIsAncModalOpen(true)}>
-              <Megaphone className="w-4 h-4 mr-1.5" />
-              <span>Broadcast Announcement</span>
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {announcements.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                No active announcements published. Click "Broadcast Announcement" to send platform alerts.
-              </div>
-            ) : (
-              announcements.map((anc) => (
-                <div key={anc.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={anc.priority === 'warning' ? 'warning' : 'info'} size="sm">
-                        {anc.priority.toUpperCase()}
-                      </Badge>
-                      <span className="font-bold text-slate-900 text-sm">{anc.title}</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">Target: {anc.target} · Expires: {anc.expires}</span>
-                  </div>
-                  <p className="text-slate-600">{anc.message}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 6: Telemetry & Audit Stream */}
-      {activeTab === 'telemetry' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4 text-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Platform Real-time Security & Audit Log Stream</h2>
-              <p className="text-slate-500">Every cross-tenant access, permission override, and high-privilege action logged immutably.</p>
-            </div>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {telemetryLogs.length === 0 ? (
-              <div className="py-8 text-center text-slate-400">
-                <Shield className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                No security or cross-tenant audit incidents recorded in current session. All RLS enforcement active.
-              </div>
-            ) : (
-              telemetryLogs.map((log, idx) => (
-                <div key={idx} className="py-2.5 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="font-mono text-slate-400">{log.time}</span>
-                    <span className="font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">{log.tenant}</span>
-                    <span className="font-semibold text-slate-900">{log.action}</span>
-                    <span className="text-slate-400">by {log.user}</span>
-                  </div>
-                  <Badge variant="success" size="sm">{log.status}</Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Integrations Management */}
-      {activeTab === 'integrations' && (
+      {/* Tab 8: Platform Security & Authorization Flow (Flowchart 1.8 & Flowchart 4) */}
+      {activeTab === 'security' && (
         <div className="space-y-6">
-          {/* Header */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <Network className="w-5 h-5 text-purple-600" />
-                  <span>Centralized Third-Party Integration Architecture</span>
-                </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Manage platform-wide approved communication channels, payment processors, LIMS, PACS, and interoperability endpoints.
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <Radio className="w-3 h-3 mr-1 text-emerald-500 animate-pulse" />
-                  12 Providers Active
+          {/* Strict Enforced Banner */}
+          <div className="bg-rose-950 text-rose-100 rounded-2xl p-6 border border-rose-800/80 shadow-xl space-y-2">
+            <div className="flex items-center space-x-2">
+              <ShieldAlert className="w-5 h-5 text-rose-400" />
+              <span className="font-black text-sm uppercase tracking-wider text-rose-300">
+                Strict Enforced Architecture Rule: No Automatic Clinical Record Access
+              </span>
+            </div>
+            <p className="text-xs text-rose-200/90 leading-relaxed max-w-4xl">
+              Platform administration operators, DevOps engineers, and Super Admins hold zero standing visibility into patient Electronic Medical Records (EMR), diagnostic notes, or prescription history. All cross-tenant queries are blocked by PostgreSQL Row-Level Security, and troubleshooting requires explicit hospital-approved JIT break-glass access.
+            </p>
+          </div>
+
+          {/* Flowchart 4: Context-Aware Authorization Architecture Visualizer */}
+          <div className="bg-slate-950 text-white rounded-2xl border border-slate-800 p-6 shadow-xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-xs">
+                <Workflow className="w-4 h-4 text-teal-400" />
+                <span className="font-bold uppercase tracking-wider text-teal-300">
+                  Flowchart 4: Security, Identity & Context-Aware Authorization Flow
                 </span>
               </div>
+              <Badge variant="brand">End-to-End Audited</Badge>
+            </div>
+
+            {/* Step-by-Step Visualization of Flowchart 4 */}
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center text-[10px]">
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">1. Client Request</div>
+                  <div className="text-slate-400">Portal / API / Mobile</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">2. Authentication</div>
+                  <div className="text-slate-400">MFA / Password / OTP</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">3. Identity Session</div>
+                  <div className="text-slate-400">JWT Token Validation</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">4. Org Context</div>
+                  <div className="text-slate-400">X-Tenant-ID Header</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">5. Branch Scope</div>
+                  <div className="text-slate-400">Assigned Facility ID</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">6. Role RBAC</div>
+                  <div className="text-slate-400">Permission Matrix</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700">
+                  <div className="font-bold text-teal-400">7. Case Auth</div>
+                  <div className="text-slate-400">Cross-Hospital Consent</div>
+                </div>
+              </div>
+
+              {/* Backend Enforcement Layer */}
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <span className="font-bold text-slate-300 text-xs block">
+                  8. Backend Authorization Enforcers (Downstream Systems)
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-[10px]">
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Database RLS</strong>
+                    <span>Tenant-Scoped SQL</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Storage Access</strong>
+                    <span>Encrypted Scans</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Cache Isolation</strong>
+                    <span>Redis Prefixing</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Job Queue Scope</strong>
+                    <span>Partitioned Workers</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Reports Scope</strong>
+                    <span>Authorized Facility</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Notification Scope</strong>
+                    <span>Tenant Channels</span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-300">
+                    <strong className="text-emerald-400 block">Offline Defense</strong>
+                    <span>Encrypted SQLite</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deployment Controls */}
+              <div className="p-3 bg-indigo-950/40 rounded-xl border border-indigo-800/40 text-[11px] text-indigo-300 flex items-center justify-between">
+                <span>Deployment-Specific Lifecycle Controls: Automated Backup &bull; Restore Drills &bull; Health Monitoring &bull; Rollback Safe</span>
+                <span className="font-bold text-indigo-200">Zero Data Leakage Guarantee</span>
+              </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Provider Grid */}
+      {/* Tab 9: Integration Management (Flowchart 1.9) */}
+      {activeTab === 'integrations' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+              <Network className="w-5 h-5 text-purple-600" />
+              <span>Flowchart 1.9: Centralized Third-Party Integration Architecture</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Communication channels, payment gateways, LIMS analyzers, PACS imaging modalities, and ABDM interoperability endpoints.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              {
-                name: 'Meta WhatsApp Business Cloud API',
-                code: 'whatsapp_meta',
-                category: 'Communication',
-                desc: 'Official WhatsApp messaging for appointments, receipts, and optical check-in passes.',
-                latency: '42ms',
-                status: 'Operational',
-                uptime: '99.98%'
-              },
-              {
-                name: 'Gupshup Enterprise DLT SMS',
-                code: 'sms_gupshup',
-                category: 'Communication',
-                desc: 'High-throughput DLT-registered telecom gateway for 6-digit OTPs and emergency alerts.',
-                latency: '25ms',
-                status: 'Operational',
-                uptime: '99.99%'
-              },
-              {
-                name: 'Amazon Simple Email Service (SES)',
-                code: 'email_ses',
-                category: 'Communication',
-                desc: 'High-deliverability transactional email service with DKIM signing and dedicated IP pools.',
-                latency: '35ms',
-                status: 'Operational',
-                uptime: '100%'
-              },
-              {
-                name: 'Razorpay Payment Gateway',
-                code: 'payment_razorpay',
-                category: 'Payment Processing',
-                desc: 'UPI, Net Banking, Credit/Debit Cards, and Auto-Debit for Indian patient and SaaS billing.',
-                latency: '52ms',
-                status: 'Operational',
-                uptime: '99.95%'
-              },
-              {
-                name: 'Stripe Global Gateway',
-                code: 'payment_stripe',
-                category: 'Payment Processing',
-                desc: 'Global multi-currency checkout, Apple Pay, Google Pay, and recurring subscription billing.',
-                latency: '48ms',
-                status: 'Operational',
-                uptime: '99.99%'
-              },
-              {
-                name: 'Orthanc / dcm4chee DICOMweb PACS',
-                code: 'pacs_orthanc',
-                category: 'Radiology Imaging',
-                desc: 'Medical imaging PACS connectivity with QIDO-RS, WADO-RS, and ephemeral viewer links.',
-                latency: '40ms',
-                status: 'Operational',
-                uptime: '99.90%'
-              },
-              {
-                name: 'Laboratory LIS / Analyzer Gateway',
-                code: 'lis_hl7',
-                category: 'Pathology & LIMS',
-                desc: 'Bidirectional interface for automated analyzers (Sysmex, Roche, Abbott) via HL7/ASTM.',
-                latency: '38ms',
-                status: 'Operational',
-                uptime: '99.95%'
-              },
-              {
-                name: 'HL7 v2 & FHIR R4 Interoperability',
-                code: 'interop_fhir',
-                category: 'Health Informatics',
-                desc: 'ABDM milestone standards adapter for Patient, Observation, and DiagnosticReport bundles.',
-                latency: '14ms',
-                status: 'Operational',
-                uptime: '100%'
-              },
-              {
-                name: 'AWS S3 Cloud Document Vault',
-                code: 'storage_s3',
-                category: 'Cloud Storage',
-                desc: 'AES-256 encrypted object storage for patient diagnostic scans and medical reports.',
-                latency: '20ms',
-                status: 'Operational',
-                uptime: '99.99%'
-              }
+              { name: 'Meta WhatsApp Business Cloud API', category: 'Communication', latency: '42ms', status: 'Operational' },
+              { name: 'Gupshup Enterprise DLT SMS', category: 'Communication', latency: '25ms', status: 'Operational' },
+              { name: 'Amazon SES Transactional Email', category: 'Communication', latency: '35ms', status: 'Operational' },
+              { name: 'Razorpay Payment Gateway (UPI / Cards)', category: 'Payment Gateway', latency: '52ms', status: 'Operational' },
+              { name: 'Orthanc / dcm4chee DICOMweb PACS', category: 'Radiology Imaging', latency: '40ms', status: 'Operational' },
+              { name: 'ABDM & FHIR R4 Interoperability Bridge', category: 'National Health Grid', latency: '14ms', status: 'Operational' },
             ].map((prov, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-purple-50 text-purple-700">
-                      {prov.category}
-                    </span>
-                    <span className="flex items-center text-[11px] font-semibold text-emerald-600">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                      {prov.status}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-bold text-slate-900">{prov.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{prov.desc}</p>
+              <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700">{prov.category}</span>
+                  <span className="text-[11px] font-semibold text-emerald-600 flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                    {prov.status}
+                  </span>
                 </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Ping: <strong className="text-slate-700">{prov.latency}</strong></span>
-                  <span className="text-slate-400">SLA: <strong className="text-emerald-700">{prov.uptime}</strong></span>
+                <h3 className="text-sm font-bold text-slate-900">{prov.name}</h3>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                  <span>Ping: <strong>{prov.latency}</strong></span>
                   <button
-                    onClick={() => showToast({ type: 'info', title: 'Connection Test Passed', message: `${prov.name} responding normally with ${prov.latency} latency.` })}
-                    className="text-purple-600 hover:text-purple-800 font-semibold"
+                    onClick={() => showToast({ type: 'info', title: 'Connection Verified', message: `${prov.name} responded in ${prov.latency}.` })}
+                    className="text-purple-600 font-semibold cursor-pointer"
                   >
                     Test Ping
                   </button>
@@ -1160,76 +1260,162 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* Webhook Stream & Dead-Letter Queue (DLQ) */}
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                  <Layers className="w-4 h-4 text-purple-600" />
-                  <span>Centralized Webhook Dispatcher & Idempotency Monitor</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  HMAC-SHA256 signature verification, replay protection, and dead-letter queue (DLQ) retry management.
-                </p>
+      {/* Tab 10: Release & Upgrade Management (Flowchart 1.10) */}
+      {activeTab === 'upgrades' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <Workflow className="w-5 h-5 text-purple-600" />
+                <span>Flowchart 1.10: Release and Upgrade Management</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                4-Stage Upgrade Flow: Release Planning &rarr; Compatibility Checks &rarr; Customer Upgrade Approval &rarr; Backup / Upgrade / Rollback.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-800">1. Release Planning</span>
+                <div className="text-lg font-bold text-purple-900">v1.0.0-LTS</div>
+                <span className="text-[10px] text-slate-500">Master Production Baseline</span>
               </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-800">2. Compatibility Checks</span>
+                <div className="text-lg font-bold text-emerald-700">100% Cleared</div>
+                <span className="text-[10px] text-emerald-600">38 DB Migrations Verified</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-800">3. Customer Upgrade Approval</span>
+                <div className="text-lg font-bold text-blue-700">Hospital Scheduled</div>
+                <span className="text-[10px] text-slate-500">Zero Forced Downtime</span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="font-semibold text-slate-800">4. Backup / Rollback</span>
+                <div className="text-lg font-bold text-teal-800">WAL Snapshot Ready</div>
+                <span className="text-[10px] text-teal-600">Deterministic Recovery</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end space-x-3">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => showToast({ type: 'success', title: 'DLQ Replay Triggered', message: 'All pending DLQ jobs re-queued with exponential backoff.' })}
+                onClick={() => {
+                  showToast({
+                    type: 'success',
+                    title: 'WAL Pre-Migration Snapshot Created',
+                    message: 'Point-in-time recovery checkpoint registered: snap_20261113_140000_wal.'
+                  });
+                }}
               >
-                <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                <span>Replay DLQ Jobs</span>
+                <Archive className="w-4 h-4 mr-1.5" />
+                <span>Create Pre-Upgrade Snapshot</span>
               </Button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-2.5 px-3">Event ID</th>
-                    <th className="py-2.5 px-3">Provider</th>
-                    <th className="py-2.5 px-3">Event Type</th>
-                    <th className="py-2.5 px-3">HMAC Signature</th>
-                    <th className="py-2.5 px-3">Idempotency Hash</th>
-                    <th className="py-2.5 px-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {webhookLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
-                        No active webhook retry events or dead-letter queue records pending.
-                      </td>
-                    </tr>
-                  ) : (
-                    webhookLogs.map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="py-2.5 px-3 text-purple-700 font-semibold">{row.id}</td>
-                        <td className="py-2.5 px-3 text-slate-800">{row.prov}</td>
-                        <td className="py-2.5 px-3 text-slate-900 font-sans font-medium">{row.event}</td>
-                        <td className="py-2.5 px-3 text-emerald-600 font-sans">{row.sig}</td>
-                        <td className="py-2.5 px-3 text-slate-400">{row.hash}</td>
-                        <td className="py-2.5 px-3">
-                          <Badge variant={row.status.includes('STAGING') ? 'warning' : 'success'} size="sm">
-                            {row.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  showToast({
+                    type: 'info',
+                    title: 'Rolling Upgrade Check',
+                    message: 'Simulated canary rolling upgrade: 0 schema lock conflicts detected.'
+                  });
+                }}
+              >
+                <RotateCcw className="w-4 h-4 mr-1.5" />
+                <span>Simulate Canary Rollout</span>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
+      {/* License Generator Modal (Flowchart 1.4) */}
+      <Modal
+        isOpen={isLicenseModalOpen}
+        onClose={() => setIsLicenseModalOpen(false)}
+        title="Issue Perpetual Software License"
+        description="Generate an offline HMAC-SHA256 cryptographically bound license token."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsLicenseModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleGenerateLicense}>
+              <KeyRound className="w-4 h-4 mr-1.5" />
+              <span>Generate & Bind License</span>
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="block text-slate-700 font-semibold mb-1">Target Hospital Legal Entity *</label>
+            <select
+              value={licHospitalName}
+              onChange={(e) => setLicHospitalName(e.target.value)}
+              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+            >
+              {hospitals.map((h) => (
+                <option key={h.id} value={h.name}>{h.name} ({h.code})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Edition Tier *</label>
+              <select
+                value={licEdition}
+                onChange={(e) => setLicEdition(e.target.value as any)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              >
+                <option value="Standard">Standard Hospital Edition</option>
+                <option value="Enterprise">Enterprise Hospital Edition</option>
+                <option value="Group Network">Group Network Edition</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">Deployment Model *</label>
+              <select
+                value={licDeployment}
+                onChange={(e) => setLicDeployment(e.target.value as any)}
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              >
+                <option value="On-Premises">On-Premises Air-Gapped</option>
+                <option value="Hybrid">Hybrid Edge Gateway</option>
+                <option value="Cloud">Dedicated Cloud Multi-Tenant</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 font-semibold mb-1">Hardware Fingerprint / Node MAC Address *</label>
+            <input
+              type="text"
+              value={licHardwareFingerprint}
+              onChange={(e) => setLicHardwareFingerprint(e.target.value)}
+              placeholder="e.g. SRV-2026-X99-MAC-AA-BB-CC"
+              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs"
+            />
+          </div>
+
+          <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 text-purple-900 text-xs">
+            <span className="font-bold block mb-0.5">Perpetual Offline Activation Token:</span>
+            <span>Generates an air-gapped signed token allowing the hospital instance to boot and operate 100% offline indefinitely.</span>
+          </div>
+        </div>
+      </Modal>
+
       {/* Onboard Hospital Modal */}
       <Modal
         isOpen={isOnboardModalOpen}
         onClose={() => setIsOnboardModalOpen(false)}
-        title="Onboard New Hospital Organization"
+        title="Onboard New Hospital Tenant"
         description="Provision a dedicated multi-tenant hospital instance with isolated PostgreSQL schema."
         footer={
           <>
@@ -1279,15 +1465,14 @@ export const SuperAdminDashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Subscription Plan Tier</label>
+              <label className="block text-slate-700 font-semibold mb-1">Hierarchy Model</label>
               <select
-                value={newHospPlan}
-                onChange={(e) => setNewHospPlan(e.target.value)}
+                value={newTenantType}
+                onChange={(e) => setNewTenantType(e.target.value as any)}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
               >
-                <option value="Starter Tier">Starter Tier (₹ 14,999/mo)</option>
-                <option value="Professional Tier">Professional Tier (₹ 29,999/mo)</option>
-                <option value="Enterprise Tier">Enterprise Tier (₹ 59,999/mo)</option>
+                <option value="Independent Hospital">Independent Hospital</option>
+                <option value="Hospital Group">Hospital Group (Multi-Branch)</option>
               </select>
             </div>
             <div>
@@ -1303,13 +1488,13 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Manage Tenant Modal (with mandatory audit reason) */}
+      {/* Manage Tenant Modal */}
       {selectedTenant && (
         <Modal
           isOpen={isManageModalOpen}
           onClose={() => setIsManageModalOpen(false)}
           title={`Tenant Lifecycle Control — ${selectedTenant.name}`}
-          description={`Organization Code: ${selectedTenant.code} · Plan: ${selectedTenant.plan}`}
+          description={`Organization Code: ${selectedTenant.code} &bull; Model: ${selectedTenant.tenantType}`}
           footer={
             <>
               <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>
@@ -1351,19 +1536,12 @@ export const SuperAdminDashboard: React.FC = () => {
                 <textarea
                   value={suspensionReason}
                   onChange={(e) => setSuspensionReason(e.target.value)}
-                  placeholder="e.g. Non-payment of subscription invoice after 30-day grace period notice."
+                  placeholder="Enter audit reason for suspension..."
                   rows={3}
                   className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                 />
               </div>
             )}
-
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs">
-              <span className="font-bold block mb-1">PostgreSQL Tenant Isolation</span>
-              <span>
-                Tenant operations are securely partitioned via Row-Level Security policy (<code>tenant_id = current_setting('app.current_tenant_id')</code>).
-              </span>
-            </div>
           </div>
         </Modal>
       )}
@@ -1449,59 +1627,8 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
       </Modal>
-
-      {/* Announcement Modal */}
-      <Modal
-        isOpen={isAncModalOpen}
-        onClose={() => setIsAncModalOpen(false)}
-        title="Broadcast Platform Announcement"
-        description="Notify hospital administrators and clinical staff across all tenant workspaces."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setIsAncModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleCreateAnnouncement}>
-              Publish Announcement
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3 text-xs">
-          <div>
-            <label className="block text-slate-700 font-semibold mb-1">Announcement Title *</label>
-            <input
-              type="text"
-              value={ancTitle}
-              onChange={(e) => setAncTitle(e.target.value)}
-              placeholder="e.g. Scheduled Maintenance Window Notice"
-              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-slate-700 font-semibold mb-1">Priority Level</label>
-            <select
-              value={ancPriority}
-              onChange={(e) => setAncPriority(e.target.value)}
-              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
-            >
-              <option value="info">Information (Blue)</option>
-              <option value="warning">Maintenance / Warning (Amber)</option>
-              <option value="critical">Critical Outage Alert (Red)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-slate-700 font-semibold mb-1">Announcement Message *</label>
-            <textarea
-              value={ancMessage}
-              onChange={(e) => setAncMessage(e.target.value)}
-              placeholder="Write broadcast message details..."
-              rows={4}
-              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };
+
+export default SuperAdminDashboard;

@@ -19,7 +19,11 @@ import {
   Lock,
   Siren,
   Scissors,
-  Network
+  Network,
+  Sparkles,
+  KeyRound,
+  FileCheck2,
+  HeartHandshake
 } from 'lucide-react';
 import { PortalType, useAuth } from '../context/AuthContext';
 
@@ -39,7 +43,7 @@ export const ROLE_OPTIONS: RoleOption[] = [
     portal: 'hospital-admin',
     title: 'Hospital Admin',
     roleNumber: 1,
-    icon: <Building2 className="w-4 h-4 text-brand-600" />,
+    icon: <Building2 className="w-4 h-4 text-teal-600" />,
     description: 'Master governance, staff access & hospital operations',
     category: 'administrative'
   },
@@ -121,86 +125,114 @@ export const ROLE_OPTIONS: RoleOption[] = [
     title: 'Inventory & Procurement',
     roleNumber: 10,
     icon: <ClipboardList className="w-4 h-4 text-orange-600" />,
-    description: 'Central store, purchase orders (PO) & GRN intake',
+    description: 'Central hospital stores, purchase requisitions & suppliers',
     category: 'operational'
-  },
-  {
-    slug: 'emergency',
-    portal: 'emergency',
-    title: 'Emergency & Trauma',
-    roleNumber: 11,
-    icon: <Siren className="w-4 h-4 text-rose-600" />,
-    description: 'ESI triage, resuscitation bays & 108 ambulance dispatch',
-    category: 'clinical'
   },
   {
     slug: 'ot',
     portal: 'ot',
     title: 'Operation Theatre',
-    roleNumber: 12,
-    icon: <Scissors className="w-4 h-4 text-purple-600" />,
-    description: 'Surgical suites, WHO 3-phase checklist & anaesthesia',
+    roleNumber: 11,
+    icon: <Scissors className="w-4 h-4 text-indigo-700" />,
+    description: 'Surgery schedules, surgical teams & WHO safety checklists',
     category: 'clinical'
   },
   {
-    slug: 'group-admin',
-    portal: 'group-admin',
-    title: 'Hospital Group Admin',
-    roleNumber: 13,
-    icon: <Network className="w-4 h-4 text-indigo-700" />,
-    description: 'Multi-hospital chain operations, branch telemetry & EMPI',
-    category: 'administrative'
-  },
-  {
-    slug: 'coordination',
-    portal: 'coordination',
-    title: 'Coordination Network',
-    roleNumber: 15,
-    icon: <Network className="w-4 h-4 text-teal-600" />,
-    description: 'NOTTO organ allocation, emergency transfers & inter-hospital network',
-    category: 'operational'
-  },
-  {
-    slug: 'patient',
-    portal: 'patient',
-    title: 'Patient',
-    roleNumber: 16,
-    icon: <Users className="w-4 h-4 text-sky-600" />,
-    description: 'Self-service appointments, reports, e-prescriptions & bills',
-    category: 'patient'
+    slug: 'emergency',
+    portal: 'emergency',
+    title: 'Emergency & Trauma',
+    roleNumber: 12,
+    icon: <Siren className="w-4 h-4 text-red-600" />,
+    description: 'Triage levels 1-5, resuscitation bays & code alerts',
+    category: 'clinical'
   }
 ];
 
-interface PublicNavbarProps {
+export interface PublicNavbarProps {
   onNavigate: (route: string) => void;
   activeRoute?: string;
 }
 
 export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRoute = '/' }) => {
   const { user } = useAuth();
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [appsDropdownOpen, setAppsDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setRoleDropdownOpen(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setAppsDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelectRole = (slug: string) => {
-    setRoleDropdownOpen(false);
-    setMobileMenuOpen(false);
-    onNavigate(`/login/${slug}`);
-  };
+  const enterprisePortals = [
+    {
+      id: 'staff',
+      name: 'Hospital Staff Application',
+      subdomain: 'app.asrtava.com',
+      path: '/login/staff',
+      icon: <Building2 className="w-5 h-5 text-teal-400" />,
+      badge: 'Hospital Employees',
+      badgeColor: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+      description: 'Doctors, Nurses, Reception, Pharmacy, Laboratory, Radiology, OT & Hospital Admin.',
+      roles: ['Doctor', 'Nurse', 'Front Desk', 'Pharmacist', 'Lab Tech', 'Admin']
+    },
+    {
+      id: 'patient',
+      name: 'Patient Portal',
+      subdomain: 'patient.asrtava.com',
+      path: '/login/patient',
+      icon: <Users className="w-5 h-5 text-blue-400" />,
+      badge: 'Patients & Family',
+      badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      description: 'Appointments, health records, lab reports, e-prescriptions, bills and follow-ups.',
+      roles: ['Appointments', 'Prescriptions', 'Lab Scans', 'Invoices']
+    },
+    {
+      id: 'network',
+      name: 'Healthcare Coordination Network',
+      subdomain: 'network.asrtava.com',
+      path: '/login/coordination',
+      icon: <Network className="w-5 h-5 text-amber-400" />,
+      badge: 'Authorized Network',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      description: 'Inter-hospital emergency transfers, NOTTO organ donor matching & regional bed matrix.',
+      roles: ['NOTTO Nodal', 'Transfer Dispatch', 'Bed Matrix', 'Blood Grid']
+    },
+    {
+      id: 'admin',
+      name: 'Platform Administration Console',
+      subdomain: 'admin.asrtava.com',
+      path: '/super-admin/login',
+      icon: <Shield className="w-5 h-5 text-purple-400" />,
+      badge: 'ASRTAVA Internal',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      description: 'Customer organizations, perpetual license generation, deployment registry & zero-privilege audit.',
+      roles: ['License Engine', 'Tri-Model Registry', 'JIT Support', 'Telemetry']
+    }
+  ];
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white">
+    <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 text-white">
+      {/* Top Banner: Ecosystem Notice */}
+      <div className="bg-gradient-to-r from-teal-950 via-slate-900 to-indigo-950 border-b border-slate-800/80 px-4 py-1.5 text-[11px] text-slate-300 hidden sm:flex items-center justify-between max-w-7xl mx-auto">
+        <div className="flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="font-semibold text-slate-200">ASRTAVA v1.0 Production Architecture</span>
+          <span className="text-slate-500">&bull;</span>
+          <span className="text-slate-400">Five Purpose-Built Applications &bull; Perpetual License &bull; Zero Cloud Lock-In</span>
+        </div>
+        <div className="flex items-center space-x-3 text-slate-400">
+          <span className="hover:text-white transition cursor-pointer" onClick={() => onNavigate('/register-hospital')}>
+            Request Deployment &rarr;
+          </span>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo & Brand */}
@@ -215,154 +247,150 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
             />
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold tracking-wider text-xl text-white">ASRTAVA</span>
+                <span className="font-black tracking-wider text-xl text-white">ASRTAVA</span>
                 <span className="text-[10px] bg-teal-500/20 text-teal-300 font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
-                  ENTERPRISE
+                  ECOSYSTEM
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 font-medium tracking-wide block">
-                Hospital Management System
+                Enterprise Hospital Management
               </span>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-8 text-xs font-semibold text-slate-300">
+          <nav className="hidden lg:flex items-center space-x-7 text-xs font-semibold text-slate-300">
             <button
               onClick={() => {
                 if (activeRoute !== '/') onNavigate('/');
-                const el = document.getElementById('features');
-                el?.scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="hover:text-teal-400 transition"
+              className="hover:text-teal-400 transition cursor-pointer"
             >
               Clinical Modules
             </button>
             <button
               onClick={() => {
                 if (activeRoute !== '/') onNavigate('/');
-                const el = document.getElementById('architecture');
-                el?.scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('architecture')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="hover:text-teal-400 transition"
+              className="hover:text-teal-400 transition cursor-pointer"
             >
-              Enterprise Security
+              Deployment & Security
             </button>
             <button
               onClick={() => {
                 if (activeRoute !== '/') onNavigate('/');
-                const el = document.getElementById('benefits');
-                el?.scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('benefits')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="hover:text-teal-400 transition"
+              className="hover:text-teal-400 transition cursor-pointer"
             >
-              Platform Benefits
+              Perpetual Licensing
             </button>
             <button
-              onClick={() => {
-                if (activeRoute !== '/') onNavigate('/');
-                const el = document.getElementById('about');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="hover:text-teal-400 transition"
+              onClick={() => onNavigate('/register-hospital')}
+              className="hover:text-teal-400 transition cursor-pointer flex items-center space-x-1"
             >
-              About ASRTAVA
+              <FileCheck2 className="w-3.5 h-3.5 text-teal-400" />
+              <span>Customer Onboarding</span>
             </button>
             <button
-              onClick={() => {
-                if (activeRoute !== '/') onNavigate('/');
-                const el = document.getElementById('contact');
-                el?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="hover:text-teal-400 transition"
+              onClick={() => onNavigate('/login/coordination')}
+              className="hover:text-amber-400 transition cursor-pointer flex items-center space-x-1"
             >
-              Contact Support
+              <Network className="w-3.5 h-3.5 text-amber-400" />
+              <span>Coordination Network</span>
             </button>
           </nav>
 
-          {/* Right Action: Return to Workspace or ROLE SELECTOR DROPDOWN */}
+          {/* Right Action: Return to Workspace or Application Gateways */}
           <div className="hidden sm:flex items-center space-x-3">
-            {user && (
+            {user ? (
               <button
                 onClick={() => onNavigate('portal')}
                 className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-emerald-700/25 border border-emerald-500/30 transition transform active:scale-95 cursor-pointer"
               >
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Return to Workspace ({user.firstName})</span>
+                <span>Return to Workspace ({user.firstName || 'User'})</span>
               </button>
-            )}
+            ) : null}
 
             <div className="relative" ref={dropdownRef}>
               <button
-                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                className="flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-teal-700/25 border border-teal-500/30 transition transform active:scale-95 cursor-pointer"
-                aria-expanded={roleDropdownOpen}
-                aria-haspopup="true"
+                onClick={() => setAppsDropdownOpen(!appsDropdownOpen)}
+                className="flex items-center space-x-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-teal-700/25 border border-teal-500/30 transition transform active:scale-95 cursor-pointer"
+                aria-expanded={appsDropdownOpen}
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>{user ? 'Switch Role' : 'Login / Select Role'}</span>
+                <span>Access Applications</span>
                 <ChevronDown
-                  className={`w-4 h-4 transition-transform duration-200 ${
-                    roleDropdownOpen ? 'rotate-180' : ''
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    appsDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
               </button>
 
-              {/* Role Dropdown Menu */}
-              {roleDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-84 bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 py-3 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+              {/* 4-App Gateway Dropdown Menu */}
+              {appsDropdownOpen && (
+                <div className="absolute right-0 mt-3 w-96 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-800 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between mb-2">
                     <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-teal-800 block">
-                        Select Authorized Role
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-teal-400 block">
+                        Select ASRTAVA Entry Point
                       </span>
-                      <span className="text-[10px] text-slate-500">
-                        Redirects to dedicated login experience
+                      <span className="text-[10px] text-slate-400">
+                        Dedicated secure portal for each stakeholder
                       </span>
                     </div>
-                    <span className="text-[10px] bg-slate-100 font-mono font-bold text-slate-600 px-2 py-0.5 rounded">
-                      11 Roles
+                    <span className="text-[10px] bg-slate-800 font-mono font-bold text-slate-300 px-2 py-0.5 rounded border border-slate-700">
+                      4 Portals
                     </span>
                   </div>
 
-                  <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 py-1">
-                    {ROLE_OPTIONS.map((role) => (
+                  <div className="space-y-1.5">
+                    {enterprisePortals.map((app) => (
                       <button
-                        key={role.slug}
-                        onClick={() => handleSelectRole(role.slug)}
-                        className="w-full text-left px-4 py-2.5 hover:bg-teal-50/70 transition flex items-start space-x-3 group"
+                        key={app.id}
+                        onClick={() => {
+                          setAppsDropdownOpen(false);
+                          onNavigate(app.path);
+                        }}
+                        className="w-full text-left p-3 rounded-xl hover:bg-slate-800/90 transition flex items-start space-x-3 group border border-transparent hover:border-slate-700"
                       >
-                        <div className="p-2 rounded-lg bg-slate-100 group-hover:bg-teal-100 transition shrink-0 mt-0.5">
-                          {role.icon}
+                        <div className="p-2 rounded-xl bg-slate-800 group-hover:bg-slate-700/80 transition shrink-0 mt-0.5 border border-slate-700/60">
+                          {app.icon}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-900 group-hover:text-teal-900 truncate">
-                              {role.roleNumber}. {role.title}
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-white group-hover:text-teal-300 truncate">
+                              {app.name}
                             </span>
-                            <span className="text-[9px] uppercase font-semibold text-slate-400 group-hover:text-teal-700">
-                              {role.category}
+                            <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border ${app.badgeColor}`}>
+                              {app.badge}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                            {role.description}
+                          <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                            {app.subdomain}
+                          </span>
+                          <p className="text-[11px] text-slate-400 line-clamp-1 mt-1">
+                            {app.description}
                           </p>
                         </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-teal-700 shrink-0 self-center" />
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-teal-400 shrink-0 self-center" />
                       </button>
                     ))}
                   </div>
 
-                  <div className="px-4 pt-2.5 pb-1 border-t border-slate-100 bg-slate-50 rounded-b-xl flex items-center justify-between text-[10px] text-slate-500">
-                    <span>Platform Admin?</span>
+                  <div className="mt-2.5 pt-2 border-t border-slate-800 px-2 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>New hospital deployment?</span>
                     <button
                       onClick={() => {
-                        setRoleDropdownOpen(false);
-                        onNavigate('/super-admin/login');
+                        setAppsDropdownOpen(false);
+                        onNavigate('/register-hospital');
                       }}
-                      className="text-purple-700 hover:text-purple-900 font-bold hover:underline"
+                      className="text-teal-400 hover:text-teal-300 font-bold hover:underline"
                     >
-                      Super Admin Login →
+                      Onboard Facility &rarr;
                     </button>
                   </div>
                 </div>
@@ -371,12 +399,12 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
           </div>
 
           {/* Mobile menu button */}
-          <div className="flex sm:hidden items-center space-x-2">
+          <div className="flex lg:hidden items-center space-x-2">
             <button
-              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+              onClick={() => setAppsDropdownOpen(!appsDropdownOpen)}
               className="bg-teal-600 text-white text-xs font-bold py-2 px-3 rounded-lg flex items-center space-x-1"
             >
-              <span>Login</span>
+              <span>Portals</span>
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
             <button
@@ -391,7 +419,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="sm:hidden bg-slate-900 border-b border-slate-800 px-4 pt-3 pb-6 space-y-3">
+        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 pt-3 pb-6 space-y-4">
           {user && (
             <div className="p-3 bg-teal-950/80 border border-teal-600/40 rounded-xl flex items-center justify-between">
               <div>
@@ -409,20 +437,42 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
               </button>
             </div>
           )}
+
           <div className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
-            All Login Gateways
+            Enterprise Application Portals
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {ROLE_OPTIONS.map((role) => (
+          <div className="grid grid-cols-1 gap-2">
+            {enterprisePortals.map((app) => (
               <button
-                key={role.slug}
-                onClick={() => handleSelectRole(role.slug)}
-                className="flex items-center space-x-2 p-2 rounded-lg bg-slate-800 text-left text-xs text-slate-200 hover:bg-slate-700"
+                key={app.id}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onNavigate(app.path);
+                }}
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-800 text-left text-xs text-slate-200 hover:bg-slate-700"
               >
-                <span>{role.icon}</span>
-                <span className="truncate">{role.title}</span>
+                <div className="flex items-center space-x-3">
+                  {app.icon}
+                  <div>
+                    <div className="font-bold text-white">{app.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">{app.subdomain}</div>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-slate-400" />
               </button>
             ))}
+          </div>
+
+          <div className="pt-2 border-t border-slate-800 flex justify-between text-xs">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onNavigate('/register-hospital');
+              }}
+              className="text-teal-400 font-bold"
+            >
+              Request Hospital Onboarding &rarr;
+            </button>
           </div>
         </div>
       )}
@@ -430,3 +480,4 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({ onNavigate, activeRo
   );
 };
 
+export default PublicNavbar;

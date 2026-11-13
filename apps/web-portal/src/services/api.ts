@@ -328,6 +328,7 @@ export const saasApi = {
   getSuperAdminDashboard: () => apiClient.get('/saas/super-admin/dashboard'),
   getTenants: (params?: { status?: string; plan?: string; search?: string }) =>
     apiClient.get('/saas/super-admin/tenants', { params }),
+  onboardTenant: (data: any) => apiClient.post('/saas/super-admin/tenants', data),
   getTenantDetails: (id: string) => apiClient.get(`/saas/super-admin/tenants/${id}`),
   updateTenantStatus: (id: string, status: string, reason: string) =>
     apiClient.put(`/saas/super-admin/tenants/${id}/status`, { status, reason }),

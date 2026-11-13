@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { HospitalProvider } from './context/HospitalContext';
 import { ToastProvider } from './components/ui/Toast';
@@ -20,17 +20,37 @@ import { EmergencyDashboard } from './portals/emergency/EmergencyDashboard';
 import { CoordinationDashboard } from './portals/coordination/CoordinationDashboard';
 import { PatientDashboard } from './portals/patient/PatientDashboard';
 
-// Public & Role-Aware Authentication Views
+// Public & 5-Application Entry Views
 import { PublicHomePage } from './public/PublicHomePage';
-import { RoleLoginView } from './auth/RoleLoginView';
+import { StaffLogin } from './auth/StaffLogin';
+import { PatientLogin } from './auth/PatientLogin';
+import { CoordinationLogin } from './auth/CoordinationLogin';
 import { SuperAdminLogin } from './auth/SuperAdminLogin';
+import { RoleLoginView } from './auth/RoleLoginView';
 import { HospitalRegistration } from './auth/HospitalRegistration';
 import { OnboardingWizard } from './auth/OnboardingWizard';
+import { resolveApplicationExperience } from './utils/appResolver';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 const MainPortalView: React.FC = () => {
   const { user, activePortal, setActivePortal, currentAuthView, setCurrentAuthView } = useAuth();
   const [resumptionToken, setResumptionToken] = React.useState<string | null>(null);
+
+  // Initialize view from subdomain or path on first load
+  useEffect(() => {
+    if (!user && (!currentAuthView || currentAuthView === '/')) {
+      const app = resolveApplicationExperience();
+      if (app === 'staff') {
+        setCurrentAuthView('/login/staff');
+      } else if (app === 'patient') {
+        setCurrentAuthView('/login/patient');
+      } else if (app === 'network') {
+        setCurrentAuthView('/login/coordination');
+      } else if (app === 'admin') {
+        setCurrentAuthView('/super-admin/login');
+      }
+    }
+  }, [user]);
 
   // Authenticated user returning to view Public Homepage
   if (user && (currentAuthView === 'public-home' || currentAuthView === '/')) {
@@ -56,24 +76,63 @@ const MainPortalView: React.FC = () => {
     );
   }
 
-  // 1. Unauthenticated Visitor Flow: Public Website & Role Login Views
+  // 1. Unauthenticated Visitor Flow: Public Website & Purpose-Built Application Logins
   if (!user) {
     if (!currentAuthView || currentAuthView === '/') {
       return <PublicHomePage onNavigate={setCurrentAuthView} />;
     }
 
-    if (currentAuthView.startsWith('/login/')) {
-      const roleSlug = currentAuthView.replace('/login/', '');
-      return <RoleLoginView roleSlug={roleSlug} onNavigate={setCurrentAuthView} />;
-    }
-
-    if (currentAuthView === '/super-admin/login') {
+    // App 2: Hospital Staff Application Login
+    if (currentAuthView === '/login/staff' || currentAuthView === '/app' || currentAuthView === '/staff') {
       return (
         <div className="relative">
           <div className="fixed top-4 left-4 z-50">
             <button
               onClick={() => setCurrentAuthView('/')}
-              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition"
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Public Homepage</span>
+            </button>
+          </div>
+          <StaffLogin onSwitchPortal={setCurrentAuthView} />
+        </div>
+      );
+    }
+
+    // App 3: Patient Portal Login
+    if (currentAuthView === '/login/patient' || currentAuthView === '/patient') {
+      return (
+        <div className="relative">
+          <div className="fixed top-4 left-4 z-50">
+            <button
+              onClick={() => setCurrentAuthView('/')}
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Public Homepage</span>
+            </button>
+          </div>
+          <PatientLogin onSwitchPortal={setCurrentAuthView} />
+        </div>
+      );
+    }
+
+    // App 4: Healthcare Coordination Network Login
+    if (currentAuthView === '/login/coordination' || currentAuthView === '/network' || currentAuthView === '/coordination') {
+      return (
+        <CoordinationLogin onSwitchPortal={setCurrentAuthView} />
+      );
+    }
+
+    // App 5: Platform Administration Console Login
+    if (currentAuthView === '/super-admin/login' || currentAuthView === '/admin' || currentAuthView === '/super-admin') {
+      return (
+        <div className="relative">
+          <div className="fixed top-4 left-4 z-50">
+            <button
+              onClick={() => setCurrentAuthView('/')}
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Public Homepage</span>
@@ -84,13 +143,19 @@ const MainPortalView: React.FC = () => {
       );
     }
 
+    // Legacy individual role login router (e.g. /login/doctor)
+    if (currentAuthView.startsWith('/login/')) {
+      const roleSlug = currentAuthView.replace('/login/', '');
+      return <RoleLoginView roleSlug={roleSlug} onNavigate={setCurrentAuthView} />;
+    }
+
     if (currentAuthView === '/register-hospital') {
       return (
         <div className="relative">
           <div className="fixed top-4 left-4 z-50">
             <button
               onClick={() => setCurrentAuthView('/')}
-              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition"
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700 shadow-md flex items-center space-x-1.5 transition cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Public Homepage</span>
@@ -144,7 +209,7 @@ const MainPortalView: React.FC = () => {
           </div>
           <button
             onClick={() => setActivePortal(primaryAuthorized)}
-            className="mt-6 px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-md transition"
+            className="mt-6 px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer"
           >
             Switch to Authorized Workspace ({primaryAuthorized})
           </button>
