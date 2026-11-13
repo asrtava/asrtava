@@ -14,13 +14,16 @@ import {
   QrCode,
   Check,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
 import { appointmentApi, billingApi } from '../../services/api';
 import { TelemedicineHub } from './TelemedicineHub';
+import { PatientAIChatbot } from '../../components/chat/PatientAIChatbot';
 
 interface PatientAppointment {
   id: string;
@@ -289,6 +292,28 @@ export const PatientDashboard: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {/* ASRTAVA AI Medical Concierge Banner */}
+            <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-cyan-950 text-white rounded-2xl p-5 shadow-sm border border-teal-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-400/40 flex items-center justify-center shrink-0">
+                  <Bot className="w-6 h-6 text-teal-300" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-bold text-sm tracking-wide">ASRTAVA AI Health Concierge</h3>
+                    <Badge variant="brand" size="sm">24/7 Available</Badge>
+                  </div>
+                  <p className="text-xs text-teal-100/80 mt-0.5">
+                    Describe your symptoms for triage, request prescription refills, or clear dues directly in chat.
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0 text-xs font-semibold text-teal-300 flex items-center space-x-1">
+                <Sparkles className="w-4 h-4 text-cyan-400" />
+                <span>Tap the widget below</span>
+              </div>
+            </div>
+
             {/* Upcoming Consultations */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -741,6 +766,9 @@ export const PatientDashboard: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* ASRTAVA Patient AI Concierge Chatbot Widget */}
+      <PatientAIChatbot />
     </div>
   );
 };

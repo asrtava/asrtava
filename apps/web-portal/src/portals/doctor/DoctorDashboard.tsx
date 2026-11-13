@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar,
   Clock,
@@ -28,12 +28,14 @@ import {
   ShieldCheck,
   Sparkles,
   Phone,
-  Layers
+  Layers,
+  AlertTriangle
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
 import { appointmentApi, clinicalApi, diagnosticsApi, inpatientApi, patientApi } from '../../services/api';
+import { CDSS } from '../../services/recommendationEngine';
 
 export interface PrescriptionItem {
   id: string;
@@ -99,6 +101,7 @@ export const DoctorDashboard: React.FC = () => {
   const { showToast } = useToast();
   const { user, activePortalTab, setActivePortalTab } = useAuth();
   const {
+    patients: hospitalPatients,
     appointments: hospitalAppointments,
     beds: hospitalBeds,
     addPrescription: hospitalAddPrescription,
@@ -145,6 +148,25 @@ export const DoctorDashboard: React.FC = () => {
   const [newRxFreq, setNewRxFreq] = useState('Once Daily (OD)');
   const [newRxDuration, setNewRxDuration] = useState('15 Days');
   const [newRxInstructions, setNewRxInstructions] = useState('After food');
+
+  // Clinical Decision Support System (CDSS) Recommendations
+  const cdssInteractions = useMemo(() => {
+    if (!newRxDrug || !activePatient) return [];
+    const existingMedNames = activePatient.prescriptions.map((p) => p.drugName);
+    return CDSS.checkDrugInteractions(existingMedNames, newRxDrug);
+  }, [newRxDrug, activePatient]);
+
+  const cdssAllergies = useMemo(() => {
+    if (!newRxDrug || !activePatient) return [];
+    const matchedHospitalPt = hospitalPatients.find((p) => p.uhid === activePatient.uhid);
+    const ptAllergies = matchedHospitalPt?.allergies ? matchedHospitalPt.allergies : [];
+    return CDSS.checkAllergies(ptAllergies, newRxDrug);
+  }, [newRxDrug, activePatient, hospitalPatients]);
+
+  const cdssPathway = useMemo(() => {
+    const diag = diagnosis || activePatient?.diagnosis;
+    return diag ? CDSS.getClinicalPathway(diag) : null;
+  }, [diagnosis, activePatient?.diagnosis]);
 
   const [isLabModalOpen, setIsLabModalOpen] = useState(false);
   const [selectedTests, setSelectedTests] = useState<string[]>(['12-Lead ECG']);
@@ -1108,6 +1130,29 @@ export const DoctorDashboard: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* CDSS Evidence-Based Clinical Pathway Recommendations */}
+                  {cdssPathway && (
+                    <div className="p-3.5 bg-teal-50/70 border border-teal-200 rounded-xl space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-teal-900 flex items-center space-x-1.5">
+                          <Sparkles className="w-4 h-4 text-teal-700" />
+                          <span>CDSS Recommended Clinical Pathway: {cdssPathway.diagnosis}</span>
+                        </span>
+                        <Badge variant="brand" size="sm">Evidence-Based</Badge>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] pt-1">
+                        <div className="bg-white p-2.5 rounded-lg border border-teal-100">
+                          <span className="font-bold text-teal-800 block mb-0.5">Recommended Diagnostics:</span>
+                          <p className="text-slate-600">{cdssPathway.recommendedLabs.concat(cdssPathway.recommendedRadiology).join(' · ')}</p>
+                        </div>
+                        <div className="bg-white p-2.5 rounded-lg border border-teal-100">
+                          <span className="font-bold text-teal-800 block mb-0.5">First-Line Pharmacotherapy:</span>
+                          <p className="text-slate-600">{cdssPathway.firstLineTherapies.join(' · ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Electronic Prescription Section */}
                   <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/40">
                     <div className="flex items-center justify-between mb-3">
@@ -1719,6 +1764,29 @@ export const DoctorDashboard: React.FC = () => {
                 )
               )}
             </div>
+
+            {/* CDSS Drug-Drug Interaction Alert Banner */}
+            {cdssInteractions.length > 0 && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 text-xs space-y-1 mt-2.5 animate-pulse">
+                <div className="font-bold flex items-center space-x-1.5 text-rose-800">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>CDSS Interaction Alert: {cdssInteractions[0].severity} Severity</span>
+                </div>
+                <p>{cdssInteractions[0].mechanism}</p>
+                <p className="font-semibold text-rose-950">Guidance: {cdssInteractions[0].recommendation}</p>
+              </div>
+            )}
+
+            {/* CDSS Drug-Allergy Alert Banner */}
+            {cdssAllergies.length > 0 && (
+              <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-950 text-xs space-y-1 mt-2.5">
+                <div className="font-bold flex items-center space-x-1.5 text-red-800">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <span>Patient Allergy Warning: {cdssAllergies[0].severity}</span>
+                </div>
+                <p>{cdssAllergies[0].recommendation}</p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

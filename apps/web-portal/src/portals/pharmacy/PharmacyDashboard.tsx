@@ -16,13 +16,15 @@ import {
   ArrowRightLeft,
   Truck,
   FileCheck,
-  ShieldAlert
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
 import { pharmacyApi } from '../../services/api';
 import { AdvancedPharmacyHub } from './AdvancedPharmacyHub';
+import { PharmacyIntelligence } from '../../services/recommendationEngine';
 
 interface RxItem {
   drug: string;
@@ -118,6 +120,20 @@ export const PharmacyDashboard: React.FC = () => {
       status: item.status
     }));
   }, [hospitalInventory]);
+
+  // Pharmacy Intelligence Inventory & Expiry Recommendations
+  const pharmacyRecommendations = useMemo(() => {
+    return inventory
+      .map((item) =>
+        PharmacyIntelligence.evaluateInventoryItem({
+          name: item.name,
+          currentStock: item.stock,
+          reorderLevel: 50,
+          expiryDate: item.exp
+        })
+      )
+      .filter((r) => r.status !== 'OPTIMAL');
+  }, [inventory]);
 
   // Dispense Modal State
   const [selectedRx, setSelectedRx] = useState<PendingRx | null>(null);
@@ -409,7 +425,38 @@ export const PharmacyDashboard: React.FC = () => {
 
       {/* Tab: Formulary Stock & Batches */}
       {activeTab === 'inventory' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="space-y-4">
+          {pharmacyRecommendations.length > 0 && (
+            <div className="p-3.5 bg-teal-50/70 border border-teal-200 rounded-xl text-xs space-y-2 text-teal-950 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center space-x-1.5 text-teal-900">
+                  <Sparkles className="w-4 h-4 text-teal-700" />
+                  <span>Pharmacy Supply Intelligence: {pharmacyRecommendations.length} Formulary Action(s) Required</span>
+                </span>
+                <Badge variant="brand" size="sm">Smart Optimization</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] pt-1">
+                {pharmacyRecommendations.slice(0, 4).map((rec, idx) => (
+                  <div key={idx} className="bg-white p-2.5 rounded-lg border border-teal-100 space-y-1 shadow-xs">
+                    <div className="flex justify-between items-center">
+                      <strong className="text-slate-900">{rec.medicineName}</strong>
+                      <Badge variant={rec.status === 'STOCKOUT_CRITICAL' ? 'danger' : 'warning'} size="sm">
+                        {rec.status === 'STOCKOUT_CRITICAL' ? 'Stockout Risk' : 'FEFO Expiry'}
+                      </Badge>
+                    </div>
+                    <p className="text-slate-600">{rec.recommendedAction}</p>
+                    {rec.suggestedGenericAlternative && (
+                      <div className="text-emerald-700 font-medium">
+                        Generic Bioequivalent: <strong>{rec.suggestedGenericAlternative}</strong>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-200">
               <tr>
@@ -465,6 +512,7 @@ export const PharmacyDashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 

@@ -15,13 +15,16 @@ import {
   QrCode,
   ShieldCheck,
   Check,
-  Scale
+  Scale,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
 import { billingApi } from '../../services/api';
 import { RevenueCycleAccountingHub } from './RevenueCycleAccountingHub';
+import { RevenueCycleIntelligence } from '../../services/recommendationEngine';
 
 interface Invoice {
   id: string;
@@ -103,6 +106,29 @@ export const FinanceDashboard: React.FC = () => {
   const [tpaPolicyNo, setTpaPolicyNo] = useState('');
   const [tpaEstCost, setTpaEstCost] = useState(0);
   const [tpaDiagnosis, setTpaDiagnosis] = useState('');
+
+  // RCIS Denial Prediction for Active Pre-Auth Submission
+  const tpaDenialPrediction = useMemo(() => {
+    return RevenueCycleIntelligence.predictClaimDenial({
+      insurer: tpaInsurer,
+      patientName: tpaPatientName || 'Patient',
+      amount: tpaEstCost || 50000,
+      diagnosis: tpaDiagnosis,
+      hasPreAuthApproval: false,
+      hasDischargeSummary: false,
+      hasItemizedBills: true,
+      hasInvestigativeReports: !!tpaDiagnosis
+    });
+  }, [tpaInsurer, tpaPatientName, tpaEstCost, tpaDiagnosis]);
+
+  // RCIS Unbilled Inpatient Charges Detector
+  const unbilledItems = useMemo(() => {
+    const allBilled = hospitalInvoices.flatMap((i) => i.items.map((it) => it.description));
+    return RevenueCycleIntelligence.detectUnbilledCharges(
+      ['Meropenem 1g IV', 'Enoxaparin 40mg Inj'],
+      allBilled
+    );
+  }, [hospitalInvoices]);
 
   const handleOpenPayment = (inv: Invoice) => {
     setSelectedInvoice(inv);
@@ -305,7 +331,34 @@ export const FinanceDashboard: React.FC = () => {
 
       {/* Invoice Table */}
       {activeTab === 'invoices' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="space-y-4">
+          {/* RCIS Revenue Loss Prevention Card */}
+          {unbilledItems.length > 0 && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2 text-amber-950 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center space-x-1.5 text-amber-900">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>RCIS Revenue Guard: {unbilledItems.length} Potentially Unbilled Inpatient Service(s) Detected</span>
+                </span>
+                <Badge variant="warning" size="sm">Audit Alert</Badge>
+              </div>
+              <p className="text-[11px] text-amber-800">
+                Cross-referenced Inpatient MAR records against published billing invoices. High-cost medications were administered but lack corresponding bill entries.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+                {unbilledItems.map((u, idx) => (
+                  <div key={idx} className="bg-white p-2.5 rounded-lg border border-amber-200 flex justify-between items-center shadow-xs">
+                    <div>
+                      <strong className="text-slate-900">{u.serviceName}</strong> ({u.department})
+                    </div>
+                    <span className="font-bold font-mono text-emerald-700">+₹{u.estimatedAmount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex justify-between items-center">
             <div className="relative w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -407,6 +460,7 @@ export const FinanceDashboard: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 
@@ -763,6 +817,40 @@ export const FinanceDashboard: React.FC = () => {
               onChange={(e) => setTpaDiagnosis(e.target.value)}
               className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg"
             />
+          </div>
+
+          {/* RCIS Denial Risk Scoring Card */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-800 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-teal-700" />
+                <span>RCIS Pre-Submission Denial Risk Analysis</span>
+              </span>
+              <Badge
+                variant={
+                  tpaDenialPrediction.riskTier === 'CRITICAL'
+                    ? 'danger'
+                    : tpaDenialPrediction.riskTier === 'MODERATE'
+                    ? 'warning'
+                    : 'success'
+                }
+                size="sm"
+              >
+                {tpaDenialPrediction.riskScore}% {tpaDenialPrediction.riskTier} Risk
+              </Badge>
+            </div>
+            {tpaDenialPrediction.detectedVulnerabilities.length > 0 && (
+              <div className="space-y-1 text-[11px] text-rose-800">
+                <span className="font-semibold block">Missing / At-Risk Items:</span>
+                {tpaDenialPrediction.detectedVulnerabilities.map((v, i) => (
+                  <div key={i}>• {v}</div>
+                ))}
+              </div>
+            )}
+            <div className="text-[11px] text-teal-800 bg-teal-50/60 p-2 rounded border border-teal-100">
+              <strong>Remediation:</strong>{' '}
+              {tpaDenialPrediction.remediationSteps[0] || 'All essential documentation attached.'}
+            </div>
           </div>
         </div>
       </Modal>

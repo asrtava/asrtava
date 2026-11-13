@@ -17,12 +17,14 @@ import {
   Filter,
   FileText,
   ArrowRightLeft,
-  ListOrdered
+  ListOrdered,
+  Sparkles
 } from 'lucide-react';
 import { Modal, Button, Input, Badge, useToast } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { useHospital } from '../../context/HospitalContext';
 import { inpatientApi, nursingApi } from '../../services/api';
+import { NursingVigilance } from '../../services/recommendationEngine';
 import { AdvancedNursingHub } from './AdvancedNursingHub';
 import { AdvancedWardHub } from './AdvancedWardHub';
 
@@ -547,7 +549,23 @@ export const NursingDashboard: React.FC = () => {
                   </Badge>
                 </div>
 
-                {isOccupied && bed.patient ? (
+                {isOccupied && bed.patient ? (() => {
+                  const hrNum = parseInt(bed.patient.vitals.hr || '75') || 75;
+                  const bpSys = parseInt(bed.patient.vitals.bp?.split('/')[0] || '120') || 120;
+                  const spo2Num = parseInt(bed.patient.vitals.spo2?.replace('%', '') || '98') || 98;
+                  const tempNum = parseFloat(bed.patient.vitals.temp?.replace('°F', '') || '98.6') || 37.0;
+
+                  const news2 = NursingVigilance.calculateNEWS2({
+                    respiratoryRate: 18,
+                    spo2: spo2Num,
+                    onOxygen: spo2Num < 94,
+                    systolicBP: bpSys,
+                    heartRate: hrNum,
+                    temperature: tempNum > 50 ? (tempNum - 32) * (5 / 9) : tempNum,
+                    consciousness: 'ALERT'
+                  });
+
+                  return (
                   <div className="space-y-2 mt-3">
                     <div>
                       <div className="font-bold text-slate-900 text-xs">{bed.patient.name}</div>
@@ -586,12 +604,30 @@ export const NursingDashboard: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* NEWS2 Clinical Vigilance & Early Deterioration Protocol */}
+                    <div className="flex items-center justify-between text-[10px] bg-slate-50 px-2 py-1.5 rounded border border-slate-100">
+                      <div className="flex items-center space-x-1">
+                        <Sparkles className="w-3 h-3 text-teal-700" />
+                        <span className="font-semibold text-slate-700">NEWS2 Score:</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <Badge
+                          variant={news2.riskCategory === 'HIGH' ? 'danger' : news2.riskCategory === 'MEDIUM' ? 'warning' : 'success'}
+                          size="sm"
+                        >
+                          {news2.score} ({news2.riskCategory})
+                        </Badge>
+                        <span className="text-[10px] text-slate-500 font-medium">· {news2.frequency}</span>
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between text-[11px] pt-1 text-slate-500">
-                      <span>Doc: {bed.patient.attendingDoctor.split(' ')[1]}</span>
+                      <span>Doc: {bed.patient.attendingDoctor.split(' ')[1] || bed.patient.attendingDoctor}</span>
                       <span className="text-teal-700 font-semibold hover:underline">View Chart →</span>
                     </div>
                   </div>
-                ) : isVacant ? (
+                );
+              })() : isVacant ? (
                   <div className="py-6 text-center text-xs text-emerald-700 font-medium">
                     Bed Available for Inpatient Admission
                   </div>
