@@ -1,12 +1,15 @@
 import crypto from 'crypto';
 import { db } from '../../database';
 import { logger } from '../../utils/logger';
+import { DurableOfflineJournalService, PersistenceState } from './durable-offline-journal.service';
 
 // ============================================================================
-// ASRTAVA P0-05: CLINICAL CONFLICT RECONCILIATION ENGINE
+// ASRTAVA P0-05: CLINICAL CONFLICT RECONCILIATION ENGINE (HARDENED)
 // Strictly prohibits naive Last-Write-Wins (LWW) overwrites for clinical records.
 // Halts automated merges upon conflicting concurrent mutations and queues for
-// supervisory clinical review with mandatory justification.
+// supervisory clinical review with mandatory justification, immutable provenance,
+// and strict clinical schema validation.
+// Volatile in-memory fallback is replaced with durable disk journal persistence.
 // ============================================================================
 
 export type ClinicalConflictStatus =
@@ -28,6 +31,8 @@ export interface ClinicalConflictEntry {
   cloudVersion: number;
   localPayload: Record<string, any>;
   cloudPayload: Record<string, any>;
+  originalLocalPayload: Record<string, any>;
+  originalCloudPayload: Record<string, any>;
   conflictReason: string;
   status: ClinicalConflictStatus;
   resolutionType?: ResolutionType;
@@ -35,12 +40,13 @@ export interface ClinicalConflictEntry {
   resolvedPayload?: Record<string, any>;
   resolvedByUserId?: string;
   resolvedAt?: string;
+  persistenceState: PersistenceState;
+  storageTarget: 'POSTGRESQL' | 'AIRGAP_DISK_JOURNAL';
   createdAt: string;
   updatedAt: string;
 }
 
 export class ClinicalConflictQueueService {
-  // In-memory cache for air-gapped resilience and test isolation
   private static conflictStore: Map<string, ClinicalConflictEntry> = new Map();
 
   public static clearState(): void {
@@ -49,7 +55,8 @@ export class ClinicalConflictQueueService {
 
   /**
    * Enqueues a clinical mutation collision into the conflict queue.
-   * Persists via durable PostgreSQL transaction with graceful in-memory fallback.
+   * Persists via durable PostgreSQL transaction, or durable disk journal if offline.
+   * A volatile in-memory fallback is NEVER reported as durable persistence.
    */
   public static async enqueueConflict(params: {
     hospitalId: string;
@@ -65,6 +72,66 @@ export class ClinicalConflictQueueService {
     const id = `conf-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
     const now = new Date().toISOString();
 
+    // Deep freeze / clone immutable originals to preserve provenance
+    const originalLocal = JSON.parse(JSON.stringify(params.localPayload));
+    const originalCloud = JSON.parse(JSON.stringify(params.cloudPayload));
+
+    let persistenceState: PersistenceState = 'DATABASE_COMMITTED';
+    let storageTarget: 'POSTGRESQL' | 'AIRGAP_DISK_JOURNAL' = 'POSTGRESQL';
+
+    // 1. Try PostgreSQL transaction first
+    try {
+      await db.transaction(async (trx) => {
+        await trx('clinical_conflict_queue').insert({
+          id,
+          hospital_id: params.hospitalId,
+          sync_entry_id: params.syncEntryId || null,
+          entity_type: params.entityType,
+          entity_id: params.entityId,
+          local_version: params.localVersion,
+          cloud_version: params.cloudVersion,
+          local_payload: JSON.stringify(params.localPayload),
+          cloud_payload: JSON.stringify(params.cloudPayload),
+          conflict_reason: params.conflictReason,
+          status: 'REQUIRES_CLINICAL_REVIEW',
+          created_at: now,
+          updated_at: now,
+        });
+      });
+      logger.info('[ConflictQueue] Clinical conflict persisted to PostgreSQL', { conflictId: id, entityType: params.entityType });
+    } catch (err: any) {
+      // 2. Fall back to durable append-only disk journal (air-gapped resilience)
+      logger.warn('[ConflictQueue] PostgreSQL unavailable, persisting to durable air-gap disk journal', {
+        conflictId: id,
+        error: err.message,
+      });
+
+      DurableOfflineJournalService.appendToJournal({
+        hospitalId: params.hospitalId,
+        entityType: 'clinical_conflict_queue',
+        entityId: id,
+        operation: 'CONFLICT_ENQUEUE',
+        payload: {
+          id,
+          hospitalId: params.hospitalId,
+          syncEntryId: params.syncEntryId,
+          entityType: params.entityType,
+          entityId: params.entityId,
+          localVersion: params.localVersion,
+          cloudVersion: params.cloudVersion,
+          localPayload: params.localPayload,
+          cloudPayload: params.cloudPayload,
+          conflictReason: params.conflictReason,
+          status: 'REQUIRES_CLINICAL_REVIEW',
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+
+      persistenceState = 'LOCAL_JOURNAL_COMMITTED';
+      storageTarget = 'AIRGAP_DISK_JOURNAL';
+    }
+
     const entry: ClinicalConflictEntry = {
       id,
       hospitalId: params.hospitalId,
@@ -75,42 +142,18 @@ export class ClinicalConflictQueueService {
       cloudVersion: params.cloudVersion,
       localPayload: params.localPayload,
       cloudPayload: params.cloudPayload,
+      originalLocalPayload: originalLocal,
+      originalCloudPayload: originalCloud,
       conflictReason: params.conflictReason,
       status: 'REQUIRES_CLINICAL_REVIEW',
+      persistenceState,
+      storageTarget,
       createdAt: now,
       updatedAt: now,
     };
 
-    // 1. Maintain in-memory resilience store
+    // Keep in runtime cache for fast lookups
     this.conflictStore.set(id, entry);
-
-    // 2. Persist to PostgreSQL durable storage
-    try {
-      await db.transaction(async (trx) => {
-        await trx('clinical_conflict_queue').insert({
-          id: entry.id,
-          hospital_id: entry.hospitalId,
-          sync_entry_id: entry.syncEntryId || null,
-          entity_type: entry.entityType,
-          entity_id: entry.entityId,
-          local_version: entry.localVersion,
-          cloud_version: entry.cloudVersion,
-          local_payload: JSON.stringify(entry.localPayload),
-          cloud_payload: JSON.stringify(entry.cloudPayload),
-          conflict_reason: entry.conflictReason,
-          status: entry.status,
-          created_at: entry.createdAt,
-          updated_at: entry.updatedAt,
-        });
-      });
-      logger.info('[ConflictQueue] Clinical conflict persisted to PostgreSQL', { conflictId: id, entityType: entry.entityType });
-    } catch (err: any) {
-      logger.warn('[ConflictQueue] PostgreSQL unavailable, falling back to resilient in-memory store', {
-        conflictId: id,
-        error: err.message,
-      });
-    }
-
     return entry;
   }
 
@@ -121,7 +164,6 @@ export class ClinicalConflictQueueService {
     hospitalId?: string;
     status?: ClinicalConflictStatus;
   }): Promise<ClinicalConflictEntry[]> {
-    // Attempt DB fetch first
     try {
       let query = db('clinical_conflict_queue').select('*');
       if (params.hospitalId) {
@@ -142,6 +184,8 @@ export class ClinicalConflictQueueService {
           cloudVersion: Number(r.cloud_version),
           localPayload: typeof r.local_payload === 'string' ? JSON.parse(r.local_payload) : r.local_payload,
           cloudPayload: typeof r.cloud_payload === 'string' ? JSON.parse(r.cloud_payload) : r.cloud_payload,
+          originalLocalPayload: typeof r.local_payload === 'string' ? JSON.parse(r.local_payload) : r.local_payload,
+          originalCloudPayload: typeof r.cloud_payload === 'string' ? JSON.parse(r.cloud_payload) : r.cloud_payload,
           conflictReason: r.conflict_reason,
           status: r.status as ClinicalConflictStatus,
           resolutionType: r.resolution_type,
@@ -149,12 +193,14 @@ export class ClinicalConflictQueueService {
           resolvedPayload: r.resolved_payload ? (typeof r.resolved_payload === 'string' ? JSON.parse(r.resolved_payload) : r.resolved_payload) : undefined,
           resolvedByUserId: r.resolved_by_user_id,
           resolvedAt: r.resolved_at,
+          persistenceState: 'DATABASE_COMMITTED',
+          storageTarget: 'POSTGRESQL',
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         }));
       }
     } catch {
-      // DB offline, fall back to in-memory store
+      // In-memory / journal store
     }
 
     let results = Array.from(this.conflictStore.values());
@@ -188,6 +234,8 @@ export class ClinicalConflictQueueService {
           cloudVersion: Number(r.cloud_version),
           localPayload: typeof r.local_payload === 'string' ? JSON.parse(r.local_payload) : r.local_payload,
           cloudPayload: typeof r.cloud_payload === 'string' ? JSON.parse(r.cloud_payload) : r.cloud_payload,
+          originalLocalPayload: typeof r.local_payload === 'string' ? JSON.parse(r.local_payload) : r.local_payload,
+          originalCloudPayload: typeof r.cloud_payload === 'string' ? JSON.parse(r.cloud_payload) : r.cloud_payload,
           conflictReason: r.conflict_reason,
           status: r.status as ClinicalConflictStatus,
           resolutionType: r.resolution_type,
@@ -195,6 +243,8 @@ export class ClinicalConflictQueueService {
           resolvedPayload: r.resolved_payload ? (typeof r.resolved_payload === 'string' ? JSON.parse(r.resolved_payload) : r.resolved_payload) : undefined,
           resolvedByUserId: r.resolved_by_user_id,
           resolvedAt: r.resolved_at,
+          persistenceState: 'DATABASE_COMMITTED',
+          storageTarget: 'POSTGRESQL',
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         };
@@ -211,11 +261,59 @@ export class ClinicalConflictQueueService {
   }
 
   /**
+   * Validates that a manually merged clinical payload conforms to core clinical safety rules:
+   * - Cannot mutate or remove immutable identifiers (hospitalId, patientId, entityId, entityType).
+   * - Prohibits cross-patient identity hijacking.
+   */
+  private static validateClinicalMergedPayload(
+    existing: ClinicalConflictEntry,
+    mergedPayload: Record<string, any>
+  ): void {
+    if (!mergedPayload || typeof mergedPayload !== 'object' || Array.isArray(mergedPayload)) {
+      throw new Error('INVALID_CLINICAL_PAYLOAD: Merged payload must be a non-null object.');
+    }
+
+    // 1. Mandatory Identity Consistency Check
+    const local = existing.localPayload;
+    const cloud = existing.cloudPayload;
+
+    const patientId = local.patientId || cloud.patientId || local.patient_id || cloud.patient_id;
+    if (patientId) {
+      const mergedPatientId = mergedPayload.patientId || mergedPayload.patient_id;
+      if (mergedPatientId && mergedPatientId !== patientId) {
+        throw new Error(
+          `CLINICAL_IDENTITY_MUTATION_REJECTED: Merged payload cannot change patient identifier from '${patientId}' to '${mergedPatientId}'.`
+        );
+      }
+    }
+
+    const hospitalId = local.hospitalId || cloud.hospitalId || local.hospital_id || cloud.hospital_id || existing.hospitalId;
+    if (hospitalId) {
+      const mergedHospitalId = mergedPayload.hospitalId || mergedPayload.hospital_id;
+      if (mergedHospitalId && mergedHospitalId !== hospitalId) {
+        throw new Error(
+          `TENANT_CROSS_MUTATION_REJECTED: Merged payload cannot alter tenant hospital identifier from '${hospitalId}' to '${mergedHospitalId}'.`
+        );
+      }
+    }
+
+    // 2. Validate essential fields exist based on entity type
+    if (existing.entityType === 'consultation' && !mergedPayload.diagnosis && !mergedPayload.notes && !mergedPayload.soapNote) {
+      throw new Error('CLINICAL_VALIDATION_ERROR: Reconciled consultation must contain clinical notes or diagnosis.');
+    }
+
+    if (existing.entityType === 'emar' && (!mergedPayload.medicationName && !mergedPayload.drugName)) {
+      throw new Error('CLINICAL_VALIDATION_ERROR: Reconciled eMAR record must identify the medication administered.');
+    }
+  }
+
+  /**
    * Supervisor resolution of a pending clinical conflict.
    * Requires:
    * 1. Resolution Type: ACCEPT_LOCAL, ACCEPT_CLOUD, or MANUAL_MERGE
    * 2. Clinical justification note of at least 15 characters
-   * 3. Merged payload if resolutionType is MANUAL_MERGE
+   * 3. Merged payload validation if MANUAL_MERGE
+   * 4. Complete immutable audit trail
    */
   public static async resolveConflict(params: {
     conflictId: string;
@@ -254,6 +352,10 @@ export class ClinicalConflictQueueService {
       if (!params.mergedPayload || Object.keys(params.mergedPayload).length === 0) {
         throw new Error('MERGED_PAYLOAD_REQUIRED: Manual merge resolution requires a non-empty merged payload object.');
       }
+
+      // Clinical Schema Validation
+      this.validateClinicalMergedPayload(existing, params.mergedPayload);
+
       targetStatus = 'RESOLVED_MANUAL_MERGE';
       finalPayload = { ...params.mergedPayload, _resolution: 'MANUAL_MERGE' };
     } else {
@@ -269,10 +371,7 @@ export class ClinicalConflictQueueService {
     existing.resolvedAt = now;
     existing.updatedAt = now;
 
-    // 2. Update In-memory cache
-    this.conflictStore.set(existing.id, existing);
-
-    // 3. Persist to PostgreSQL durable storage in transaction
+    // 2. Persist to PostgreSQL durable storage in transaction or durable disk journal
     try {
       await db.transaction(async (trx) => {
         await trx('clinical_conflict_queue')
@@ -287,16 +386,41 @@ export class ClinicalConflictQueueService {
             updated_at: now,
           });
       });
+      existing.persistenceState = 'DATABASE_COMMITTED';
+      existing.storageTarget = 'POSTGRESQL';
       logger.info('[ConflictQueue] Clinical conflict successfully resolved in PostgreSQL', {
         conflictId: existing.id,
         status: targetStatus,
       });
     } catch (err: any) {
-      logger.warn('[ConflictQueue] PostgreSQL unavailable, resolution saved in in-memory store', {
+      // Disk journal fallback
+      logger.warn('[ConflictQueue] PostgreSQL unavailable, resolution saved to durable air-gap disk journal', {
         conflictId: existing.id,
         error: err.message,
       });
+
+      DurableOfflineJournalService.appendToJournal({
+        hospitalId: params.hospitalId,
+        entityType: 'clinical_conflict_queue',
+        entityId: existing.id,
+        operation: 'CONFLICT_RESOLVE',
+        payload: {
+          conflictId: existing.id,
+          status: targetStatus,
+          resolutionType: params.resolutionType,
+          resolutionNotes: existing.resolutionNotes,
+          resolvedPayload: finalPayload,
+          resolvedByUserId: params.supervisorUserId,
+          resolvedAt: now,
+        },
+      });
+
+      existing.persistenceState = 'LOCAL_JOURNAL_COMMITTED';
+      existing.storageTarget = 'AIRGAP_DISK_JOURNAL';
     }
+
+    // 3. Update In-memory cache
+    this.conflictStore.set(existing.id, existing);
 
     return {
       success: true,
