@@ -20,7 +20,7 @@ services:
     region: oregon
     rootDir: .
     buildCommand: npm --prefix backend install --production=false && npm --prefix backend run build
-    startCommand: npm --prefix backend start
+    startCommand: node scripts/migrate_neon.js && node scripts/seed_permissions.js && node scripts/seed_neon.js && npm --prefix backend start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
