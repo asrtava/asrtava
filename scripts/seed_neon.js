@@ -1,6 +1,25 @@
-require('dotenv').config();
-const { Client } = require('pg');
-const bcrypt = require('bcryptjs');
+const path = require('path');
+
+function loadModule(name) {
+  try {
+    return require(name);
+  } catch (e1) {
+    try {
+      return require(path.join(__dirname, '..', 'backend', 'node_modules', name));
+    } catch (e2) {
+      return require(path.join(process.cwd(), 'backend', 'node_modules', name));
+    }
+  }
+}
+
+try {
+  loadModule('dotenv').config();
+} catch (e) {
+  // In production (e.g. Render), environment variables are already set in process.env
+}
+
+const { Client } = loadModule('pg');
+const bcrypt = loadModule('bcryptjs');
 
 const connectionString = process.env.DATABASE_URL;
 
