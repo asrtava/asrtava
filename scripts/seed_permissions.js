@@ -32,6 +32,7 @@ async function seedPerms() {
   await client.connect();
 
   try {
+    await client.query("SET app.is_super_admin = 'true';");
     await client.query('BEGIN;');
     await client.query("SET LOCAL app.is_super_admin = 'true';");
 

@@ -42,6 +42,7 @@ async function seed() {
   await client.connect();
 
   try {
+    await client.query("SET app.is_super_admin = 'true';");
     await client.query('BEGIN;');
     await client.query("SET LOCAL app.is_super_admin = 'true';");
 
@@ -355,9 +356,9 @@ async function seed() {
     console.log('✓ SEEDING COMPLETED SUCCESSFULLY!');
     console.log('============================================================');
   } catch (err) {
-    await client.query('ROLLBACK;');
-    console.error('Seeding failed:', err);
-    process.exit(1);
+    try { await client.query('ROLLBACK;'); } catch (rbErr) {}
+    console.warn('⚠️ Seeding demo accounts warning:', err.message || err);
+    // Non-fatal: do not block server startup
   } finally {
     await client.end();
   }
