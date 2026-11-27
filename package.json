@@ -12,7 +12,12 @@
     "dev:portal": "npm --prefix apps/web-portal run dev",
     "dev:website": "npm --prefix apps/public-website run dev",
     "dev:mobile": "npm --prefix apps/patient-mobile start",
-    "build:all": "npm --prefix backend run build && npm --prefix apps/web-portal run build"
+    "build:backend": "npm --prefix backend run build",
+    "build:portal": "npm --prefix apps/web-portal run build",
+    "build:all": "npm --prefix backend run build && npm --prefix apps/web-portal run build",
+    "start:backend": "npm --prefix backend start",
+    "db:migrate": "node scripts/migrate_neon.js",
+    "db:seed": "node scripts/seed_neon.js && node scripts/seed_permissions.js"
   }
 }
 
