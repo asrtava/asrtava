@@ -19,7 +19,7 @@ services:
     plan: free # Can upgrade to 'starter' for 24/7 always-on service
     region: oregon
     rootDir: .
-    buildCommand: npm --prefix backend install && npm --prefix backend run build
+    buildCommand: npm --prefix backend install --production=false && npm --prefix backend run build
     startCommand: npm --prefix backend start
     healthCheckPath: /health
     autoDeploy: true

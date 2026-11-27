@@ -19,6 +19,9 @@ export interface AuthenticatedUser {
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser;
   hospitalId?: string | null;
+  body: any;
+  params: any;
+  query: any;
 }
 
 /**
