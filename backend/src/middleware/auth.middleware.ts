@@ -11,6 +11,9 @@ export interface AuthenticatedUser {
   roles: string[];
   activePortal?: string;
   sessionId?: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
 }
 
 export interface AuthenticatedRequest extends Request {
