@@ -33,6 +33,7 @@ async function seedPerms() {
 
   try {
     await client.query('BEGIN;');
+    await client.query("SET LOCAL app.is_super_admin = 'true';");
 
     // 1. Insert permissions catalog
     const permissions = [

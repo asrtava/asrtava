@@ -43,6 +43,7 @@ async function seed() {
 
   try {
     await client.query('BEGIN;');
+    await client.query("SET LOCAL app.is_super_admin = 'true';");
 
     // 1. Ensure Standard Roles exist
     const roles = [
