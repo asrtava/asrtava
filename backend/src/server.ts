@@ -75,6 +75,20 @@ app.use((req, _res, next) => {
   next();
 });
 
+// Root Landing Route
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'ASRTAVA Healthcare Technology Platform API',
+    status: 'online',
+    version: '1.0.0',
+    documentation: '/api/v1/openapi.json',
+    healthCheck: '/health',
+    readiness: '/ready',
+    metrics: '/metrics',
+    ecosystem: 'Multi-Tenant Paperless Hospital Management System',
+  });
+});
+
 // Health & Liveness Probe
 app.get('/health', (_req, res) => {
   res.json({
